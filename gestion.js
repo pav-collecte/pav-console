@@ -82,13 +82,18 @@
     });
     $("g-pipeline").innerHTML = lignes.length ? '<table class="dns"><tr><th style="text-align:left">Commune</th><th style="text-align:left">Statut</th><th style="text-align:left">Prochaine action</th></tr>' + lignes.join("") + '</table>' : "Aucune commune.";
   }
+  function dessinerPotentiel(com) {
+    var pt = gPotentiel(com), el = $("g-potentiel");
+    if (!el) { el = document.createElement("div"); el.id = "g-potentiel"; $("g-contrat").insertAdjacentElement("afterend", el); }
+    el.innerHTML = '<div style="margin-top:8px;padding:8px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px;font-size:15px">Potentiel : <b>' + (pt.points || "?") + ' point(s)</b>' + (pt.estime ? ' <span class="petit">(estimé : ' + gEsc(pt.base) + ')</span>' : ' <span class="petit">(' + gEsc(pt.base) + ')</span>')
+      + (pt.tarif && pt.points ? ' · <b>' + gEuros(pt.points * pt.tarif) + ' HT/an</b> <span class="petit">à ' + gEuros(pt.tarif) + '/point</span>' : ' · <span class="petit">montant : renseignez « tarif_point_defaut » (onglet Factures) ou le tarif de la commune</span>') + '</div>';
+  }
+  var G_AUTO_FAIT = {};
   function dessinerFiche() {
     var com = $("g-commune").value; if (!com) { $("g-fiche").innerHTML = ""; return; }
     var c = gClient(com), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     $("g-contrat").innerHTML = "Contrat (onglet Communes) : tarif par point <b>" + (ct.tarif_point ? gEuros(ct.tarif_point) : "non renseigné") + "</b> · anniversaire <b>" + (gDateFR(ct.anniversaire) || "non renseigné") + "</b> · initialisation " + (ct.cloture_initialisation ? "clôturée le <b>" + gDateFR(ct.cloture_initialisation) + "</b>" : "<b>en cours</b>") + (ct.etat ? " · état : " + gEsc(ct.etat) : "");
-    var pt = gPotentiel(com);
-    $("g-contrat").innerHTML += '<div style="margin-top:8px;padding:8px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px;font-size:15px">Potentiel : <b>' + (pt.points || "?") + ' point(s)</b>' + (pt.estime ? ' <span class="petit">(estimé : ' + gEsc(pt.base) + ')</span>' : ' <span class="petit">(' + gEsc(pt.base) + ')</span>')
-      + (pt.tarif && pt.points ? ' · <b>' + gEuros(pt.points * pt.tarif) + ' HT/an</b> <span class="petit">à ' + gEuros(pt.tarif) + '/point</span>' : ' · <span class="petit">montant : renseignez « tarif_point_defaut » (onglet Factures) ou le tarif de la commune</span>') + '</div>';
+    dessinerPotentiel(com);
     $("g-fiche").innerHTML = gChamp("gf-statut", "Statut de la relation", c.statut || "prospect", null, G_STATUTS)
       + gChamp("gf-nom", "Nom officiel (facturation)", c.nom_officiel, "text", null, "ex. Mairie d'Andancette")
       + gChamp("gf-siret", "SIRET de la mairie", c.siret)
@@ -103,6 +108,8 @@
       + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
     dessinerInfos(c);
     dessinerContacts(); dessinerEchanges();
+    // Fiche sans infos publiques : recherche lancée d'elle-même (une fois par commune et par session).
+    if (!c.infos_maj && !(G_AUTO && G_AUTO.infos_maj) && !G_AUTO_FAIT[com]) { G_AUTO_FAIT[com] = 1; rechercherInfos(true); }
   }
   /* Infos publiques de la commune : geo.api.gouv.fr (INSEE, habitants, intercommunalité),
      Annuaire de l'administration (téléphone, e-mail, site, adresse, horaires de la mairie),
@@ -138,7 +145,7 @@
       return j + " " + [c1, c2].filter(Boolean).join(", ");
     }).join(" ; ");
   }
-  function rechercherInfos() {
+  function rechercherInfos(auto) {
     var com = $("g-commune").value; if (!com) return;
     var nom = (gCommunes().filter(function (c) { return c[0] === com; })[0] || [com, com])[1];
     var c = gClient(com), cp = gVal("gf-cp");
@@ -148,6 +155,7 @@
       var g = c.code_insee ? l.filter(function (x) { return x.code === c.code_insee; })[0] : null;
       if (!g && cp) g = l.filter(function (x) { return (x.codesPostaux || []).indexOf(cp) >= 0; })[0];
       if (!g && l.length > 1 && l[1].nom.toLowerCase() === l[0].nom.toLowerCase()) {
+        if (auto) throw new Error("Plusieurs communes portent ce nom : cliquez « Rechercher automatiquement » pour choisir la bonne.");
         var choix = prompt("Plusieurs communes portent ce nom. Indiquez le numéro de la bonne :\n" + l.filter(function (x) { return x.nom.toLowerCase() === l[0].nom.toLowerCase(); }).map(function (x, i) { return (i + 1) + ". " + x.nom + " (" + x.codeDepartement + ") — " + (x.population || "?") + " hab."; }).join("\n"), "1");
         if (!choix) throw new Error("Recherche annulée.");
         g = l[Number(choix) - 1];
@@ -196,7 +204,8 @@
       if (a._ville && vide("gf-ville")) $("gf-ville").value = a._ville;
       if (a.email_mairie && vide("gf-email")) { $("gf-email").value = a.email_mairie; faits.push("e-mail de facturation"); }
       delete a._siret; delete a._adresse; delete a._cp; delete a._ville;
-      G_AUTO = a; dessinerInfos(gClient(com));
+      if ($("g-commune").value !== com) return;
+      G_AUTO = a; dessinerInfos(gClient(com)); dessinerPotentiel(com);
       msg("msg-fiche", "Infos publiques trouvées" + (faits.length ? " ; complété : " + faits.join(", ") : "") + ". Vérifiez puis « Enregistrer la fiche ».", "ok");
     }).catch(function (e) { msg("msg-fiche", e.message, "ko"); });
   }
@@ -453,7 +462,7 @@
 
   /* ——— Potentiel d'une commune : points connus (Referentiel) ou estimés (habitants), × tarif ——— */
   function gPotentiel(com) {
-    var c = gClient(com), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
+    var c = Object.assign({}, gClient(com), (G_AUTO && $("g-commune").value === com) ? G_AUTO : {}), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     var connus = (Number(c.nb_points) || 0) + (Number(c.nb_points_a_verifier) || 0);
     var hpp = Number(String(gReglage("habitants_par_point")).replace(",", ".")) || 300;
     var tarif = Number(String(ct.tarif_point || gReglage("tarif_point_defaut") || "").replace(",", ".")) || 0;
@@ -549,6 +558,7 @@
         var c = x.c, s = suivie(c), pos = [c.centre.coordinates[1], c.centre.coordinates[0]];
         var r = Math.max(5, Math.min(16, 3 + Math.sqrt(c.population || 0) / 9));
         var m = L.circleMarker(pos, { radius: r, color: s.statut === "aucun" ? "#7d857e" : "#fff", weight: s.statut === "aucun" ? 1 : 2, fillColor: G_COULEURS[s.statut] || G_COULEURS.aucun, fillOpacity: s.statut === "aucun" ? 0.45 : 0.95 }).addTo(GK.couche);
+        m.on("mouseover", function () { this.openPopup(); });
         var hpp = Number(gReglage("habitants_par_point")) || 300, tarif = Number(String(gReglage("tarif_point_defaut")).replace(",", ".")) || 0;
         var pts = s.client && (Number(s.client.nb_points) || 0) ? Number(s.client.nb_points) : Math.max(1, Math.ceil((c.population || 0) / hpp));
         m.bindPopup('<b>' + gEsc(c.nom) + '</b> (' + gEsc(c.codeDepartement) + ')<br>' + (c.population || 0).toLocaleString("fr-FR") + ' habitants · ' + x.d.toFixed(1) + ' km'
