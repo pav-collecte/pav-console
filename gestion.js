@@ -21,6 +21,8 @@
       if (!G_CHARGE) chargerGestion(); else if (b.dataset.onglet === "carte") ouvrirCarteProspects(); else if (b.dataset.onglet === "agenda") dessinerAgenda();
     });
   });
+  // Smartphone : la barre d'onglets défile, l'onglet choisi est ramené au centre.
+  nav.addEventListener("click", function (e) { var b = e.target.closest("button"); if (b && b.scrollIntoView) b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); });
   /* — Clients (CRM) et facturation : fiches, contacts, échanges, émetteur, devis, factures.
      Données dans le classeur commun (onglets créés par n8n au premier chargement). — */
   var G = null, G_CHARGE = false, G_DOC = null;
