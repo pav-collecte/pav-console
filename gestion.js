@@ -106,7 +106,7 @@
       + gChamp("gf-date", "Date du contrat", c.date_contrat, "date")
       + gChamp("gf-notes", "Notes", c.notes, "zone")
       + htmlConditions(c)
-      + ((G.communes || []).some(function (x) { return x.commune === com; }) ? '<p class="petit" style="margin-top:10px">✓ Commune déployée (application et météo en place).</p>' : '<button class="second" type="button" id="gf-deployer" style="margin-top:12px;width:100%">Lancer le déploiement de la commune</button><p class="petit">Ouvre l\'onglet « Créer » pré-rempli avec cette commune (recherche INSEE et mairie lancée) : vous complétez puis validez.</p>')
+      + ((G.communes || []).some(function (x) { return x.commune === com; }) ? htmlDeployee(com) : '<button class="second" type="button" id="gf-deployer" style="margin-top:12px;width:100%">Lancer le déploiement de la commune</button><p class="petit">Ouvre l\'onglet « Créer » pré-rempli avec cette commune (recherche INSEE et mairie lancée) : vous complétez puis validez.</p>')
       + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
       + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
       + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
@@ -844,5 +844,23 @@
   $("gt-mode-ok").addEventListener("click", function () {
     gEnvoyer({ op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "mode_facturation_defaut", valeur: $("gt-mode").value, description: "annuel ou mensuel : facturation par défaut de l'abonnement" } }, "msg-tarifs-base", "Mode de facturation par défaut enregistré.").catch(function () {});
   });
+
+
+  /* ——— Commune déployée : liens vers l'application de collecte et la météo, vignette météo ——— */
+  function gSite(com) {
+    var ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {}, s = String(ct.site || "").trim();
+    if (!s) return "";
+    if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+    return s.replace(/\/+$/, "");
+  }
+  function htmlDeployee(com) {
+    var s = gSite(com);
+    if (!s) return '<p class="petit" style="margin-top:10px">✓ Commune déployée (adresse du site non renseignée dans l\'onglet Communes).</p>';
+    return '<div style="margin-top:12px;padding:10px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px"><b>Commune déployée</b>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+      + '<a class="second" href="' + gEsc(s) + '/" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:9px 10px;border-radius:9px;border:1px solid var(--trait);background:#fff;text-decoration:none;font-weight:600">Application de collecte</a>'
+      + '<a class="second" href="' + gEsc(s) + '/meteo/" target="_blank" rel="noopener" style="flex:1;text-align:center;padding:9px 10px;border-radius:9px;border:1px solid var(--trait);background:#fff;text-decoration:none;font-weight:600">Météo détaillée</a></div>'
+      + '<iframe src="' + gEsc(s) + '/meteo/widget.html" title="Météo de la propreté des points de collecte" loading="lazy" style="width:100%;height:420px;border:1px solid var(--trait);border-radius:10px;margin-top:10px;background:#fff"></iframe></div>';
+  }
 
 })();
