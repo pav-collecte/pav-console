@@ -16,6 +16,15 @@
   nav { display:flex; gap:6px; margin-top:10px; }
   nav button { flex:1; border:0; border-radius:8px; padding:9px 6px; font:600 14px system-ui; background:rgba(255,255,255,.12); color:#fff; }
   nav button.actif { background:#fff; color:var(--vert); }
+  /* Smartphone : onglets sur une ligne qui défile, assistant plus discret */
+  @media (max-width:640px) {
+    header { padding:10px 12px 8px; }
+    nav { overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+    nav::-webkit-scrollbar { display:none; }
+    nav button { flex:0 0 auto; padding:8px 12px; }
+    #chat-ouvrir { right:10px; padding:9px 13px; font-size:13px; opacity:.92; }
+    main { padding-bottom:90px; }
+  }
   main { padding:14px 14px 80px; max-width:640px; margin:0 auto; }
   section { display:none; } section.actif { display:block; }
   .carte { background:var(--carte); border:1px solid var(--trait); border-radius:12px; padding:14px; margin-bottom:12px; }
@@ -32,7 +41,7 @@
   .msg.ok { display:block; background:#E7F3EC; color:var(--ok); }
   .msg.ko { display:block; background:#FBE9E7; color:var(--ko); }
   .msg.info { display:block; background:#EEF1EF; color:var(--doux); }
-  .grille { display:grid; grid-template-columns:1fr 92px; gap:8px; align-items:center; }
+  .grille { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; }
   .grille span { font-size:15px; }
   .gps { display:flex; gap:10px; align-items:center; margin-top:6px; }
   .gps output { font:13px ui-monospace, Menlo, monospace; color:var(--doux); }
@@ -2570,6 +2579,6 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=6" defer></script>
+<script src="gestion.js?v=7" defer></script>
 </body>
 </html>
