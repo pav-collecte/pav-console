@@ -154,7 +154,10 @@
     var nom = (gCommunes().filter(function (c) { return c[0] === com; })[0] || [com, com])[1];
     var c = gClient(com), cp = gVal("gf-cp");
     msg("msg-fiche", "Recherche des infos publiques de " + nom + "…");
-    gJson("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + "&fields=nom,code,codesPostaux,codeDepartement,population,epci&boost=population&limit=8").then(function (l) {
+    gJson("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + "&fields=nom,code,codesPostaux,codeDepartement,population,epci&boost=population&limit=8").catch(function () {
+      // geo.api.gouv.fr injoignable (certains réseaux mobiles) : liste des communes hébergée avec la console.
+      return listeCommunes().then(function (t) { return t.filter(function (x) { return slugCommune(x.nom) === slugCommune(nom); }).slice(0, 8); });
+    }).then(function (l) {
       l = l.filter(function (x) { return x.nom.toLowerCase() === String(nom).toLowerCase(); }).concat(l.filter(function (x) { return x.nom.toLowerCase() !== String(nom).toLowerCase(); }));
       var g = c.code_insee ? l.filter(function (x) { return x.code === c.code_insee; })[0] : null;
       if (!g && cp) g = l.filter(function (x) { return (x.codesPostaux || []).indexOf(cp) >= 0; })[0];
@@ -511,46 +514,36 @@
     if (window.L) return Promise.resolve();
     if (GK.chargeL) return GK.chargeL;
     GK.chargeL = new Promise(function (ok, ko) {
-      var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(l);
-      var s = document.createElement("script"); s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; s.onload = ok; s.onerror = function () { GK.chargeL = null; s.remove(); ko(new Error("Fond de carte indisponible (chargement de Leaflet) : réessayez.")); };
-      document.head.appendChild(s);
+      var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "leaflet.css?v=1"; document.head.appendChild(l);
+      var essai = function (src, suite) {
+        var s = document.createElement("script"); s.src = src; s.onload = ok;
+        s.onerror = function () { s.remove(); if (suite) essai(suite); else { GK.chargeL = null; ko(new Error("Bibliothèque de carte indisponible : réessayez.")); } };
+        document.head.appendChild(s);
+      };
+      essai("leaflet.js?v=1", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
     });
     return GK.chargeL;
   }
-  // Communes chargées par département (seulement ceux que le cercle touche) : léger, même sur smartphone.
-  var GK_DEPS = {};
-  function gJsonRetry(u) { return gJson(u).catch(function () { return new Promise(function (r) { setTimeout(r, 800); }).then(function () { return gJson(u); }); }); }
+  // Liste des communes hébergée avec la console (communes.json, d'après geo.api.gouv.fr) :
+  // aucun appel externe, la carte marche aussi sur les réseaux mobiles qui bloquent geo.api.gouv.fr.
+  var GK_LISTE = null;
+  function listeCommunes() {
+    if (GK_LISTE) return GK_LISTE;
+    msg("msg-carte", "Chargement des communes…");
+    GK_LISTE = fetch("communes.json?v=1").then(function (r) { if (!r.ok) throw new Error("communes.json : " + r.status); return r.json(); }).then(function (j) {
+      GK.communes = j.c.map(function (x) { return { code: x[0], nom: x[1], centre: { coordinates: [x[3], x[2]] }, population: x[4], codeDepartement: x[5], codesPostaux: x[6] ? [x[6]] : [] }; });
+      cacher("msg-carte"); return GK.communes;
+    }).catch(function (e) { GK_LISTE = null; throw new Error("Liste des communes indisponible (" + e.message + ") : vérifiez la connexion puis réessayez."); });
+    return GK_LISTE;
+  }
   function centreDepuisNom(nom) {
-    return gJsonRetry("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + "&fields=nom,centre&boost=population&limit=5").then(function (l) {
-      var c0 = l.filter(function (c) { return slugCommune(c.nom) === slugCommune(nom); })[0] || l[0];
-      if (!c0 || !c0.centre) throw new Error("Commune de centre introuvable : « " + nom + " ».");
+    return listeCommunes().then(function (l) {
+      var c0 = l.filter(function (c) { return slugCommune(c.nom) === slugCommune(nom); }).sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
+      if (!c0) throw new Error("Commune de centre introuvable : « " + nom + " ».");
       return [c0.centre.coordinates[1], c0.centre.coordinates[0]];
     });
   }
-  function communesAutour(centre, rayon) {
-    msg("msg-carte", "Chargement des communes…");
-    var pts = [centre];
-    for (var k = 0; k < 16; k++) [1, 0.5].forEach(function (f) {
-      var a = k * Math.PI / 8, dLat = rayon * f * Math.cos(a) / 111, dLon = rayon * f * Math.sin(a) / (111 * Math.cos(centre[0] * Math.PI / 180));
-      pts.push([centre[0] + dLat, centre[1] + dLon]);
-    });
-    return Promise.all(pts.map(function (p) {
-      return gJsonRetry("https://geo.api.gouv.fr/communes?lat=" + p[0].toFixed(5) + "&lon=" + p[1].toFixed(5) + "&fields=codeDepartement").then(function (l) { return (l[0] || {}).codeDepartement; }).catch(function () { return null; });
-    })).then(function (deps) {
-      deps = deps.filter(function (d, i) { return d && deps.indexOf(d) === i; });
-      if (!deps.length) throw new Error("Service des communes (geo.api.gouv.fr) injoignable : réessayez dans un instant.");
-      return Promise.all(deps.map(function (d) {
-        if (GK_DEPS[d]) return GK_DEPS[d];
-        return gJsonRetry("https://geo.api.gouv.fr/departements/" + d + "/communes?fields=nom,code,centre,population,codeDepartement,codesPostaux").then(function (l) {
-          GK_DEPS[d] = l.filter(function (c) { return c.centre && c.centre.coordinates; }); return GK_DEPS[d];
-        });
-      }));
-    }).then(function (listes) {
-      var vus = {}; GK.communes = [];
-      Object.keys(GK_DEPS).forEach(function (d) { GK_DEPS[d].forEach(function (c) { if (!vus[c.code]) { vus[c.code] = 1; GK.communes.push(c); } }); });
-      cacher("msg-carte"); return GK.communes;
-    }).catch(function (e) { throw new Error(/fetch/i.test(e.message) ? "Service des communes (geo.api.gouv.fr) injoignable depuis ce réseau : réessayez, ou désactivez un éventuel bloqueur." : e.message); });
-  }
+  function communesAutour() { return listeCommunes(); }
   function slugCommune(t) {
     return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   }
