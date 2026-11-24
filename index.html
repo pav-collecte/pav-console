@@ -1,0 +1,2458 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1F3A2E">
+<title>PAV — console d'installation</title>
+<style>
+  :root { --fond:#F4F1EA; --carte:#FFFFFF; --encre:#1D2420; --doux:#5E6B63; --vert:#1F3A2E; --accent:#C8762B; --ok:#2E7D4F; --ko:#B3261E; --trait:#DDD6C8; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--fond); color:var(--encre); font:16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background:var(--vert); color:#fff; padding:14px 16px calc(10px); position:sticky; top:0; z-index:5; }
+  header h1 { margin:0; font-size:17px; letter-spacing:.02em; font-weight:650; }
+  header p { margin:2px 0 0; font-size:12px; opacity:.75; }
+  nav { display:flex; gap:6px; margin-top:10px; }
+  nav button { flex:1; border:0; border-radius:8px; padding:9px 6px; font:600 14px system-ui; background:rgba(255,255,255,.12); color:#fff; }
+  nav button.actif { background:#fff; color:var(--vert); }
+  main { padding:14px 14px 80px; max-width:640px; margin:0 auto; }
+  section { display:none; } section.actif { display:block; }
+  .carte { background:var(--carte); border:1px solid var(--trait); border-radius:12px; padding:14px; margin-bottom:12px; }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--vert); }
+  label { display:block; font-size:13px; color:var(--doux); margin:10px 0 4px; }
+  label b { color:var(--encre); font-weight:600; }
+  input, select, textarea { width:100%; padding:11px 12px; border:1px solid var(--trait); border-radius:9px; font:16px system-ui; background:#fff; color:var(--encre); }
+  input:focus, select:focus { outline:2px solid var(--accent); border-color:transparent; }
+  .requis input { border-color:#E6C39E; background:#FFFBF5; }
+  button.principal { width:100%; margin-top:14px; padding:14px; border:0; border-radius:10px; background:var(--accent); color:#fff; font:700 16px system-ui; }
+  button.second { padding:10px 12px; border:1px solid var(--trait); border-radius:9px; background:#fff; font:600 14px system-ui; color:var(--vert); }
+  button:disabled { opacity:.55; }
+  .msg { margin-top:12px; padding:12px; border-radius:9px; font-size:14px; white-space:pre-wrap; display:none; }
+  .msg.ok { display:block; background:#E7F3EC; color:var(--ok); }
+  .msg.ko { display:block; background:#FBE9E7; color:var(--ko); }
+  .msg.info { display:block; background:#EEF1EF; color:var(--doux); }
+  .grille { display:grid; grid-template-columns:1fr 92px; gap:8px; align-items:center; }
+  .grille span { font-size:15px; }
+  .gps { display:flex; gap:10px; align-items:center; margin-top:6px; }
+  .gps output { font:13px ui-monospace, Menlo, monospace; color:var(--doux); }
+  .code { font:700 28px ui-monospace, Menlo, monospace; letter-spacing:.06em; text-align:center; padding:14px; background:#FFF6EC; border:1px dashed var(--accent); border-radius:10px; margin:10px 0; user-select:all; }
+  .liens a { display:block; margin:4px 0; color:var(--vert); }
+  table.dns { width:100%; border-collapse:collapse; font-size:14px; margin-top:6px; }
+  table.dns td { border:1px solid var(--trait); padding:6px 8px; } table.dns td:first-child { color:var(--doux); width:35%; }
+  .petit { font-size:12px; color:var(--doux); }
+  #verrou { position:fixed; inset:0; background:var(--fond); z-index:10; display:flex; align-items:center; justify-content:center; padding:20px; }
+  #verrou .carte { width:100%; max-width:380px; }
+  button.second { cursor:pointer; transition:background .15s, color .15s, transform .05s; }
+  button.second:hover { background:#F4F1EA; }
+  button.second:active { transform:scale(.96); }
+  button.second.actif { background:var(--vert); color:#fff; border-color:var(--vert); }
+  .en-edition { background:#FFF6EC; box-shadow:inset 4px 0 0 var(--accent); padding-left:10px !important; border-radius:6px; }
+  .carte.edition { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .jauge { margin:12px 0 4px; }
+  .jauge label { display:flex; justify-content:space-between; align-items:baseline; margin:0 0 2px; }
+  .jauge output { font:700 15px ui-monospace, Menlo, monospace; color:var(--vert); }
+  input[type=range] { width:100%; padding:0; border:0; height:30px; accent-color:var(--accent); background:transparent; }
+  input[type=range]:focus { outline:none; }
+  .coche { display:flex; gap:10px; align-items:center; color:var(--encre); font-size:14px; }
+  .coche input { width:20px; height:20px; flex:none; }
+  .palier { border-top:1px solid var(--trait); padding-top:6px; margin-top:8px; }
+  .palier .lit { font-size:14px; color:var(--encre); font-weight:600; }
+  .palier.modifie .lit::after { content:" • modifié"; color:var(--accent); font-weight:600; font-size:12px; }
+  .resultat-bac.sim-copie { margin:6px 0 22px; }
+  .resultat-bac { margin-top:14px; padding:14px; border-radius:10px; background:#F4F1EA; text-align:center; font-size:14px; }
+  .resultat-bac .lettre { display:inline-block; width:64px; height:64px; line-height:64px; border-radius:14px; color:#fff; font:800 36px system-ui; margin-bottom:6px; }
+  .barre-bac { position:sticky; bottom:0; background:var(--fond); padding:8px 0; border-top:1px solid var(--trait); }
+  .barre-bac .msg { margin:0 0 8px; }
+  .echelle-bac { display:flex; gap:6px; justify-content:center; margin:4px 0 12px; }
+  .echelle-bac .cran { width:54px; padding:6px 0 5px; border-radius:10px; color:#fff; opacity:.28; display:flex; flex-direction:column; align-items:center; transition:opacity .15s, transform .15s; }
+  .echelle-bac .cran b { font:800 22px system-ui; line-height:1.1; }
+  .echelle-bac .cran small { font-size:11px; }
+  .echelle-bac .cran.actif { opacity:1; transform:scale(1.18); box-shadow:0 2px 8px rgba(0,0,0,.25); }
+  #chat-ouvrir { position:fixed; right:14px; bottom:84px; z-index:9; border:0; border-radius:24px; padding:12px 16px; background:var(--vert); color:#fff; font:700 15px system-ui; box-shadow:0 4px 14px rgba(0,0,0,.25); cursor:pointer; }
+  #chat { position:fixed; right:14px; bottom:14px; z-index:9; width:min(420px, calc(100vw - 28px)); height:min(580px, 78vh); background:#fff; border:1px solid var(--trait); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,.25); display:flex; flex-direction:column; }
+  #chat[hidden] { display:none; }
+  .chat-tete { display:flex; gap:8px; align-items:center; padding:10px 12px; background:var(--vert); color:#fff; border-radius:14px 14px 0 0; }
+  .chat-tete .petit { color:#fff; opacity:.75; flex:1; }
+  .chat-tete button { border:0; background:transparent; color:#fff; font:700 20px system-ui; cursor:pointer; padding:0 4px; }
+  #chat-fil { flex:1; overflow:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+  .bulle { max-width:88%; padding:8px 11px; border-radius:12px; font-size:14px; white-space:pre-wrap; line-height:1.4; }
+  .bulle.moi { align-self:flex-end; background:#FFF1E2; }
+  .bulle.lui { align-self:flex-start; background:#F1EFE9; }
+  .bulle.action { align-self:flex-start; background:#E7F3EC; color:var(--ok); font-size:12px; padding:5px 9px; }
+  .bulle.erreur { align-self:flex-start; background:#FBE9E7; color:var(--ko); font-size:12px; padding:5px 9px; }
+  #chat-form { display:flex; gap:8px; padding:10px; border-top:1px solid var(--trait); }
+  #chat-form textarea { flex:1; resize:none; font-size:15px; }
+  #chat-form .principal { width:auto; margin:0; padding:10px 14px; }
+  .a-valider { animation:valider 1.2s ease-in-out 5; box-shadow:0 0 0 3px var(--ok); }
+  @keyframes valider { 50% { box-shadow:0 0 0 7px rgba(46,125,79,.35); } }
+  .jauge-travail { margin-top:12px; }
+  .jauge-travail > div { height:8px; border-radius:6px; background:var(--trait); overflow:hidden; }
+  .jauge-travail > div > div { height:100%; width:0; background:var(--vert); transition:width .25s linear; }
+  .jauge-travail span { display:block; margin-top:6px; font-size:13px; color:var(--encre); }
+  .champ-erreur { outline: 3px solid var(--ko, #B3261E) !important; outline-offset: 2px; }
+  input.technique { background: #EEECE7 !important; color: #8A867E !important; border-color: #DDD8CE !important; cursor: not-allowed; }
+  .cadenas { margin-left: 8px; padding: 2px 8px; font-size: 12px; border: 1px solid var(--line, #DDD8CE); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="verrou">
+  <div class="carte">
+    <h2>Console d'installation PAV</h2>
+    <p class="petit">Réservée à l'administrateur. Le code est vérifié par le serveur ; il reste enregistré sur cet appareil seulement.</p>
+    <label for="code-admin"><b>Code administrateur</b></label>
+    <div style="position:relative">
+      <input id="code-admin" type="password" autocomplete="current-password" style="padding-right:52px">
+      <button type="button" id="voir-code" aria-label="Afficher le code" title="Afficher le code" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;padding:0;border:0;background:transparent;box-shadow:none;cursor:pointer;color:#555;display:flex;align-items:center;justify-content:center">
+        <svg id="oeil-ouvert" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg id="oeil-barre" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      </button>
+    </div>
+    <button class="principal" id="entrer">Entrer</button>
+    <div class="msg" id="msg-verrou"></div>
+  </div>
+</div>
+
+<header>
+  <h1>PAV — console d'installation</h1>
+  <p id="sous-titre">Nouvelle commune, points de collecte, agents</p>
+  <nav>
+    <button data-onglet="commune" class="actif">Créer</button>
+    <button data-onglet="modifier">Modifier</button>
+    <button data-onglet="points">Points</button>
+    <button data-onglet="agents">Agents</button>
+    <button data-onglet="bac">Bac-Score</button>
+  </nav>
+</header>
+
+<main>
+  <section id="commune" class="actif">
+    <div class="carte" id="carte-brouillons" hidden>
+      <h2>Brouillons en cours</h2>
+      <p class="petit">Une commune en brouillon n'existe pas encore. Préparez ses points (onglet Points) et ses agents (onglet Agents) en choisissant « Brouillon — … » dans le menu commune, puis reprenez-la ici et validez pour tout créer d'un coup.</p>
+      <div id="liste-brouillons" class="petit"></div>
+    </div>
+    <div class="carte">
+      <h2>Nouvelle commune</h2>
+      <p class="petit">Les champs viennent du modèle de classeur. Les champs orangés sont à remplir ; les autres ont une valeur par défaut modifiable.
+      À la validation : dossiers Drive, copie du classeur modèle, ligne dans l'onglet Communes, dépôt GitHub, site et première diffusion du moteur.</p>
+      <form id="form-commune"><div id="champs">Chargement du modèle…</div>
+        <label for="alertes"><b>E-mails des alertes</b> — séparés par des virgules</label>
+        <input id="alertes" type="text" inputmode="email" placeholder="services.techniques@mairie-xxx.fr">
+        <label style="display:flex;gap:8px;align-items:center;margin:12px 0 0;font-weight:400"><input type="checkbox" id="creer-osm" checked style="width:20px;height:20px;flex:none;margin:0"> Intégrer les points de collecte connus d'OpenStreetMap (ajoutés d'office au brouillon, ou proposés à cocher après une création directe)</label>
+        <div id="brouillon-actif" class="petit" hidden style="margin:12px 0 0;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"></div>
+        <button class="second" type="button" id="brouillon-enregistrer" style="width:100%;margin-top:12px">Enregistrer comme brouillon (la commune n'est pas encore créée)</button>
+        <button class="principal" type="submit" id="creer">Créer la commune</button>
+      </form>
+      <div class="msg" id="msg-commune"></div>
+      <div id="resultat-commune"></div>
+    </div>
+  </section>
+
+  <section id="modifier">
+    <div class="carte">
+      <h2>Modifier une commune</h2>
+      <p class="petit">Tous les paramètres de la commune (onglet Parametres de son classeur) s'affichent ci-dessous : modifiez ce qu'il faut puis « Enregistrer les modifications » en bas. Le site suit au prochain passage de n8n (15 minutes). Les adresses se changent avec la carte « Domaine définitif ».</p>
+      <label for="commune-edit"><b>Commune</b></label>
+      <select id="commune-edit" class="choix-commune"></select>
+      <button class="second" id="charger-commune" type="button" style="margin-top:10px">Recharger</button>
+      <div id="champs-edit"></div>
+      <div class="msg" id="msg-edit"></div>
+    </div>
+    <div class="carte">
+      <h2>Domaine définitif</h2>
+      <p class="petit">Pour que le site de la commune ait sa propre adresse (par exemple <b>collecte.mairie-albon.fr</b> au lieu de l'adresse provisoire) :</p>
+      <ol class="petit" style="margin:4px 0 8px;padding-left:20px;line-height:1.5">
+        <li><b>Chez l'hébergeur du nom de domaine de la mairie</b> (OVH, Gandi, prestataire informatique…), créer dans la zone DNS un enregistrement <b>CNAME</b> : nom <code>collecte</code> (la partie avant le domaine), cible <code>pav-collecte.github.io</code>.</li>
+        <li>Attendre que l'enregistrement soit actif : de quelques minutes à une heure en général.</li>
+        <li>Choisir la commune ci-dessous, saisir l'adresse complète (<code>collecte.mairie-xxx.fr</code>, sans https://) et cliquer « Mettre à jour l'adresse ».</li>
+      </ol>
+      <p class="petit">La console fait le reste en une fois : elle déclare l'adresse auprès de GitHub Pages (fichier CNAME du dépôt de la commune), met à jour les liens de l'application et de la météo dans le classeur, et autorise cette adresse à envoyer les photos. GitHub délivre ensuite le certificat HTTPS, en général dans l'heure ; si l'adresse ne s'ouvre pas encore en https, cochez « Enforce HTTPS » dans les réglages Pages du dépôt de la commune. Pour revenir à l'adresse provisoire, videz le champ et cliquez à nouveau.</p>
+      <label for="commune-domaine"><b>Commune</b></label>
+      <select id="commune-domaine" class="choix-commune"></select>
+      <label for="domaine"><b>Sous-domaine</b></label>
+      <input id="domaine" type="text" inputmode="url" placeholder="collecte.mairie-xxx.fr">
+      <button class="principal" id="basculer">Mettre à jour l'adresse</button>
+      <div class="msg" id="msg-domaine"></div>
+      <div id="resultat-domaine"></div>
+    </div>
+    <div class="carte">
+      <h2>Mettre la commune à la corbeille</h2>
+      <p class="petit">Suppression logique de la commune choisie ci-dessus : elle n'est plus publiée et les agents ne peuvent plus envoyer de photos. Rien n'est effacé, elle se restaure depuis la corbeille. La suppression définitive (dossiers Drive, dépôt GitHub) n'est possible que 7 jours plus tard.</p>
+      <button class="second" type="button" id="commune-suspendre" style="width:100%;color:var(--ko)">Mettre à la corbeille</button>
+      <div class="msg" id="msg-suspendre"></div>
+    </div>
+    <div class="carte" id="carte-corbeille" hidden>
+      <h2>Corbeille</h2>
+      <p class="petit">Communes suspendues. « Supprimer définitivement » met leurs dossiers Drive (classeur, photos) à la corbeille Google, récupérables 30 jours, coupe le site, archive le dépôt GitHub, puis retire la commune de la liste.</p>
+      <div id="liste-corbeille" class="petit"></div>
+      <div class="msg" id="msg-corbeille"></div>
+    </div>
+  </section>
+
+  <section id="points">
+    <div class="carte">
+      <h2 id="titre-point">Nouveau point de collecte</h2>
+      <p class="petit">À faire sur place, devant les conteneurs : la position GPS est celle du téléphone.</p>
+      <label for="commune-point"><b>Commune</b></label>
+      <select id="commune-point" class="choix-commune"></select>
+      <label for="nom-point"><b>Nom du point</b></label>
+      <input id="nom-point" type="text" placeholder="Îlot Place de la Mairie">
+      <label><b>Position</b></label>
+      <div class="gps"><button class="second" id="btn-gps" type="button">Prendre la position</button><output id="gps-etat">—</output></div>
+      <label><b>Nombre de conteneurs par flux</b></label>
+      <div class="grille" id="grille-flux"></div>
+      <label id="bloc-actif" style="display:none;gap:10px;align-items:center;margin-top:12px;color:var(--encre);font-size:14px"><input type="checkbox" id="point-actif" style="width:20px;height:20px;flex:none" checked> Point actif (décochez pour le retirer des tournées sans le supprimer)</label>
+      <button class="principal" id="ajouter-point">Enregistrer le point</button>
+      <button class="second" id="annuler-point" type="button" style="display:none;width:100%;margin-top:8px">Annuler la modification</button>
+      <div class="msg" id="msg-point"></div>
+    </div>
+    <div class="carte">
+      <h2>Points de la commune <button class="second" id="rafraichir-points" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>
+      <div id="liste-points" class="petit">—</div>
+      <div class="msg" id="msg-liste"></div>
+    </div>
+    <div class="carte" id="carte-prerempli">
+      <h2>Pré-remplir les points</h2>
+      <p class="petit">Pour démarrer une commune : reprend les conteneurs connus d'OpenStreetMap, ou le fichier de points publié par la collectivité (CSV ou GeoJSON). Les points cochés sont créés <b>« à vérifier »</b> : absents de la météo et des tournées jusqu'à leur validation sur place par un agent (position reprise, conteneurs comptés).</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:2;min-width:180px"><label for="osm-ville"><b>Ville à chercher</b></label>
+        <input id="osm-ville" type="text" placeholder="la commune choisie ci-dessus"></div>
+        <div style="flex:1;min-width:110px"><label for="osm-dep"><b>Département</b></label>
+        <input id="osm-dep" type="text" maxlength="3" placeholder="ex. 26"></div>
+      </div>
+      <p class="petit" style="margin:4px 0 0">Laissez vide pour la commune choisie. Une autre ville (ex. un hameau rattaché, une commune voisine) s'écrit comme sur OpenStreetMap ; en cas d'homonymes, la console vous fait choisir.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="second" id="osm-chercher" type="button">Chercher dans OpenStreetMap</button>
+        <button class="second" id="import-choisir" type="button">Importer un fichier…</button>
+        <input type="file" id="import-fichier" accept=".csv,.geojson,.json,text/csv,application/json" style="display:none">
+      </div>
+      <div id="osm-jauge" class="jauge-travail" hidden><div><div></div></div><span></span></div>
+      <div class="msg" id="msg-prerempli"></div>
+      <div id="candidats" class="petit"></div>
+      <button class="principal" id="candidats-creer" type="button" style="display:none">Créer les points cochés (à vérifier)</button>
+      <p class="petit" style="margin-top:10px">Données OpenStreetMap © contributeurs OpenStreetMap, licence ODbL.</p>
+    </div>
+  </section>
+
+  <section id="agents">
+    <div class="carte">
+      <h2>Nouvel agent</h2>
+      <p class="petit">Le code d'accès est créé avec le préfixe de la commune et ajouté à l'onglet Releveurs. Il reste consultable dans la liste ci-dessous.</p>
+      <label for="commune-agent"><b>Commune</b></label>
+      <select id="commune-agent" class="choix-commune"></select>
+      <label for="nom-agent"><b>Nom de l'agent</b></label>
+      <input id="nom-agent" type="text" placeholder="Dupont">
+      <button class="principal" id="ajouter-agent">Créer le code</button>
+      <div class="msg" id="msg-agent"></div>
+      <div id="resultat-agent"></div>
+      <div id="agents-lot" hidden style="margin-top:14px;padding-top:10px;border-top:1px solid var(--trait)">
+        <b>Agents à créer</b> <span class="petit">— noms provisoires, modifiables ensuite avec « Modifier »</span>
+        <div id="agents-lot-liste" class="petit" style="margin:6px 0"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="principal" id="agents-lot-creer" type="button" style="flex:1">Créer les codes</button>
+          <button class="second" id="agents-lot-annuler" type="button">Annuler</button>
+        </div>
+      </div>
+    </div>
+    <div class="carte">
+      <h2>Agents de la commune <button class="second" id="rafraichir-agents" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>
+      <div id="liste-agents" class="petit">—</div>
+      <div class="msg" id="msg-agents"></div>
+    </div>
+    <p class="petit" style="text-align:center"><a href="#" id="oublier">Oublier le code administrateur sur cet appareil</a></p>
+  </section>
+  <section id="bac">
+    <div class="carte">
+      <h2>Bac-Score — versions du barème</h2>
+      <p class="petit">Chaque version a une date d'entrée en vigueur. Un relevé est toujours noté avec la version en vigueur le jour de la photo : une nouvelle version ne réécrit pas les notes déjà publiées. Les versions en vigueur ou passées ne se modifient plus ; seules les versions à venir peuvent être corrigées ou supprimées.</p>
+      <label for="bac-portee"><b>Barème de</b></label>
+      <select id="bac-portee"></select>
+      <div id="bac-frise" class="petit" style="margin-top:10px">—</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="second" id="bac-nouvelle" type="button">Nouvelle version</button>
+        <button class="second" id="bac-retour" type="button" style="display:none">Revenir au modèle…</button>
+      </div>
+      <div id="bac-retour-form" style="display:none;margin-top:10px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px">
+        <label for="bac-retour-date"><b>La commune suit de nouveau le modèle commun à partir du</b></label>
+        <input type="date" id="bac-retour-date">
+        <button class="principal" id="bac-retour-ok" type="button">Enregistrer le retour au modèle</button>
+      </div>
+      <div class="msg" id="msg-bac"></div>
+    </div>
+    <div id="bac-editeur" style="display:none">
+      <div class="carte" id="bac-entete">
+        <h2 id="bac-titre">Version</h2>
+        <div id="bac-champs">
+          <label for="bac-nom"><b>Nom de la version</b></label>
+          <input type="text" id="bac-nom" placeholder="Barème 2027">
+          <label for="bac-depuis"><b>En vigueur à partir du</b> — au plus tôt demain</label>
+          <input type="date" id="bac-depuis">
+        </div>
+        <p class="petit" id="bac-lecture" style="display:none"></p>
+      </div>
+      <div class="carte">
+        <h2>Simulateur</h2>
+        <p class="petit">Faites bouger les jauges pour voir la note qu'obtiendrait un flux avec cette version.</p>
+        <div class="jauge"><label><b>Sacs au sol</b> <output id="sim-sacs-v">0</output></label><input type="range" id="sim-sacs" min="0" max="12" step="1" value="0"></div>
+        <p class="petit" style="margin:2px 0 8px">Nombre de sacs posés au sol à côté des conteneurs, comptés sur la photo. Il donne les points de propreté selon les paliers de la carte « Propreté au sol ».</p>
+        <label class="coche"><input type="checkbox" id="sim-sanssac"> Dépôt sans sac comptable (carton, encombrant)</label>
+        <p class="petit" style="margin:2px 0 6px 30px">Des déchets sont posés au sol mais ne se comptent pas en sacs : carton, meuble, électroménager… Sans cette règle le point aurait 0 en propreté alors qu'il est sale : il prend à la place le forfait réglable juste en dessous. Ne joue que lorsque 0 sac est compté ; dès qu'il y a des sacs, ce sont les paliers de propreté qui s'appliquent.</p>
+        <div id="forfait-sanssac" style="margin:0 0 8px 30px"></div>
+        <div class="resultat-bac sim-copie" aria-hidden="true"></div>
+        <div class="jauge"><label><b>Conteneurs pleins ou bloqués</b> <output id="sim-plein-v">0 %</output></label><input type="range" id="sim-plein" min="0" max="1" step="0.05" value="0"></div>
+        <p class="petit" style="margin:2px 0 8px">Part des conteneurs du point qui sont pleins ou bloqués : 1 sur 3 = 33 %, 2 sur 4 = 50 %. Elle donne les points de remplissage selon les paliers de la carte « Remplissage ».</p>
+        <label class="coche"><input type="checkbox" id="sim-inacc"> Point inaccessible</label>
+        <p class="petit" style="margin:2px 0 6px 30px">Les conteneurs n'ont pas pu être atteints ni ouverts : voiture garée devant, travaux, accès bloqué par des dépôts… Le remplissage ne peut pas être mesuré, alors le critère prend le forfait réglable juste en dessous, quel que soit le pourcentage affiché au-dessus.</p>
+        <div id="forfait-inacc" style="margin:0 0 8px 30px"></div>
+        <div class="resultat-bac sim-copie" aria-hidden="true"></div>
+        <div class="jauge"><label><b>Passages avec dépôt sur la période</b> <output id="sim-rec-v">0</output></label><input type="range" id="sim-rec" min="0" max="12" step="1" value="0"></div>
+        <p class="petit" style="margin:2px 0 8px">Nombre de passages où un dépôt au sol a été constaté sur ce point pendant la période de récidive (réglable dans « Réglages », 30 jours au départ), le passage du jour compris : 1 = premier dépôt de la période. C'est ce qui distingue un incident isolé d'un point qui revient sans cesse. Plusieurs photos prises à quelques minutes d'intervalle ne comptent que pour un passage.</p>
+        <div id="sim-resultat" class="resultat-bac">—</div>
+      </div>
+      <div id="bac-criteres"></div>
+      <div class="carte">
+        <h2>Lettres</h2>
+        <p class="petit">Total de points maximum pour chaque lettre. La dernière lettre vaut « et au-delà ».</p>
+        <div id="bac-lettres"></div>
+      </div>
+      <div class="carte">
+        <h2>Réglages</h2>
+        <div id="bac-reglages"></div>
+      </div>
+      <p class="petit">Publication sous 15 minutes : bareme.json (modèle) dans le moteur, bareme-commune.json dans le site de chaque commune. En cas d'incohérence, n8n ne publie rien.</p>
+      <div class="barre-bac">
+        <div class="msg" id="msg-bac-ed"></div>
+        <div style="display:flex;gap:8px"><button class="second" id="bac-fermer" type="button" style="flex:1">Fermer</button><button class="principal" id="bac-enregistrer" type="button" style="flex:2;margin-top:0">Enregistrer la version</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+<button id="chat-ouvrir" type="button" aria-label="Ouvrir l'assistant">Assistant</button>
+<div id="chat" hidden>
+  <div class="chat-tete"><b>Assistant</b><span class="petit">il prépare, vous validez</span><button id="chat-vider" type="button" title="Nouvelle conversation" aria-label="Nouvelle conversation">↺</button><button id="chat-fermer" type="button" aria-label="Fermer">×</button></div>
+  <div id="chat-fil"></div>
+  <form id="chat-form"><textarea id="chat-texte" rows="2" placeholder="Ex. : prépare pour Albon une version plus sévère sur la récidive à partir du 1er janvier"></textarea><button class="principal" type="submit">Envoyer</button></form>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var API = "https://n8n.srv1040760.hstgr.cloud/webhook/pav-console-api";
+  var $ = function (id) { return document.getElementById(id); };
+  var CODE = "";
+  try { CODE = localStorage.getItem("pav-console-code") || ""; } catch (e) {}
+  var FLUX = [];
+  var position = null;
+  var LOGO = null;
+  var ADRESSES = null;
+  var COMMUNE = "";
+
+  /* Remet l'image au carré (centrée, fond transparent), 1024 px au plus, en PNG. */
+  /* Logo ou blason de la commune d'après Wikidata (code INSEE), images de Wikimedia Commons. L'administrateur choisit. */
+  function chercherLogo(galerie, apercu, bt, cible) {
+    var pf = cible.prefixe, val = function (k) { return (($(pf + k) || {}).value || "").trim(); };
+    var nom = val("commune.nom"), dep = val("commune.departement"), insee = val("commune.codeInsee");
+    if (!nom && !insee) { msg(cible.msg, "Indiquez d'abord le nom de la commune.", "ko"); return; }
+    bt.disabled = true; galerie.textContent = "Recherche du logo…";
+    var code = insee ? Promise.resolve(insee) : fetch("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + (dep ? "&codeDepartement=" + encodeURIComponent(dep) : "") + "&fields=code,nom&boost=population&limit=1")
+      .then(function (r) { return r.json(); }).then(function (l) { if (!l.length) throw new Error("commune introuvable"); return l[0].code; });
+    code.then(function (c) {
+      var q = 'SELECT ?logo ?blason WHERE { ?x wdt:P374 "' + String(c).toUpperCase().replace(/[^0-9AB]/g, "") + '". OPTIONAL { ?x wdt:P154 ?logo } OPTIONAL { ?x wdt:P94 ?blason } }';
+      return fetch("https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(q)).then(function (r) { return r.json(); });
+    }).then(function (j) {
+      var vus = {}, fichiers = [];
+      ((j.results && j.results.bindings) || []).forEach(function (b) {
+        [["logo", "Logo"], ["blason", "Blason"]].forEach(function (k) {
+          if (!b[k[0]]) return;
+          var f = decodeURIComponent(b[k[0]].value.split("/").pop());
+          if (!vus[f]) { vus[f] = 1; fichiers.push({ titre: k[1], fichier: f }); }
+        });
+      });
+      if (!fichiers.length) throw new Error("aucun logo ni blason sur Wikidata pour cette commune");
+      return Promise.all(fichiers.map(function (f) {
+        return fetch("https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&prop=imageinfo&iiprop=url&iiurlwidth=512&titles=" + encodeURIComponent("File:" + f.fichier))
+          .then(function (r) { return r.json(); }).then(function (jj) { var p = Object.values(jj.query.pages)[0]; f.url = p.imageinfo && p.imageinfo[0].thumburl; return f; });
+      }));
+    }).then(function (fichiers) {
+      galerie.innerHTML = "";
+      fichiers.filter(function (f) { return f.url; }).forEach(function (f) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "second";
+        b.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;font-size:12px";
+        var im = document.createElement("img"); im.src = f.url; im.alt = f.titre; im.style.cssText = "width:96px;height:96px;object-fit:contain;background:#fff";
+        b.appendChild(im); b.appendChild(document.createTextNode(f.titre + " — choisir"));
+        b.addEventListener("click", function () {
+          b.disabled = true;
+          fetch(f.url).then(function (r) { return r.blob(); }).then(carre).then(function (url) {
+            cible.poser(url); apercu.src = url; apercu.style.display = "block";
+            msg(cible.msg, f.titre + " de la commune retenu (Wikimedia Commons)" + (pf === "e-" ? " : cliquez « Enregistrer les modifications » pour l'appliquer." : ". Vous pouvez encore déposer un autre fichier à la place."), "ok");
+          }).catch(function () { msg(cible.msg, "Image illisible : déposez un fichier.", "ko"); }).then(function () { b.disabled = false; });
+        });
+        galerie.appendChild(b);
+      });
+      var n = document.createElement("p"); n.className = "petit"; n.style.flexBasis = "100%";
+      n.textContent = "Source Wikidata et Wikimedia Commons. Le blason n'est pas forcément le logo actuel de la mairie : vérifiez avec elle.";
+      galerie.appendChild(n);
+    }).catch(function (er) { galerie.textContent = "Rien trouvé (" + er.message + "). Déposez le fichier fourni par la mairie."; })
+      .then(function () { bt.disabled = false; });
+  }
+  function carre(file) {
+    return new Promise(function (ok, ko) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 512, hh = img.naturalHeight || 512;
+        var s = Math.min(1024, Math.max(w, hh)), k = s / Math.max(w, hh);
+        var c = document.createElement("canvas"); c.width = c.height = s;
+        c.getContext("2d").drawImage(img, (s - w * k) / 2, (s - hh * k) / 2, w * k, hh * k);
+        URL.revokeObjectURL(url);
+        ok(c.toDataURL("image/png"));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); ko(new Error("image")); };
+      img.src = url;
+    });
+  }
+
+  /* Copie dans le presse-papiers (avec repli pour les navigateurs qui refusent l'API). */
+  function copier(texte, bouton) {
+    var fini = function () {
+      bouton.textContent = "Copié ✓";
+      setTimeout(function () { bouton.textContent = bouton.dataset.l; }, 1500);
+    };
+    var repli = function () {
+      var z = document.createElement("textarea"); z.value = texte; z.setAttribute("readonly", "");
+      z.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(z); z.select(); z.setSelectionRange(0, texte.length);
+      var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(z);
+      if (ok) fini(); else prompt("Copiez :", texte);
+    };
+    try { navigator.clipboard.writeText(texte).then(fini, repli); } catch (e) { repli(); }
+  }
+  /* QR code d'accès d'un agent : ouvre l'appli de la commune avec son code déjà
+     enregistré (l'appli lit ?code=…, le garde, puis l'efface de l'adresse).
+     Le dessin vient du qr.js publié sur le site de la commune. */
+  function siteCommune(com) {
+    var c = (LISTE_COMMUNES || []).filter(function (x) { return x.commune === com; })[0];
+    return c && c.site ? String(c.site).replace(/\/+$/, "") : "";
+  }
+  var QR_MOD = {};
+  function boutonQR(code, nom, com) {
+    var bt = document.createElement("button"); bt.type = "button"; bt.className = "second"; bt.textContent = "QR";
+    bt.title = "QR code d'accès : ouvre l'appli avec ce code";
+    var panneau = null;
+    bt.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (panneau) { panneau.remove(); panneau = null; return; }
+      var site = siteCommune(com);
+      panneau = document.createElement("div");
+      panneau.style.cssText = "flex-basis:100%;width:100%;text-align:center;padding:10px 0";
+      var ligne = bt.parentNode; ligne.parentNode.insertBefore(panneau, ligne.nextSibling);
+      if (!site) { panneau.textContent = "Adresse du site de la commune inconnue (onglet Communes, colonne site)."; return; }
+      var lien = site + "/?code=" + encodeURIComponent(code);
+      var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "QR code d'accès de " + (nom || code));
+      svg.style.cssText = "display:block;width:100%;max-width:220px;height:auto;margin:0 auto;background:#fff;padding:10px;border-radius:10px;border:1px solid var(--trait)";
+      var p = document.createElement("div"); p.className = "petit"; p.style.margin = "6px 0";
+      p.textContent = "À scanner par " + (nom || "l'agent") + " : l'appli s'ouvre avec le code " + code + " déjà enregistré. Ce QR vaut accès : à remettre en main propre.";
+      panneau.appendChild(svg); panneau.appendChild(p); panneau.appendChild(boutonCopier(lien, "Copier le lien"));
+      (QR_MOD[site] || (QR_MOD[site] = import(site + "/qr.js"))).then(function (m) { m.dessiner(svg, lien); })
+        .catch(function () { delete QR_MOD[site]; svg.replaceWith(document.createTextNode("QR indisponible : utilisez « Copier le lien ».")); });
+    });
+    return bt;
+  }
+  function boutonCopier(texte, libelle) {
+    var b = document.createElement("button"); b.type = "button"; b.className = "second";
+    b.textContent = b.dataset.l = libelle || "Copier";
+    b.style.cssText = "padding:6px 10px;font-size:13px;flex:none";
+    b.addEventListener("click", function (e) { e.preventDefault(); copier(String(texte), b); });
+    return b;
+  }
+
+  function msg(id, texte, genre) { var m = $(id); m.className = "msg " + (genre || "info"); m.textContent = texte; }
+  function cacher(id) { $(id).className = "msg"; $(id).textContent = ""; }
+
+  function api(action, donnees) {
+    var corps = Object.assign({ action: action, codeAdmin: CODE }, donnees || {});
+    return fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var j = null;
+          try { j = JSON.parse(t); } catch (e) {}
+          if (!r.ok || !j) throw new Error(r.status >= 500 ? "Échec côté serveur : voir l'exécution dans n8n." : "Réponse inattendue du serveur (" + r.status + ").");
+          if (!j.ok) throw new Error(j.motif || "Refusé.");
+          return j;
+        });
+      });
+  }
+
+  /* — verrou — */
+  function entrer() {
+    CODE = $("code-admin").value.trim() || CODE;
+    msg("msg-verrou", "Vérification…");
+    api("communes").then(function (j) {
+      try { localStorage.setItem("pav-console-code", CODE); } catch (e) {}
+      $("verrou").style.display = "none";
+      remplirCommunes(j.communes);
+      chargerModele();
+      chargerBrouillons().catch(function () {});
+    }).catch(function (e) { msg("msg-verrou", e.message, "ko"); });
+  }
+  $("entrer").addEventListener("click", entrer);
+  $("code-admin").addEventListener("keydown", function (e) { if (e.key === "Enter") entrer(); });
+  /* Œil : affiche ou masque le code administrateur pendant la saisie. */
+  $("voir-code").addEventListener("click", function () {
+    var i = $("code-admin"), visible = i.type === "password";
+    i.type = visible ? "text" : "password";
+    $("oeil-ouvert").style.display = visible ? "none" : "";
+    $("oeil-barre").style.display = visible ? "" : "none";
+    this.setAttribute("aria-label", visible ? "Masquer le code" : "Afficher le code"); this.title = this.getAttribute("aria-label");
+    i.focus();
+  });
+  $("oublier").addEventListener("click", function (e) {
+    e.preventDefault();
+    try { localStorage.removeItem("pav-console-code"); } catch (er) {}
+    location.reload();
+  });
+  if (CODE) entrer(); else cacher("msg-verrou");
+
+  /* — onglets — */
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (x) { x.classList.toggle("actif", x === b); });
+      Array.prototype.forEach.call(document.querySelectorAll("section"), function (s) { s.classList.toggle("actif", s.id === b.dataset.onglet); });
+    });
+  });
+
+  /* Corbeille : les communes suspendues (colonne etat) sont retirées des menus et listées à part. */
+  var CORBEILLE = [];
+  function remplirCommunes(liste) {
+    if (liste !== LISTE_COMMUNES) {
+      CORBEILLE = liste.filter(function (c) { return c.etat; });
+      liste = liste.filter(function (c) { return !c.etat; });
+      dessinerCorbeille();
+    }
+    LISTE_COMMUNES = liste;
+    var dernier = "";
+    try { dernier = localStorage.getItem("pav-console-commune") || ""; } catch (e) {}
+    Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (sel) {
+      var avant = sel.value;
+      sel.innerHTML = "";
+      liste.forEach(function (c) {
+        var o = document.createElement("option");
+        o.value = c.commune; o.textContent = c.nom || c.commune;
+        if (c.commune === (avant || COMMUNE || dernier)) o.selected = true;
+        sel.appendChild(o);
+      });
+      if ((sel.id === "commune-point" || sel.id === "commune-agent") && BROUILLONS.length) {
+        var g = document.createElement("optgroup"); g.label = "Brouillons (pas encore créées)";
+        BROUILLONS.forEach(function (b) {
+          var o = document.createElement("option"); o.value = "brouillon:" + b.id; var dpb = ((b.donnees && b.donnees.params) || {})["commune.departement"]; o.textContent = "Brouillon — " + b.nom + (dpb ? " (" + dpb + ")" : "");
+          if (o.value === (avant || COMMUNE)) o.selected = true;
+          g.appendChild(o);
+        });
+        sel.appendChild(g);
+      }
+      sel.onchange = function () {
+        COMMUNE = sel.value;
+        try { localStorage.setItem("pav-console-commune", sel.value); } catch (e) {}
+        /* Une seule commune active pour toute la console : les autres menus suivent. */
+        Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) { if (s !== sel) s.value = COMMUNE; });
+      };
+    });
+  }
+  function dessinerCorbeille() {
+    var box = $("liste-corbeille"); if (!box) return;
+    box.innerHTML = ""; $("carte-corbeille").hidden = !CORBEILLE.length;
+    CORBEILLE.forEach(function (c) {
+      var d = Date.parse(c.suspenduLe), jours = isFinite(d) ? (Date.now() - d) / 86400000 : 0, possible = jours >= 7;
+      var l = document.createElement("div"); l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--trait)";
+      var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:160px";
+      var n = document.createElement("b"); n.textContent = c.nom || c.commune; n.style.cssText = "display:block;color:var(--encre);font-size:14px";
+      var s = document.createElement("span");
+      s.textContent = "dans la corbeille depuis le " + (isFinite(d) ? new Date(d).toLocaleDateString("fr-FR") : "?")
+        + (possible ? "" : " — suppression définitive possible à partir du " + new Date(d + 7 * 86400000).toLocaleDateString("fr-FR"));
+      t.appendChild(n); t.appendChild(s); l.appendChild(t);
+      var r = document.createElement("button"); r.type = "button"; r.className = "second"; r.textContent = "Restaurer"; r.style.cssText = "padding:6px 10px;font-size:13px";
+      r.addEventListener("click", function () {
+        r.disabled = true;
+        api("commune-restaurer", { commune: c.commune }).then(function () {
+          msg("msg-corbeille", (c.nom || c.commune) + " est restaurée : publication et envois des agents reprennent.", "ok"); return rafraichirCommunes();
+        }).catch(function (er) { msg("msg-corbeille", er.message, "ko"); r.disabled = false; });
+      });
+      var x = document.createElement("button"); x.type = "button"; x.className = "second"; x.textContent = "Supprimer définitivement";
+      x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)"; x.disabled = !possible;
+      x.addEventListener("click", function () {
+        var nom = c.nom || c.commune;
+        var tape = prompt("Suppression DÉFINITIVE de « " + nom + " » : dossiers Drive (classeur, photos) à la corbeille Google, récupérables 30 jours ; site coupé ; dépôt GitHub archivé ; commune retirée de la liste.\n\nRetapez le nom exact de la commune pour confirmer :");
+        if (!tape) return;
+        x.disabled = true; msg("msg-corbeille", "Suppression de " + nom + " en cours…");
+        api("commune-supprimer", { commune: c.commune, confirmation: tape }).then(function (j) {
+          msg("msg-corbeille", nom + " est supprimée : " + (j.dossierCommune ? "dossier Drive « " + j.nomDossier + " »" : j.drive + " élément(s) Drive") + " à la corbeille Google (30 jours pour récupérer), dépôt " + j.depot + " archivé.", "ok");
+          return rafraichirCommunes();
+        }).catch(function (er) { msg("msg-corbeille", er.message, "ko"); x.disabled = false; });
+      });
+      l.appendChild(r); l.appendChild(x); box.appendChild(l);
+    });
+  }
+  $("commune-suspendre").addEventListener("click", function () {
+    var com = $("commune-edit").value, c = LISTE_COMMUNES.filter(function (x) { return x.commune === com; })[0], bt = this;
+    if (!c) return;
+    if (!confirm("Mettre « " + (c.nom || c.commune) + " » à la corbeille ?\nElle ne sera plus publiée et les agents ne pourront plus envoyer de photos. Rien n'est effacé : vous pourrez la restaurer.")) return;
+    bt.disabled = true;
+    api("commune-suspendre", { commune: com }).then(function () {
+      msg("msg-suspendre", (c.nom || c.commune) + " est dans la corbeille (en bas de cet onglet).", "ok"); return rafraichirCommunes();
+    }).catch(function (er) { msg("msg-suspendre", er.message, "ko"); }).then(function () { bt.disabled = false; });
+  });
+  function rafraichirCommunes() { return api("communes").then(function (j) { remplirCommunes(j.communes); }); }
+
+  /* — nouvelle commune — */
+  function chargerModele() {
+    api("modele").then(function (j) {
+      FLUX = j.flux || [];
+      var box = $("champs"); box.innerHTML = "";
+      j.params.forEach(function (p) {
+        var wrap = document.createElement("div");
+        if (p.aRemplir) wrap.className = "requis";
+        var lab = document.createElement("label");
+        var b = document.createElement("b"); b.textContent = p.description || p.cle;
+        lab.appendChild(b);
+        var petit = document.createElement("span"); petit.className = "petit"; petit.textContent = "  " + p.cle;
+        lab.appendChild(petit);
+        var inp = document.createElement("input");
+        inp.name = p.cle; inp.type = "text";
+        if (p.aRemplir) { inp.placeholder = p.valeur.replace(/^À REMPLIR\s*:?\s*/i, ""); inp.required = !/insee|codepostal/i.test(p.cle); }
+        else inp.value = p.valeur;
+        lab.htmlFor = inp.id = "p-" + p.cle;
+        verrouTechnique(p.cle, inp, lab);
+        if (p.cle === "commune.nom") setTimeout(function () { ajouterRechercheCommune(inp); }, 0);
+        wrap.appendChild(lab);
+        if (p.cle === "commune.logoDrive") {
+          /* Logo : on dépose un fichier (recommandé) ; le lien Drive reste possible à la place. */
+          inp.required = false; inp.placeholder = "ou collez un lien Drive";
+          var fichier = document.createElement("input");
+          fichier.type = "file"; fichier.accept = "image/png,image/jpeg,image/webp,image/svg+xml"; fichier.id = "logo-fichier";
+          var apercu = document.createElement("img");
+          apercu.id = "logo-apercu"; apercu.alt = ""; apercu.style.cssText = "display:none;width:96px;height:96px;margin:8px 0;border:1px solid var(--trait);border-radius:10px;background:#fff;object-fit:contain";
+          fichier.addEventListener("change", function () {
+            LOGO = null; apercu.style.display = "none";
+            if (!fichier.files || !fichier.files[0]) return;
+            carre(fichier.files[0]).then(function (url) { LOGO = url; apercu.src = url; apercu.style.display = "block"; })
+              .catch(function () { msg("msg-commune", "Image illisible : essayez un PNG ou un JPG.", "ko"); });
+          });
+          wrap.appendChild(fichier); wrap.appendChild(apercu);
+          var chercher = document.createElement("button"); chercher.type = "button"; chercher.className = "second";
+          chercher.textContent = "Chercher le logo de la commune"; chercher.style.cssText = "margin:8px 0;padding:8px 12px;font-size:14px";
+          var galerie = document.createElement("div"); galerie.id = "logo-galerie"; galerie.className = "petit"; galerie.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start";
+          chercher.addEventListener("click", function () { chercherLogo(galerie, apercu, chercher, { prefixe: "p-", msg: "msg-commune", poser: function (url) { LOGO = url; } }); });
+          wrap.appendChild(chercher); wrap.appendChild(galerie);
+          var note = document.createElement("p"); note.className = "petit";
+          note.textContent = "L'image est remise au carré (fond transparent) et réduite à 1024 px au plus ; n8n en tire ensuite le favicon et les icônes.";
+          wrap.appendChild(note);
+        }
+        wrap.appendChild(inp); box.appendChild(wrap);
+      });
+      dessinerFlux();
+      brancherCommune();
+      brancherAdresses();
+    }).catch(function (e) { $("champs").textContent = e.message; });
+  }
+
+  /* Identifiant de commune, même calcul que n8n (sans accents, minuscules, tirets). */
+  function idCommune(n) {
+    return (n || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+
+  /* Adresses : provisoire (GitHub) tant que le sous-domaine n'existe pas, ou définitive.
+     La météo suit toujours l'application (même site + meteo/). */
+  function brancherAdresses() {
+    var app = $("p-adresses.application"), met = $("p-adresses.meteo"), nom = $("p-commune.nom");
+    if (!app || !met) return;
+    var bloc = document.createElement("label");
+    bloc.style.cssText = "display:flex;gap:10px;align-items:flex-start;margin:14px 0 4px;color:var(--encre);font-size:14px";
+    var coche = document.createElement("input"); coche.type = "checkbox"; coche.id = "provisoire"; coche.checked = true;
+    coche.style.cssText = "width:20px;height:20px;margin-top:2px;flex:none";
+    var t = document.createElement("span");
+    t.innerHTML = "<b>Adresse provisoire GitHub</b> — le sous-domaine de la mairie n'existe pas encore. Le site est en ligne tout de suite ; on passera au domaine définitif plus tard (onglet Modifier, carte « Domaine définitif »). Ces adresses ne répondent qu’une fois la commune créée (quelques minutes après la validation) : les liens à copier — site, classeur, Drive, dépôt — s’affichent à la fin de la création.";
+    bloc.appendChild(coche); bloc.appendChild(t);
+    app.parentNode.parentNode.insertBefore(bloc, app.parentNode);
+    function maj() {
+      var p = coche.checked;
+      app.readOnly = met.readOnly = p;
+      app.style.background = met.style.background = p ? "#F1EFE9" : "";
+      if (p) {
+        var id = idCommune(nom ? nom.value : "");
+        app.value = id ? "https://pav-collecte.github.io/pav-" + id + "/" : "";
+        met.value = id ? app.value + "meteo/" : "";
+      }
+    }
+    coche.addEventListener("change", function () { if (!coche.checked) { app.value = ""; met.value = ""; } maj(); });
+    if (nom) { nom.addEventListener("input", maj); nom.addEventListener("change", maj); }
+    app.addEventListener("input", function () {
+      var v = app.value.trim(); if (!v) return;
+      if (v.slice(-1) !== "/") v += "/";
+      met.value = v + "meteo/";
+    });
+    ADRESSES = maj;
+    maj();
+  }
+
+  /* Nom de la commune : suggestions de l'API officielle geo.api.gouv.fr, qui remplit le département
+     (et propose un préfixe si le champ est vide). */
+  /* Préfixe proposé : initiales des mots significatifs (Saint-Rambert-d'Albon → SRA),
+     ou les 3 premières lettres pour un nom d'un seul mot (Albon → ALB). Modifiable. */
+  function prefixeAuto(n) {
+    var vides = ["DE", "DU", "DES", "LA", "LE", "LES", "D", "L", "SUR", "SOUS", "EN", "ET", "AU", "AUX"];
+    var mots = n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[^A-Z]+/)
+      .filter(function (m) { return m && vides.indexOf(m) < 0; });
+    if (!mots.length) return "";
+    if (mots.length === 1) return mots[0].slice(0, 3);
+    return mots.slice(0, 4).map(function (m) { return m.charAt(0); }).join("");
+  }
+
+  function brancherCommune() {
+    var nom = $("p-commune.nom"), dep = $("p-commune.departement"), pre = $("p-commune.prefixeCode");
+    var cp = $("p-commune.codePostal"), insee = $("p-commune.codeInsee");
+    if (!nom) return;
+    var liste = document.createElement("div"); liste.className = "suggestions";
+    liste.style.cssText = "display:none;border:1px solid var(--trait);border-radius:9px;margin-top:4px;background:#fff;overflow:hidden";
+    nom.parentNode.appendChild(liste);
+    var minuteur = null, dernier = "";
+    nom.addEventListener("input", function () {
+      clearTimeout(minuteur);
+      var q = nom.value.trim();
+      if (q.length < 2) { liste.style.display = "none"; return; }
+      minuteur = setTimeout(function () {
+        dernier = q;
+        fetch("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(q) + "&fields=nom,code,codeDepartement,departement,codesPostaux&boost=population&limit=6")
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (q !== dernier) return;
+            liste.innerHTML = "";
+            if (!res.length) { liste.style.display = "none"; return; }
+            res.forEach(function (c) {
+              var b = document.createElement("button"); b.type = "button";
+              b.style.cssText = "display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--trait);background:#fff;font:15px system-ui;color:var(--encre)";
+              b.textContent = c.nom + " — " + c.codeDepartement + " " + ((c.departement && c.departement.nom) || "") + " (" + ((c.codesPostaux || [])[0] || "") + ")";
+              b.addEventListener("click", function () {
+                nom.value = c.nom;
+                if (dep) dep.value = c.codeDepartement;
+                if (cp) cp.value = (c.codesPostaux || [])[0] || "";
+                if (insee) insee.value = c.code || "";
+                if (pre) pre.value = prefixeAuto(c.nom);
+                if (ADRESSES) ADRESSES();
+                liste.style.display = "none";
+              });
+              liste.appendChild(b);
+            });
+            liste.style.display = "block";
+          }).catch(function () { liste.style.display = "none"; });
+      }, 300);
+    });
+  }
+
+  $("form-commune").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var params = {};
+    Array.prototype.forEach.call($("champs").querySelectorAll("input"), function (i) { params[i.name] = i.value.trim(); });
+    var bouton = $("creer"); bouton.disabled = true;
+    $("resultat-commune").innerHTML = "";
+    msg("msg-commune", "Création en cours (dossiers, classeur, dépôt GitHub)… comptez une minute.");
+    if (BROUILLON_ID) msg("msg-commune", "Création de la commune à partir du brouillon (dossiers, classeur, dépôt GitHub)… comptez une minute, puis l'import des points et des agents.");
+    api("creer", { params: params, alertes: $("alertes").value.trim(), logo: LOGO, provisoire: !!($("provisoire") && $("provisoire").checked) }).then(function (j) {
+      msg("msg-commune", "Commune « " + j.nom + " » créée (préfixe " + j.prefixe + ").", "ok");
+      var r = $("resultat-commune"); r.innerHTML = "";
+      var liens = document.createElement("div"); liens.className = "liens";
+      [["Classeur de la commune", j.liens.classeur], ["Dossier Drive", j.liens.dossier], ["Dépôt GitHub", j.liens.depot], ["Site de la commune", j.liens.site]].forEach(function (l) {
+        var ligne = document.createElement("div"); ligne.style.cssText = "display:flex;gap:8px;align-items:center";
+        var a = document.createElement("a"); a.href = l[1]; a.target = "_blank"; a.rel = "noopener"; a.textContent = l[0] + " — " + l[1]; a.style.cssText = "flex:1;min-width:0;overflow-wrap:anywhere";
+        ligne.appendChild(a); ligne.appendChild(boutonCopier(l[1])); liens.appendChild(ligne);
+      });
+      r.appendChild(liens);
+      if (j.dns) afficherDns(r, j.dns);
+      else {
+        var p = document.createElement("p"); p.className = "petit";
+        p.textContent = "Adresse provisoire : le site sera en ligne d'ici quelques minutes. Quand la mairie aura créé son sous-domaine, utilisez l'onglet Modifier, carte « Domaine définitif ».";
+        r.appendChild(p);
+      }
+      var p2 = document.createElement("p"); p2.className = "petit";
+      p2.textContent = "Le logo, config.json et la météo seront publiés au prochain passage de n8n (toutes les 15 minutes). Ajoutez maintenant les points et les agents.";
+      r.appendChild(p2);
+      var osm = $("creer-osm") && $("creer-osm").checked, br = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+      rafraichirCommunes().then(function () {
+        var c = LISTE_COMMUNES.filter(function (x) { return (j.commune && x.commune === j.commune) || (x.nom || "").toLowerCase() === String(j.nom || "").toLowerCase(); })[0];
+        if (!c) return;
+        if (br) return finaliserBrouillon(br, c, r);
+        if (!osm) return;
+        var p3 = document.createElement("p"); p3.className = "petit"; p3.textContent = "Recherche des points OpenStreetMap lancée dans l'onglet Points : cochez ceux à créer.";
+        r.appendChild(p3);
+        preparerOSM(c.commune, j.nom || c.nom || "", "", params["commune.codeInsee"] || "").catch(function () {});
+      });
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); })
+      .then(function () { bouton.disabled = false; });
+  });
+
+  /* — Brouillons de commune : rien n'est créé (ni dossier, ni classeur, ni dépôt) avant la validation. — */
+  var BROUILLONS = [], BROUILLON_ID = "";
+  function estBrouillon(com) { return String(com || "").indexOf("brouillon:") === 0; }
+  function brouillonDe(com) { var id = String(com || "").slice(10); return BROUILLONS.filter(function (b) { return b.id === id; })[0] || null; }
+  function donneesFormulaire() {
+    var params = {};
+    Array.prototype.forEach.call($("champs").querySelectorAll("input[name]"), function (i) { params[i.name] = i.value.trim(); });
+    return { params: params, alertes: $("alertes").value.trim(), logo: LOGO || "", provisoire: !!($("provisoire") && $("provisoire").checked) };
+  }
+  function chargerBrouillons() {
+    return api("brouillons").then(function (j) { BROUILLONS = j.brouillons || []; dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES); });
+  }
+  function sauverBrouillon(id, d) {
+    return api("brouillon-ecrire", { brouillon: { id: id || "", donnees: d } }).then(function (j) {
+      var b = BROUILLONS.filter(function (x) { return x.id === j.id; })[0];
+      if (!b) { b = { id: j.id }; BROUILLONS.push(b); }
+      b.nom = j.nom; b.maj = j.maj; b.donnees = d;
+      dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES); majBrouillonActif();
+      return b;
+    });
+  }
+  function majBrouillonActif() {
+    var box = $("brouillon-actif"), b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    if (!b) { BROUILLON_ID = ""; box.hidden = true; $("creer").textContent = "Créer la commune"; return; }
+    var d = b.donnees || {};
+    box.hidden = false; box.innerHTML = "";
+    box.appendChild(document.createTextNode("Brouillon « " + b.nom + " » ouvert : " + (d.points || []).length + " point(s) et " + (d.agents || []).length + " agent(s) seront créés avec la commune. "));
+    var f = document.createElement("a"); f.href = "#"; f.textContent = "Fermer le brouillon";
+    f.addEventListener("click", function (e) { e.preventDefault(); BROUILLON_ID = ""; majBrouillonActif(); dessinerBrouillons(); });
+    box.appendChild(f);
+    $("creer").textContent = "Valider le brouillon et créer la commune";
+  }
+  function afficherAgents(com) {
+    var b = document.querySelector('nav button[data-onglet="agents"]'); if (b && !b.classList.contains("actif")) b.click();
+    COMMUNE = com;
+    Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) { s.value = com; });
+    listerAgents();
+  }
+  function dessinerBrouillons() {
+    var box = $("liste-brouillons"); box.innerHTML = "";
+    $("carte-brouillons").hidden = !BROUILLONS.length;
+    BROUILLONS.forEach(function (b) {
+      var d = b.donnees || {};
+      var l = document.createElement("div"); l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--trait)";
+      var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:160px";
+      var n = document.createElement("b"); var dpl = ((b.donnees && b.donnees.params) || {})["commune.departement"]; n.textContent = b.nom + (dpl ? " (" + dpl + ")" : "") + (BROUILLON_ID === b.id ? " (ouvert)" : ""); n.style.cssText = "display:block;color:var(--encre);font-size:14px";
+      var s = document.createElement("span");
+      s.textContent = (d.points || []).length + " point(s), " + (d.agents || []).length + " agent(s)" + (b.maj ? " — modifié le " + new Date(b.maj).toLocaleString("fr-FR") : "");
+      t.appendChild(n); t.appendChild(s); l.appendChild(t);
+      [["Reprendre", function () { reprendreBrouillon(b); }], ["Points", function () { afficherPoints("brouillon:" + b.id); }],
+       ["Agents", function () { afficherAgents("brouillon:" + b.id); }], ["Supprimer", function () { supprimerBrouillon(b); }]].forEach(function (x) {
+        var bt = document.createElement("button"); bt.type = "button"; bt.className = "second"; bt.textContent = x[0];
+        bt.style.cssText = "padding:6px 10px;font-size:13px" + (x[0] === "Supprimer" ? ";color:var(--ko)" : "");
+        bt.addEventListener("click", x[1]); l.appendChild(bt);
+      });
+      box.appendChild(l);
+    });
+  }
+  /* Recherche de la commune (geo.api.gouv.fr) : remplit nom officiel, département, code postal et code INSEE
+     dès la saisie, y compris dans un brouillon. En cas d’homonymes, on propose la liste. */
+  /* Infos de la mairie : téléphone, e-mail et site d’après l’Annuaire de l’administration (service-public.fr),
+     nom du maire d’après le Répertoire national des élus (data.gouv.fr). Renvoie la liste de ce qui a été rempli. */
+  /* Réglages techniques (terrain, photos, dépôt…) : grisés et non modifiables par défaut ; « Modifier » les déverrouille au besoin. */
+  function verrouTechnique(cle, inp, lab) {
+    if (!/^(terrain|mentions|depot|photos)[.]|^adresses[.]referentiel$|^commune[.]logo$/.test(cle)) return;
+    inp.readOnly = true; inp.classList.add("technique");
+    var cad = document.createElement("button"); cad.type = "button"; cad.className = "cadenas"; cad.textContent = "🔒 Modifier";
+    cad.title = "Réglage technique : à ne changer qu’en connaissance de cause";
+    cad.addEventListener("click", function (ev) { ev.preventDefault(); inp.readOnly = !inp.readOnly; inp.classList.toggle("technique", inp.readOnly); cad.textContent = inp.readOnly ? "🔒 Modifier" : "🔓 Verrouiller"; if (!inp.readOnly) inp.focus(); });
+    lab.appendChild(cad);
+  }
+  function infosMairie(insee, champ) {
+    var set = function (k, v) { var e = champ(k); v = String(v || "").trim(); if (e && v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); return true; } return false; };
+    var lire = function (v) { try { return typeof v === "string" ? JSON.parse(v) : (v || []); } catch (e) { return []; } };
+    var annuaire = fetch("https://api-lannuaire.service-public.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/records?where=" + encodeURIComponent("code_insee_commune='" + insee + "' and pivot like 'mairie'") + "&limit=5")
+      .then(function (r) { return r.json(); }).then(function (j) {
+        var l = j.results || [], m = l.filter(function (x) { return /^Mairie -/i.test(x.nom || ""); })[0] || l[0]; if (!m) return [];
+        var faits = [];
+        if (set("commune.telephone", (lire(m.telephone)[0] || {}).valeur)) faits.push("téléphone");
+        if (set("commune.email", m.adresse_courriel)) faits.push("e-mail");
+        if (set("commune.siteMairie", (lire(m.site_internet)[0] || {}).valeur)) faits.push("site");
+        return faits;
+      }).catch(function () { return []; });
+    var maire = fetch("https://www.data.gouv.fr/api/1/datasets/5c34c4d1634f4173183a64f1/").then(function (r) { return r.json(); }).then(function (d) {
+      var rs = (d.resources || []).filter(function (r) { return /maire/i.test(r.title || ""); })[0]; if (!rs) return [];
+      return fetch("https://tabular-api.data.gouv.fr/api/resources/" + rs.id + "/data/?" + encodeURIComponent("Code de la commune") + "__exact=" + encodeURIComponent(insee))
+        .then(function (r) { return r.json(); }).then(function (j) {
+          var e = (j.data || [])[0]; if (!e) return [];
+          return set("commune.maire", (e["Prénom de l'élu"] || "") + " " + (e["Nom de l'élu"] || "")) ? ["maire"] : [];
+        });
+    }).catch(function () { return []; });
+    return Promise.all([maire, annuaire]).then(function (l) { return l[0].concat(l[1]); });
+  }
+  /* En cas d’erreur (création, brouillon, modification), on amène l’administrateur sur le champ en cause. */
+  var CHAMP_ERREUR = [[/Nom de commune/i, "commune.nom"], [/Préfixe/i, "commune.prefixeCode"], [/sous-domaine|adresses[.]application/i, "adresses.application"], [/e-mail pour les alertes/i, "#alertes"], [/^Logo/i, "commune.logoDrive"]];
+  function allerAuChamp(idMsg, texte) {
+    var zone = $(idMsg) && $(idMsg).closest(".carte"); if (!zone) return;
+    var t = String(texte || ""), cible = null, champs = zone.querySelectorAll("input[name], textarea[name], select[name]");
+    Array.prototype.some.call(champs, function (i) { if (i.name && i.name.indexOf(".") > 0 && t.indexOf(i.name) >= 0) { cible = i; return true; } });
+    if (!cible) CHAMP_ERREUR.some(function (r) { if (r[0].test(t)) { cible = r[1].charAt(0) === "#" ? $(r[1].slice(1)) : zone.querySelector('[name="' + r[1] + '"]'); return !!cible; } return false; });
+    if (!cible && /remplir|manquant|obligatoire|indiquez/i.test(t)) Array.prototype.some.call(champs, function (i) { if (i.required && !i.value.trim() && i.offsetParent) { cible = i; return true; } });
+    if (!cible || !cible.offsetParent) return;
+    cible.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () { try { cible.focus({ preventScroll: true }); } catch (e) {} }, 400);
+    cible.classList.add("champ-erreur"); setTimeout(function () { cible.classList.remove("champ-erreur"); }, 5000);
+  }
+  var msgSimple = msg;
+  msg = function (id, texte, genre) { msgSimple(id, texte, genre); if (genre === "ko") allerAuChamp(id, texte); };
+  function ajouterRechercheCommune(inp) {
+    if (!inp.parentNode || inp.dataset.recherche) return; inp.dataset.recherche = "1";
+    var pf = inp.id.slice(0, inp.id.indexOf("commune.nom"));
+    var bt = document.createElement("button"); bt.type = "button"; bt.className = "second"; bt.textContent = "Rechercher la commune (code postal, INSEE, mairie)";
+    bt.style.cssText = "margin:6px 0 4px;padding:7px 12px;font-size:13px";
+    var res = document.createElement("div"); res.className = "petit"; res.style.margin = "4px 0 10px";
+    inp.parentNode.insertBefore(res, inp.nextSibling); inp.parentNode.insertBefore(bt, res);
+    function champ(k) { return document.getElementById(pf + k); }
+    function poser(c) {
+      var set = function (k, v) { var e = champ(k); if (e && v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); } };
+      set("commune.nom", c.nom); set("commune.departement", c.codeDepartement); set("commune.codeInsee", c.code);
+      var cps = c.codesPostaux || []; set("commune.codePostal", cps[0]);
+      res.textContent = "✓ " + c.nom + " (" + c.codeDepartement + ") — INSEE " + c.code + (cps.length ? " — code postal " + cps[0] + (cps.length > 1 ? " (autres : " + cps.slice(1).join(", ") + ")" : "") : "") + "." + (BROUILLON_ID ? " Pensez à enregistrer le brouillon." : "");
+      if (champ("commune.maire") || champ("commune.telephone")) {
+        var base = res.textContent; res.textContent = base + " Recherche des infos de la mairie…";
+        infosMairie(c.code, champ).then(function (f) { res.textContent = base + (f.length ? " Mairie : " + f.join(", ") + " trouvé(s) — à vérifier." : " Infos de la mairie introuvables : à saisir à la main."); });
+      }
+    }
+    function chercher() {
+      var nom = inp.value.trim(), dep = ((champ("commune.departement") || {}).value || "").trim();
+      if (!nom) { res.textContent = "Indiquez d’abord le nom de la commune."; return; }
+      res.textContent = "Recherche…"; bt.disabled = true;
+      var url = "https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + (dep ? "&codeDepartement=" + encodeURIComponent(dep) : "") + "&fields=nom,code,codesPostaux,codeDepartement&boost=population&limit=8";
+      fetch(url).then(function (r) { return r.json(); }).then(function (l) {
+        if (!l.length) { res.textContent = "Aucune commune « " + nom + " »" + (dep ? " dans le " + dep : "") + " : vérifiez l’orthographe" + (dep ? " ou le département." : "."); return; }
+        var exact = l.filter(function (c) { return c.nom.toLowerCase() === nom.toLowerCase(); });
+        if (exact.length === 1 || l.length === 1) { poser(exact[0] || l[0]); return; }
+        res.textContent = "Plusieurs communes possibles : ";
+        l.forEach(function (c) { var b = document.createElement("button"); b.type = "button"; b.className = "second"; b.style.cssText = "margin:4px 6px 0 0;padding:5px 10px;font-size:13px"; b.textContent = c.nom + " (" + c.codeDepartement + ")"; b.addEventListener("click", function () { poser(c); }); res.appendChild(b); });
+      }).catch(function () { res.textContent = "Recherche impossible pour le moment (réseau)."; }).then(function () { bt.disabled = false; });
+    }
+    bt.addEventListener("click", chercher);
+  }
+  function reprendreBrouillon(b) {
+    var d = b.donnees || {}, p = d.params || {};
+    BROUILLON_ID = b.id;
+    Array.prototype.forEach.call($("champs").querySelectorAll("input[name]"), function (i) { if (p[i.name] !== undefined) i.value = p[i.name]; });
+    $("alertes").value = d.alertes || "";
+    if ($("provisoire")) $("provisoire").checked = !!d.provisoire;
+    LOGO = d.logo || null;
+    var ap = $("logo-apercu"); if (ap) { if (LOGO) { ap.src = LOGO; ap.style.display = "block"; } else ap.style.display = "none"; }
+    majBrouillonActif(); dessinerBrouillons();
+    var nb = document.querySelector('nav button[data-onglet="commune"]'); if (nb && !nb.classList.contains("actif")) nb.click();
+    $("form-commune").scrollIntoView({ behavior: "smooth", block: "start" });
+    msg("msg-commune", "Brouillon « " + b.nom + " » repris. Complétez si besoin, enregistrez, ou validez pour créer la commune.", "ok");
+  }
+  function supprimerBrouillon(b) {
+    if (!confirm("Supprimer définitivement le brouillon « " + b.nom + " » ?\n\n" + ((b.donnees.points || []).length) + " point(s) et " + ((b.donnees.agents || []).length) + " agent(s) préparés seront effacés.\nAucune commune n'a encore été créée : rien d'autre n'est touché.")) return;
+    msg("msg-commune", "Suppression du brouillon « " + b.nom + " »…");
+    api("brouillon-supprimer", { id: b.id }).then(function () {
+      BROUILLONS = BROUILLONS.filter(function (x) { return x.id !== b.id; });
+      if (BROUILLON_ID === b.id) BROUILLON_ID = "";
+      dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES); majBrouillonActif();
+      msg("msg-commune", "✓ Brouillon « " + b.nom + " » supprimé : ses " + ((b.donnees.points || []).length) + " point(s) et " + ((b.donnees.agents || []).length) + " agent(s) préparés ont été effacés. Aucune commune n'avait été créée.", "ok");
+      $("msg-commune").scrollIntoView({ behavior: "smooth", block: "center" });
+    }).catch(function (er) { msg("msg-commune", "Suppression impossible : " + er.message, "ko"); $("msg-commune").scrollIntoView({ behavior: "smooth", block: "center" }); });
+  }
+  $("brouillon-enregistrer").addEventListener("click", function () {
+    var bt = this, d = donneesFormulaire(), anc = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    if (!d.params["commune.nom"]) { msg("msg-commune", "Indiquez au moins le nom de la commune pour enregistrer le brouillon.", "ko"); return; }
+    d.points = anc ? (anc.donnees.points || []) : []; d.agents = anc ? (anc.donnees.agents || []) : [];
+    bt.disabled = true; msg("msg-commune", "Enregistrement du brouillon…");
+    var nouveau = !anc, osm = $("creer-osm") && $("creer-osm").checked;
+    sauverBrouillon(anc ? anc.id : "", d).then(function (b) {
+      BROUILLON_ID = b.id; majBrouillonActif(); dessinerBrouillons();
+      msg("msg-commune", "Brouillon « " + b.nom + " » enregistré : la commune n'est pas encore créée." + (nouveau && osm ? " Recherche des points OpenStreetMap…" : " Préparez ses points et ses agents (choisissez « Brouillon — " + b.nom + " » dans les onglets Points et Agents), puis revenez valider."), "ok");
+      if (nouveau && osm) return integrerOSMBrouillon(b);
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); }).then(function () { bt.disabled = false; });
+  });
+  /* À la création d'un brouillon : les conteneurs connus d'OpenStreetMap sont ajoutés d'office au brouillon
+     (points « à vérifier », retirables dans l'onglet Points). En cas d'homonymes, on laisse choisir dans l'onglet Points. */
+  function integrerOSMBrouillon(b) {
+    var p = b.donnees.params || {};
+    return api("osm-chercher", { commune: "brouillon:" + b.id, brouillon: true, ville: p["commune.nom"] || b.nom,
+      departement: p["commune.departement"] || "", insee: p["commune.codeInsee"] || "" }).then(function (j) {
+      if (j.choix && j.choix.length) {
+        msg("msg-commune", "Brouillon « " + b.nom + " » enregistré. Plusieurs communes portent ce nom : ouvrez l'onglet Points (« Brouillon — " + b.nom + " ») et lancez « Chercher dans OpenStreetMap » pour choisir la bonne.", "ok");
+        return;
+      }
+      var connus = FLUX.map(function (f) { return f.id; }), existants = pointsDuBrouillon(b);
+      var ajout = (j.candidats || []).filter(function (c) {
+        return !existants.some(function (e) { return distM(c, { lat: Number(e.lat), lon: Number(e.lon) }) < 40; });
+      }).map(function (c) {
+        var u = {}; Object.keys(c.unites || {}).forEach(function (f) { if (connus.indexOf(f) >= 0 && c.unites[f] > 0) u[f] = c.unites[f]; });
+        if (!Object.keys(u).length) FLUX.forEach(function (f) { u[f.id] = 1; });
+        return { nom: c.nom, lat: c.lat, lon: c.lon, unites: u };
+      });
+      if (!ajout.length) { msg("msg-commune", "Brouillon « " + b.nom + " » enregistré. Aucun conteneur trouvé sur OpenStreetMap pour " + (j.commune || b.nom) + " : ajoutez les points dans l'onglet Points (fichier, assistant).", "ok"); return; }
+      var liste = (b.donnees.points = b.donnees.points || []);
+      ajout.forEach(function (x) { liste.push(x); });
+      return sauverBrouillon(b.id, b.donnees).then(function () {
+        msg("msg-commune", "Brouillon « " + b.nom + " » enregistré avec " + ajout.length + " point(s) OpenStreetMap (" + (j.commune || b.nom) + "), à vérifier sur le terrain après création. Retirez ceux qui n'existent pas dans l'onglet Points ; préparez les agents dans l'onglet Agents, puis revenez valider.", "ok");
+      });
+    }).catch(function (er) {
+      msg("msg-commune", "Brouillon « " + b.nom + " » enregistré, mais la recherche OpenStreetMap a échoué (" + er.message + "). Relancez-la depuis l'onglet Points.", "ko");
+    });
+  }
+  function finaliserBrouillon(br, c, r) {
+    var d = br.donnees || {}, pts = d.points || [], ags = d.agents || [], lignes = [], p = Promise.resolve();
+    if (pts.length) p = p.then(function () {
+      msg("msg-commune", "Commune créée. Import des " + pts.length + " point(s) du brouillon…");
+      return api("points-importer", { commune: c.commune, points: pts }).then(function (j) { lignes.push(j.codes.length + " point(s) créé(s) « à vérifier » : " + j.codes.join(", ")); });
+    });
+    ags.forEach(function (nom, i) {
+      p = p.then(function () {
+        msg("msg-commune", "Création des codes d'agents… " + (i + 1) + " / " + ags.length);
+        return api("agent", { commune: c.commune, nom: nom }).then(function (j) { lignes.push("Agent " + j.nom + " : " + j.code); });
+      });
+    });
+    return p.then(function () { return api("brouillon-supprimer", { id: br.id }); }).then(function () {
+      BROUILLONS = BROUILLONS.filter(function (x) { return x.id !== br.id; }); BROUILLON_ID = "";
+      majBrouillonActif(); dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES);
+      msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon.", "ok");
+    }).catch(function (er) {
+      msg("msg-commune", "Commune créée, mais l'import du brouillon s'est arrêté : " + er.message + ". Le brouillon est conservé ; terminez depuis les onglets Points et Agents.", "ko");
+    }).then(function () {
+      if (!lignes.length) return;
+      var pre = document.createElement("div"); pre.className = "petit"; pre.style.cssText = "white-space:pre-line;font-family:ui-monospace,Menlo,monospace;margin-top:8px";
+      pre.textContent = lignes.join("\n"); r.appendChild(pre);
+    });
+  }
+
+  function afficherDns(r, dns) {
+    var h2 = document.createElement("h2"); h2.style.marginTop = "14px"; h2.textContent = "À faire chez l’hébergeur du domaine";
+    var p = document.createElement("p"); p.className = "petit";
+    p.textContent = "Dans la zone DNS de " + dns.zone + ", créez cette entrée. Le site passe sur ce domaine dès que le DNS est propagé (jusqu’à une heure) ; activez ensuite « Enforce HTTPS » dans les réglages Pages du dépôt.";
+    var t = document.createElement("table"); t.className = "dns";
+    [["Type", dns.type], ["Sous-domaine", dns.nom], ["Cible", dns.cible]].forEach(function (l) {
+      var tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td");
+      a.textContent = l[0]; b.textContent = l[1]; tr.appendChild(a); tr.appendChild(b);
+      var cc = document.createElement("td"); cc.style.width = "1%"; cc.appendChild(boutonCopier(l[1])); tr.appendChild(cc); t.appendChild(tr);
+    });
+    r.appendChild(h2); r.appendChild(p); r.appendChild(t);
+  }
+
+  /* — modifier une commune — */
+  var LOGO_EDIT = null, PREFIXE_INIT = "", COMMUNE_EDIT = "";
+  function chargerCommune() {
+    var box = $("champs-edit"); box.innerHTML = "";
+    COMMUNE_EDIT = $("commune-edit").value;
+    msg("msg-edit", "Chargement…");
+    api("lire-commune", { commune: COMMUNE_EDIT }).then(function (j) {
+      cacher("msg-edit"); LOGO_EDIT = null; PREFIXE_INIT = "";
+      var titre = document.createElement("h2"); titre.style.marginTop = "14px"; titre.textContent = j.nom;
+      box.appendChild(titre);
+      j.params.forEach(function (p) {
+        var lab = document.createElement("label");
+        var b = document.createElement("b"); b.textContent = p.description || p.cle; lab.appendChild(b);
+        var petit = document.createElement("span"); petit.className = "petit"; petit.textContent = "  " + p.cle; lab.appendChild(petit);
+        var inp = document.createElement("input"); inp.type = "text"; inp.name = p.cle; inp.value = p.valeur;
+        lab.htmlFor = inp.id = "e-" + p.cle; verrouTechnique(p.cle, inp, lab);
+        box.appendChild(lab);
+        if (p.cle.indexOf("adresses.") === 0) { inp.readOnly = true; inp.style.background = "#F1EFE9"; inp.dataset.ignore = "1"; }
+        if (p.cle === "commune.prefixeCode") PREFIXE_INIT = p.valeur;
+        if (p.cle === "commune.logoDrive") {
+          var actuel = document.createElement("img"); actuel.alt = "Logo actuel";
+          actuel.style.cssText = "display:none;width:96px;height:96px;margin:8px 0;border:1px solid var(--trait);border-radius:10px;background:#fff;object-fit:contain";
+          var apercuLogo = function (url) {
+            if (!url) { actuel.style.display = "none"; return; }
+            api("logo", { url: url }).then(function (r) { actuel.src = r.data; actuel.style.display = "block"; })
+              .catch(function () { actuel.style.display = "none"; });
+          };
+          box.appendChild(actuel);
+          apercuLogo(p.valeur);
+          inp.addEventListener("change", function () { apercuLogo(inp.value.trim()); });
+          var note = document.createElement("p"); note.className = "petit"; note.textContent = "Nouveau logo (facultatif) : il remplace le lien ci-dessous.";
+          var f = document.createElement("input"); f.type = "file"; f.accept = "image/png,image/jpeg,image/webp,image/svg+xml";
+          var ap = document.createElement("img"); ap.alt = "";
+          ap.style.cssText = "display:none;width:96px;height:96px;margin:8px 0;border:1px solid var(--trait);border-radius:10px;background:#fff;object-fit:contain";
+          f.addEventListener("change", function () {
+            LOGO_EDIT = null; ap.style.display = "none";
+            if (!f.files || !f.files[0]) return;
+            carre(f.files[0]).then(function (url) { LOGO_EDIT = url; ap.src = url; ap.style.display = "block"; })
+              .catch(function () { msg("msg-edit", "Image illisible : essayez un PNG ou un JPG.", "ko"); });
+          });
+          box.appendChild(note); box.appendChild(f); box.appendChild(ap);
+          var chE = document.createElement("button"); chE.type = "button"; chE.className = "second";
+          chE.textContent = "Chercher le logo de la commune"; chE.style.cssText = "margin:8px 0;padding:8px 12px;font-size:14px";
+          var galE = document.createElement("div"); galE.className = "petit"; galE.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start";
+          chE.addEventListener("click", function () { chercherLogo(galE, ap, chE, { prefixe: "e-", msg: "msg-edit", poser: function (url) { LOGO_EDIT = url; } }); });
+          box.appendChild(chE); box.appendChild(galE);
+        }
+        box.appendChild(inp);
+        if (inp.readOnly && inp.value) box.appendChild(boutonCopier(inp.value, "Copier l’adresse"));
+      });
+      var la = document.createElement("label"); la.htmlFor = "e-alertes"; la.innerHTML = "<b>E-mails des alertes</b> — séparés par des virgules";
+      var ia = document.createElement("input"); ia.type = "text"; ia.id = "e-alertes"; ia.value = j.alertes || ""; ia.inputMode = "email";
+      box.appendChild(la); box.appendChild(ia);
+      var bt = document.createElement("button"); bt.className = "principal"; bt.type = "button"; bt.textContent = "Enregistrer les modifications";
+      bt.addEventListener("click", function () { enregistrerCommune(bt); });
+      box.appendChild(bt);
+    }).catch(function (er) { msg("msg-edit", er.message, "ko"); });
+  }
+  function enregistrerCommune(bt) {
+    var params = {};
+    Array.prototype.forEach.call($("champs-edit").querySelectorAll("input[type=text]"), function (i) {
+      if (i.name && !i.dataset.ignore) params[i.name] = i.value.trim();
+    });
+    var pre = (params["commune.prefixeCode"] || "").toUpperCase();
+    if (PREFIXE_INIT && pre && pre !== PREFIXE_INIT.toUpperCase()
+      && !confirm("Le préfixe passe de " + PREFIXE_INIT + " à " + pre + ". Les codes des agents déjà créés commencent par l'ancien préfixe : il faudra sans doute leur en créer de nouveaux. Continuer ?")) return;
+    bt.disabled = true; msg("msg-edit", "Enregistrement…");
+    api("modifier-commune", { commune: COMMUNE_EDIT, params: params, alertes: $("e-alertes").value.trim(), logo: LOGO_EDIT }).then(function (j) {
+      msg("msg-edit", "Commune « " + j.nom + " » mise à jour (" + j.n + " paramètres" + (j.logo ? ", nouveau logo" : "") + "). Le site suit au prochain passage de n8n (15 minutes).", "ok");
+      PREFIXE_INIT = pre || PREFIXE_INIT;
+      rafraichirCommunes();
+    }).catch(function (er) { msg("msg-edit", er.message, "ko"); })
+      .then(function () { bt.disabled = false; });
+  }
+  $("charger-commune").addEventListener("click", chargerCommune);
+  $("commune-edit").addEventListener("change", chargerCommune);
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
+    if (b.dataset.onglet === "modifier") b.addEventListener("click", function () {
+      if (COMMUNE_EDIT !== $("commune-edit").value || !$("champs-edit").children.length) chargerCommune();
+    });
+  });
+
+  /* — domaine définitif — */
+  $("basculer").addEventListener("click", function () {
+    var b = this; b.disabled = true; $("resultat-domaine").innerHTML = "";
+    var dom = $("domaine").value.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    msg("msg-domaine", dom ? "Passage sur " + dom + "…" : "Retour à l'adresse provisoire…");
+    api("adresse", { commune: $("commune-domaine").value, domaine: dom }).then(function (j) {
+      msg("msg-domaine", "Adresse de " + j.nom + " : " + j.app, "ok");
+      $("resultat-domaine").appendChild(boutonCopier(j.app, "Copier l’adresse"));
+      if (j.dns) afficherDns($("resultat-domaine"), j.dns);
+      rafraichirCommunes();
+    }).catch(function (er) { msg("msg-domaine", er.message, "ko"); })
+      .then(function () { b.disabled = false; });
+  });
+
+  /* — points — */
+  function dessinerFlux() {
+    var g = $("grille-flux"); g.innerHTML = "";
+    FLUX.forEach(function (f) {
+      var s = document.createElement("span"); s.textContent = f.libelle;
+      var i = document.createElement("input"); i.type = "number"; i.min = "0"; i.max = "20"; i.step = "1"; i.value = "0"; i.inputMode = "numeric"; i.dataset.flux = f.id;
+      g.appendChild(s); g.appendChild(i);
+    });
+  }
+  $("btn-gps").addEventListener("click", function () {
+    if (!navigator.geolocation) { $("gps-etat").textContent = "GPS indisponible"; return; }
+    position = null;
+    $("gps-etat").textContent = "recherche…";
+    var meilleur = null, fin = Date.now() + 20000;
+    var w = navigator.geolocation.watchPosition(function (p) {
+      if (!meilleur || p.coords.accuracy < meilleur.coords.accuracy) meilleur = p;
+      $("gps-etat").textContent = meilleur.coords.latitude.toFixed(6) + ", " + meilleur.coords.longitude.toFixed(6) + " ± " + Math.round(meilleur.coords.accuracy) + " m";
+      if (meilleur.coords.accuracy <= 10 || Date.now() > fin) { navigator.geolocation.clearWatch(w); position = meilleur; }
+      else position = meilleur;
+    }, function (err) { $("gps-etat").textContent = "refusé : " + err.message; }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    setTimeout(function () { navigator.geolocation.clearWatch(w); }, 21000);
+  });
+  /* Modification d'un point existant : le formulaire passe en mode édition. */
+  var EDIT_POINT = null;
+  /* Repère visuel : ligne du point en cours de modification, bouton enfoncé, formulaire encadré. */
+  function marquerEdition(bouton, ligne) {
+    Array.prototype.forEach.call(document.querySelectorAll("#liste-points .en-edition"), function (e) { e.classList.remove("en-edition"); });
+    Array.prototype.forEach.call(document.querySelectorAll("#liste-points button.actif"), function (e) { e.classList.remove("actif"); e.textContent = "Modifier"; });
+    $("titre-point").parentNode.classList.toggle("edition", !!bouton);
+    if (bouton) { bouton.classList.add("actif"); bouton.textContent = "En cours ↑"; }
+    if (ligne) ligne.classList.add("en-edition");
+  }
+  function modeNouveau() {
+    EDIT_POINT = null;
+    marquerEdition(null, null);
+    $("titre-point").textContent = "Nouveau point de collecte";
+    $("ajouter-point").textContent = "Enregistrer le point";
+    $("annuler-point").style.display = "none"; $("bloc-actif").style.display = "none";
+    $("nom-point").value = ""; position = null; $("gps-etat").textContent = "—";
+    Array.prototype.forEach.call($("grille-flux").querySelectorAll("input"), function (i) { i.value = "0"; });
+  }
+  function modeEdition(pt, com, bouton, ligne) {
+    EDIT_POINT = { code: pt.code, lat: pt.lat, lon: pt.lon, commune: com };
+    marquerEdition(bouton, ligne);
+    $("titre-point").textContent = "Modifier le point " + pt.code;
+    $("ajouter-point").textContent = "Enregistrer les modifications";
+    $("annuler-point").style.display = "block"; $("bloc-actif").style.display = "flex";
+    $("point-actif").checked = pt.actif !== "non" && pt.actif !== "a_verifier";
+    EDIT_POINT.aVerifier = pt.actif === "a_verifier";
+    $("nom-point").value = pt.nom; position = null;
+    $("gps-etat").textContent = "position actuelle conservée (" + pt.lat + ", " + pt.lon + ") — reprenez-la pour la changer";
+    Array.prototype.forEach.call($("grille-flux").querySelectorAll("input"), function (i) { i.value = String((pt.unites || {})[i.dataset.flux] || 0); });
+    cacher("msg-point");
+    $("titre-point").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  $("annuler-point").addEventListener("click", function () { modeNouveau(); cacher("msg-point"); });
+  $("ajouter-point").addEventListener("click", function () {
+    if (estBrouillon($("commune-point").value)) { msg("msg-point", "Pour un brouillon, ajoutez les points avec « Pré-remplir les points » (OpenStreetMap, fichier) ou l'assistant ; la saisie sur place se fera une fois la commune créée.", "ko"); return; }
+    if (!position && !EDIT_POINT) { msg("msg-point", "Prenez d'abord la position.", "ko"); return; }
+    var unites = {};
+    Array.prototype.forEach.call($("grille-flux").querySelectorAll("input"), function (i) { unites[i.dataset.flux] = Number(i.value) || 0; });
+    var b = this; b.disabled = true;
+    msg("msg-point", "Enregistrement…");
+    var nomCommune = $("commune-point").selectedOptions[0].textContent;
+    var envoi = EDIT_POINT
+      ? api("modifier-point", {
+          commune: EDIT_POINT.commune, code: EDIT_POINT.code, nom: $("nom-point").value.trim(),
+          lat: position ? position.coords.latitude : EDIT_POINT.lat, lon: position ? position.coords.longitude : EDIT_POINT.lon,
+          unites: unites, actif: $("point-actif").checked ? true : (EDIT_POINT.aVerifier ? "a_verifier" : false)
+        }).then(function (j) { return "Point " + j.code + " modifié (" + j.lignes + " flux" + (j.actif === "non" ? ", inactif" : "") + ")."; })
+      : api("point", {
+          commune: $("commune-point").value, nom: $("nom-point").value.trim(),
+          lat: position.coords.latitude, lon: position.coords.longitude, precision: position.coords.accuracy,
+          unites: unites
+        }).then(function (j) { return "Point " + j.code + " enregistré pour " + nomCommune + " (" + j.lignes + " flux). Vous pouvez passer au suivant."; });
+    envoi.then(function (texte) {
+      msg("msg-point", texte, "ok");
+      modeNouveau();
+      listerPoints();
+    }).catch(function (er) { msg("msg-point", er.message, "ko"); })
+      .then(function () { b.disabled = false; });
+  });
+
+  /* Liste des points de la commune choisie, avec suppression. */
+  function pointsDuBrouillon(b) { return (b.donnees.points || []).map(function (p, i) { return { code: "B" + (i + 1), nom: p.nom, lat: p.lat, lon: p.lon }; }); }
+  function listerPointsBrouillon(com) {
+    var box = $("liste-points"), b = brouillonDe(com); box.innerHTML = "";
+    if (!b) { box.textContent = "Brouillon introuvable."; return; }
+    var pts = (b.donnees.points = b.donnees.points || []);
+    POINTS_COMMUNE = pointsDuBrouillon(b);
+    var info = document.createElement("p"); info.className = "petit";
+    info.textContent = "Brouillon « " + b.nom + " » : ces points seront créés « à vérifier » à la validation de la commune (onglet Créer).";
+    box.appendChild(info);
+    if (!pts.length) { var v = document.createElement("div"); v.textContent = "Aucun point pour l'instant : utilisez « Pré-remplir les points » ci-dessous, ou l'assistant."; box.appendChild(v); return; }
+    pts.forEach(function (pt, i) {
+      var l = document.createElement("div");
+      l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--trait)";
+      var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:150px";
+      var n = document.createElement("b"); n.textContent = "B" + (i + 1) + " — " + pt.nom; n.style.cssText = "display:block;color:var(--encre);font-size:14px";
+      var s = document.createElement("span"); s.textContent = Object.keys(pt.unites || {}).map(function (f) { return libFlux(f) + " × " + pt.unites[f]; }).join(", ");
+      t.appendChild(n); t.appendChild(s);
+      var a = document.createElement("a"); a.textContent = "carte"; a.href = "#";
+      a.addEventListener("click", function (ev) { ev.preventDefault(); window.ouvrirCarte(pt.lat, pt.lon, pt.nom); });
+      var x = document.createElement("button"); x.type = "button"; x.className = "second"; x.textContent = "Retirer";
+      x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
+      x.addEventListener("click", function () {
+        x.disabled = true; pts.splice(i, 1);
+        sauverBrouillon(b.id, b.donnees).then(function () { listerPoints(); }).catch(function (er) { msg("msg-liste", er.message, "ko"); x.disabled = false; });
+      });
+      l.appendChild(t); l.appendChild(a); l.appendChild(x); box.appendChild(l);
+    });
+  }
+  function listerPoints() {
+    var box = $("liste-points"), com = $("commune-point").value;
+    if (!com) { box.textContent = "—"; return; }
+    if (estBrouillon(com)) return listerPointsBrouillon(com);
+    box.textContent = "Chargement…"; cacher("msg-liste");
+    api("points", { commune: com }).then(function (j) {
+      box.innerHTML = ""; POINTS_COMMUNE = j.points;
+      if (!j.points.length) { box.textContent = "Aucun point pour l'instant."; return; }
+      j.points.forEach(function (pt) {
+        var l = document.createElement("div");
+        l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--trait)";
+        var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:150px";
+        var b = document.createElement("b"); b.textContent = pt.code + " — " + pt.nom; b.style.cssText = "display:block;color:var(--encre);font-size:14px";
+        var s = document.createElement("span"); s.textContent = pt.flux.join(", ") + (pt.actif === "a_verifier" ? " — à vérifier sur le terrain" : (pt.actif && pt.actif !== "oui" ? " (inactif)" : ""));
+        t.appendChild(b); t.appendChild(s);
+        var carte = document.createElement("a"); carte.textContent = "carte"; carte.href = "#"; carte.addEventListener("click", function (ev) { ev.preventDefault(); window.ouvrirCarte(pt.lat, pt.lon, pt.code + " — " + pt.nom); });
+        var x = document.createElement("button"); x.type = "button"; x.className = "second"; x.textContent = "Supprimer";
+        x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
+        x.addEventListener("click", function () {
+          if (!confirm("Supprimer le point " + pt.code + " (" + pt.nom + ") du Referentiel ?\nLes relevés déjà faits restent dans l'onglet Observations.")) return;
+          x.disabled = true;
+          api("supprimer-point", { commune: com, code: pt.code }).then(function () {
+            if (EDIT_POINT && EDIT_POINT.code === pt.code) modeNouveau();
+            msg("msg-liste", "Point " + pt.code + " supprimé.", "ok"); listerPoints();
+          }).catch(function (er) { msg("msg-liste", er.message, "ko"); x.disabled = false; });
+        });
+        var m = document.createElement("button"); m.type = "button"; m.className = "second"; m.textContent = "Modifier";
+        m.style.cssText = "padding:6px 10px;font-size:13px";
+        m.addEventListener("click", function () { modeEdition(pt, com, m, l); });
+        l.appendChild(t); l.appendChild(carte); l.appendChild(boutonCopier(String(pt.lat).replace(",", ".") + ", " + String(pt.lon).replace(",", "."), "Copier GPS")); l.appendChild(m); l.appendChild(x); box.appendChild(l);
+      });
+    }).catch(function (er) { box.textContent = ""; msg("msg-liste", er.message, "ko"); });
+  }
+  $("rafraichir-points").addEventListener("click", listerPoints);
+  $("commune-point").addEventListener("change", listerPoints);
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
+    if (b.dataset.onglet === "points") b.addEventListener("click", listerPoints);
+  });
+
+  /* Liste des agents (codes d'accès) de la commune choisie, avec suppression. */
+  function listerAgentsBrouillon(com) {
+    var box = $("liste-agents"), b = brouillonDe(com); box.innerHTML = "";
+    if (!b) { box.textContent = "Brouillon introuvable."; return; }
+    var ags = (b.donnees.agents = b.donnees.agents || []);
+    var info = document.createElement("p"); info.textContent = "Brouillon « " + b.nom + " » : les codes seront créés à la validation de la commune.";
+    box.appendChild(info);
+    if (!ags.length) { var v = document.createElement("div"); v.textContent = "Aucun agent pour l'instant."; box.appendChild(v); return; }
+    ags.forEach(function (nom, i) {
+      var l = document.createElement("div"); l.style.cssText = "display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--trait)";
+      var t = document.createElement("b"); t.textContent = nom; t.style.cssText = "flex:1;color:var(--encre);font-size:14px";
+      var x = document.createElement("button"); x.type = "button"; x.className = "second"; x.textContent = "Retirer";
+      x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
+      x.addEventListener("click", function () { x.disabled = true; ags.splice(i, 1); sauverBrouillon(b.id, b.donnees).then(listerAgents).catch(function (er) { msg("msg-agents", er.message, "ko"); }); });
+      l.appendChild(t); l.appendChild(x); box.appendChild(l);
+    });
+  }
+  function listerAgents() {
+    var box = $("liste-agents"), com = $("commune-agent").value;
+    if (!com) { box.textContent = "—"; return; }
+    if (estBrouillon(com)) return listerAgentsBrouillon(com);
+    box.textContent = "Chargement…"; cacher("msg-agents");
+    api("agents", { commune: com }).then(function (j) {
+      box.innerHTML = "";
+      if (!j.agents.length) { box.textContent = "Aucun agent pour l'instant."; return; }
+      j.agents.forEach(function (ag) {
+        var inactif = ag.actif && ag.actif !== "oui";
+        var bloc = document.createElement("div"); bloc.style.cssText = "padding:9px 0;border-bottom:1px solid var(--trait)";
+        var l = document.createElement("div"); l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center";
+        var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:150px" + (inactif ? ";opacity:.55" : "");
+        var b = document.createElement("b"); b.textContent = (ag.nom || "(sans nom)") + (inactif ? " — inactif" : "") + (ag.admin ? " — administrateur terrain" : "");
+        b.style.cssText = "display:block;color:var(--encre);font-size:14px";
+        var s = document.createElement("span"); s.textContent = ag.code; s.style.cssText = "font:14px ui-monospace, Menlo, monospace;user-select:all";
+        t.appendChild(b); t.appendChild(s);
+        var m = document.createElement("button"); m.type = "button"; m.className = "second"; m.textContent = "Modifier";
+        m.style.cssText = "padding:6px 10px;font-size:13px";
+        var x = document.createElement("button"); x.type = "button"; x.className = "second"; x.textContent = "Supprimer";
+        x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
+        x.addEventListener("click", function () {
+          if (!confirm("Supprimer le code " + ag.code + " (" + (ag.nom || "") + ") ? L'agent ne pourra plus se connecter. Ses relevés déjà faits restent dans l'onglet Observations.")) return;
+          x.disabled = true;
+          api("supprimer-agent", { commune: com, code: ag.code }).then(function () {
+            msg("msg-agents", "Code " + ag.code + " supprimé.", "ok"); listerAgents();
+          }).catch(function (er) { msg("msg-agents", er.message, "ko"); x.disabled = false; });
+        });
+        l.appendChild(t); l.appendChild(boutonCopier(ag.code)); l.appendChild(boutonQR(ag.code, ag.nom, com)); l.appendChild(m); l.appendChild(x);
+        bloc.appendChild(l);
+        /* Panneau de modification : nom, actif, nouveau code. */
+        var ed = document.createElement("div");
+        ed.style.cssText = "display:none;margin-top:8px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px";
+        ed.innerHTML = '<label><b>Nom</b></label><input type="text" class="ag-nom">'
+          + '<label style="display:flex;gap:10px;align-items:center;color:var(--encre);font-size:14px"><input type="checkbox" class="ag-actif" style="width:20px;height:20px;flex:none"> Agent actif (décochez pour bloquer son accès sans le supprimer)</label>'
+          + '<label style="display:flex;gap:10px;align-items:center;color:var(--encre);font-size:14px"><input type="checkbox" class="ag-code" style="width:20px;height:20px;flex:none"> Générer un nouveau code (l’ancien ne fonctionnera plus)</label>'
+          + '<label style="display:flex;gap:10px;align-items:center;color:var(--encre);font-size:14px"><input type="checkbox" class="ag-admin" style="width:20px;height:20px;flex:none"> Administrateur terrain : peut modifier les points (nom, position, conteneurs) depuis l’appli de tournée</label>'
+        + '<button type="button" class="principal ag-ok">Enregistrer</button>';
+        ed.querySelector(".ag-nom").value = ag.nom || "";
+        ed.querySelector(".ag-actif").checked = !inactif; ed.querySelector(".ag-admin").checked = !!ag.admin;
+        m.addEventListener("click", function () {
+          var ouvert = ed.style.display === "none";
+          ed.style.display = ouvert ? "block" : "none";
+          m.classList.toggle("actif", ouvert); m.textContent = ouvert ? "Fermer" : "Modifier";
+          bloc.classList.toggle("en-edition", ouvert);
+        });
+        ed.querySelector(".ag-ok").addEventListener("click", function () {
+          var bt = this, neuf = ed.querySelector(".ag-code").checked;
+          if (neuf && !confirm("Remplacer le code " + ag.code + " ? L’agent devra saisir le nouveau code dans l’application.")) return;
+          bt.disabled = true;
+          api("modifier-agent", {
+            commune: com, code: ag.code, nom: ed.querySelector(".ag-nom").value.trim(),
+            actif: ed.querySelector(".ag-actif").checked, nouveauCode: neuf, admin: ed.querySelector(".ag-admin").checked
+          }).then(function (r) {
+            msg("msg-agents", neuf
+              ? "Nouveau code pour " + r.nom + " : " + r.code + " (l’ancien ne fonctionne plus)."
+              : "Agent " + r.nom + " mis à jour" + (r.actif === "non" ? " : inactif" : "") + (r.admin ? " — administrateur terrain (il doit rouvrir l’appli)." : "."), "ok");
+            listerAgents();
+          }).catch(function (er) { msg("msg-agents", er.message, "ko"); bt.disabled = false; });
+        });
+        bloc.appendChild(ed); box.appendChild(bloc);
+      });
+    }).catch(function (er) { box.textContent = ""; msg("msg-agents", er.message, "ko"); });
+  }
+  $("rafraichir-agents").addEventListener("click", listerAgents);
+  $("commune-agent").addEventListener("change", listerAgents);
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
+    if (b.dataset.onglet === "agents") b.addEventListener("click", listerAgents);
+  });
+
+  /* — agents — */
+  $("ajouter-agent").addEventListener("click", function () {
+    if (estBrouillon($("commune-agent").value)) {
+      var brg = brouillonDe($("commune-agent").value), nm = $("nom-agent").value.trim();
+      if (!brg) return; if (!nm) { msg("msg-agent", "Indiquez le nom de l'agent.", "ko"); return; }
+      (brg.donnees.agents = brg.donnees.agents || []).push(nm);
+      sauverBrouillon(brg.id, brg.donnees).then(function () { $("nom-agent").value = ""; msg("msg-agent", nm + " ajouté au brouillon : son code sera créé à la validation de la commune.", "ok"); listerAgents(); })
+        .catch(function (er) { brg.donnees.agents.pop(); msg("msg-agent", er.message, "ko"); });
+      return;
+    }
+    var b = this; b.disabled = true;
+    $("resultat-agent").innerHTML = "";
+    msg("msg-agent", "Création du code…");
+    api("agent", { commune: $("commune-agent").value, nom: $("nom-agent").value.trim() }).then(function (j) {
+      msg("msg-agent", "Code créé pour " + j.nom + ". Transmettez-le à l'agent : il le saisit une fois dans l'application.", "ok");
+      var d = document.createElement("div"); d.className = "code"; d.textContent = j.code;
+      $("resultat-agent").appendChild(d);
+      if (j.code) $("resultat-agent").appendChild(boutonQR(j.code, j.nom, $("commune-agent").value));
+      var cp = boutonCopier(j.code, "Copier le code"); cp.style.width = "100%"; $("resultat-agent").appendChild(cp);
+      $("nom-agent").value = "";
+      listerAgents();
+    }).catch(function (er) { msg("msg-agent", er.message, "ko"); })
+      .then(function () { b.disabled = false; });
+  });
+  /* Agents en lot (préparés par l'assistant) : noms provisoires agent1, agent2…, codes créés au clic de l'administrateur. */
+  var AGENTS_LOT = [];
+  /* Le chatbot crée directement le lot préparé (même effet que le bouton « Créer N codes d’agent »). */
+  function creerLotAuto() {
+    var b = $("agents-lot-creer"), lot = $("agents-lot");
+    return new Promise(function (ok, ko) {
+      b.click(); var t0 = Date.now();
+      (function att() {
+        var t = $("msg-agent").textContent || "";
+        if (lot.hidden) return /^Arrêt après/.test(t) ? ko(new Error(t)) : ok(t);
+        if (!b.disabled && Date.now() - t0 > 500) return ko(new Error(t || "création des agents impossible"));
+        if (Date.now() - t0 > 300000) return ko(new Error("délai dépassé pour la création des agents"));
+        setTimeout(att, 400);
+      })();
+    });
+  }
+  function preparerAgentsLot(com, noms) {
+    AGENTS_LOT = noms.slice();
+    $("agents-lot-liste").textContent = noms.join(", ");
+    $("agents-lot").hidden = false;
+    var b = $("agents-lot-creer"); b.disabled = false;
+    b.textContent = "Créer " + noms.length + " code" + (noms.length > 1 ? "s" : "") + " d'agent";
+    b.classList.remove("a-valider"); void b.offsetWidth; b.classList.add("a-valider");
+    b.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  $("agents-lot-annuler").addEventListener("click", function () { AGENTS_LOT = []; $("agents-lot").hidden = true; });
+  $("agents-lot-creer").addEventListener("click", function () {
+    var com = $("commune-agent").value, b = this, noms = AGENTS_LOT.slice(), faits = [];
+    if (!com || !noms.length) return;
+    if (estBrouillon(com)) {
+      var brl = brouillonDe(com); if (!brl) return;
+      var la = (brl.donnees.agents = brl.donnees.agents || []); noms.forEach(function (n) { la.push(n); });
+      b.disabled = true;
+      sauverBrouillon(brl.id, brl.donnees).then(function () {
+        msg("msg-agent", noms.length + " agent(s) ajouté(s) au brouillon : les codes seront créés à la validation de la commune.", "ok");
+        AGENTS_LOT = []; $("agents-lot").hidden = true; listerAgents();
+      }).catch(function (er) { noms.forEach(function () { la.pop(); }); msg("msg-agent", er.message, "ko"); b.disabled = false; });
+      return;
+    }
+    b.disabled = true; $("resultat-agent").innerHTML = "";
+    noms.reduce(function (p, nom) {
+      return p.then(function () {
+        msg("msg-agent", "Création des codes… " + (faits.length + 1) + " / " + noms.length);
+        return api("agent", { commune: com, nom: nom }).then(function (j) { faits.push(j.nom + " : " + j.code); });
+      });
+    }, Promise.resolve()).then(function () {
+      msg("msg-agent", noms.length + " code(s) créé(s). Renommez les agents avec « Modifier » dans la liste ci-dessous.", "ok");
+    }).catch(function (er) {
+      msg("msg-agent", "Arrêt après " + faits.length + " code(s) : " + er.message, "ko");
+    }).then(function () {
+      var d = document.createElement("div"); d.className = "petit"; d.style.cssText = "white-space:pre-line;font-family:ui-monospace,Menlo,monospace";
+      d.textContent = faits.join("\n"); $("resultat-agent").appendChild(d);
+      AGENTS_LOT = []; $("agents-lot").hidden = true; listerAgents();
+    });
+  });
+  /* — Bac-Score : versions datées du barème (modèle commun, puis déclinaison par commune) — */
+  var COULEURS = { A: "#2E7D4F", B: "#7CB342", C: "#F2B705", D: "#E07B24", E: "#B3261E" };
+  var BORNES = { proprete: { max: 20, pas: 1 }, remplissage: { max: 1, pas: 0.01 }, recidive: { max: 20, pas: 1 } };
+  var CRITERES = [["proprete", "Propreté au sol"], ["remplissage", "Remplissage"], ["recidive", "Récidive"]];
+  var REGLAGES = [
+    { lib: "Points pour un dépôt sans sac comptable", min: 0, max: 10, pas: 1, get: function (V) { return V.proprete.depotSansSac; }, set: function (V, v) { V.proprete.depotSansSac = v; } },
+    { lib: "Points pour un point inaccessible", min: 0, max: 10, pas: 1, get: function (V) { return V.remplissage.inaccessible; }, set: function (V, v) { V.remplissage.inaccessible = v; } },
+    { lib: "Fenêtre de la récidive (jours)", min: 7, max: 90, pas: 1, get: function (V) { return V.recidive.fenetreJours; }, set: function (V, v) { V.recidive.fenetreJours = v; } },
+    { lib: "Photos regroupées en un seul passage (minutes)", min: 5, max: 120, pas: 5, get: function (V) { return (V.passage || {}).minutes; }, set: function (V, v) { V.passage = V.passage || {}; V.passage.minutes = v; } }
+  ];
+  var CHOIX = [
+    { cle: "ilot", lib: "Note de l'îlot", options: [["max", "le flux le plus dégradé"], ["moyenne", "la moyenne des flux"]] },
+    { cle: "commune", lib: "Note de la commune", options: [["moyenne", "la moyenne des îlots"], ["max", "l'îlot le plus dégradé"]] }
+  ];
+  var LISTE_COMMUNES = [];
+  var BACD = null;      /* réponse du serveur : versions du modèle et de la commune choisie */
+  var V = null;         /* version affichée dans l'éditeur */
+  var ED = null;        /* { mode: "creer"|"modifier"|"voir", version } */
+  function copie(o) { return JSON.parse(JSON.stringify(o)); }
+  function pts(n) { return n + (Number(n) > 1 ? " points" : " point"); }
+  function fmt(c, v) { return c === "remplissage" ? Math.round(v * 100) + " %" : String(v); }
+  function jourFR(d) {
+    if (!d || d < "2010") return "d'origine";
+    return "depuis le " + new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  }
+  function demain() {
+    var a = BACD && BACD.aujourdhui ? new Date(BACD.aujourdhui + "T12:00:00") : new Date();
+    a.setDate(a.getDate() + 1);
+    return a.toISOString().slice(0, 10);
+  }
+  function lit(c, p, i) {
+    var prec = i > 0 ? p[i - 1].max : null, x = p[i];
+    if (c === "proprete") {
+      if (x.max === null) return (prec + 1) + " sacs au sol ou plus → " + pts(x.points);
+      if (i === 0) return (x.max === 0 ? "rien au sol" : "jusqu'à " + x.max + " sacs au sol") + " → " + pts(x.points);
+      return (x.max === prec + 1 ? x.max + " sac(s) au sol" : "de " + (prec + 1) + " à " + x.max + " sacs au sol") + " → " + pts(x.points);
+    }
+    if (c === "remplissage") {
+      if (x.max === null) return "plus de " + fmt(c, prec) + " des conteneurs pleins → " + pts(x.points);
+      if (i === 0 && x.max === 0) return "aucun conteneur plein → " + pts(x.points);
+      return "jusqu'à " + fmt(c, x.max) + " des conteneurs pleins → " + pts(x.points);
+    }
+    if (x.max === null) return (prec + 1) + " passages avec dépôt ou plus → " + pts(x.points);
+    if (i === 0 && x.max === 0) return "aucun passage avec dépôt → " + pts(x.points);
+    var de = i === 0 ? 0 : prec + 1;
+    return (x.max === de ? x.max + " passage(s) avec dépôt" : "de " + de + " à " + x.max + " passages avec dépôt") + " → " + pts(x.points);
+  }
+  function jauge(libelle, min, max, pas, valeur, affiche, quand, lecture) {
+    var d = document.createElement("div"); d.className = "jauge";
+    var l = document.createElement("label"); var b = document.createElement("b"); b.textContent = libelle;
+    var o = document.createElement("output"); o.textContent = affiche(valeur);
+    l.appendChild(b); l.appendChild(o);
+    var r = document.createElement("input"); r.type = "range"; r.min = min; r.max = max; r.step = "any"; r.value = valeur; r.disabled = !!lecture;
+    r.addEventListener("input", function () {
+      var v = Math.round(Number(r.value) / pas) * pas;
+      v = quand(Math.round(v * 10000) / 10000);
+      r.value = v; o.textContent = affiche(v);
+    });
+    d.appendChild(l); d.appendChild(r);
+    return d;
+  }
+  function pointsPalier(p, x) {
+    for (var i = 0; i < p.length; i++) if (p[i].max === null || x <= p[i].max) return p[i].points;
+    return p.length ? p[p.length - 1].points : 0;
+  }
+  /* La note simulée est recopiée sous chaque réglage du simulateur, pour voir l’effet sans faire défiler. */
+  (function () {
+    var src = $("sim-resultat"); if (!src || !window.MutationObserver) return;
+    new MutationObserver(function () { Array.prototype.forEach.call(document.querySelectorAll(".sim-copie"), function (c) { c.innerHTML = src.innerHTML; }); })
+      .observe(src, { childList: true, subtree: true, characterData: true });
+  })();
+  /* Toucher au forfait « point inaccessible » ou « dépôt sans sac » coche la situation correspondante dans le simulateur,
+     pour voir tout de suite l’effet du réglage (le forfait sans sac ne joue qu’avec 0 sac compté). */
+  [["forfait-inacc", "sim-inacc", null], ["forfait-sanssac", "sim-sanssac", "sim-sacs"]].forEach(function (r) {
+    var box = $(r[0]); if (!box) return;
+    box.addEventListener("input", function () {
+      var c = $(r[1]); if (c && !c.checked) c.checked = true;
+      if (r[2] && $(r[2]) && Number($(r[2]).value) !== 0) $(r[2]).value = 0;
+      setTimeout(simuler, 0);
+    });
+  });
+  function simuler() {
+    if (!V) return;
+    var sacs = Number($("sim-sacs").value), plein = Number($("sim-plein").value), rec = Number($("sim-rec").value);
+    $("sim-sacs-v").textContent = sacs; $("sim-plein-v").textContent = Math.round(plein * 100) + " %"; $("sim-rec-v").textContent = rec;
+    var p1 = (sacs === 0 && $("sim-sanssac").checked) ? Number(V.proprete.depotSansSac) || 0 : pointsPalier(V.proprete.paliers, sacs);
+    var p2 = $("sim-inacc").checked ? Number(V.remplissage.inaccessible) || 0 : pointsPalier(V.remplissage.paliers, plein);
+    var p3 = pointsPalier(V.recidive.paliers, rec);
+    var total = p1 + p2 + p3, lettre = null;
+    for (var i = 0; i < V.lettres.length; i++) { if (V.lettres[i].max === null || total <= V.lettres[i].max) { lettre = V.lettres[i]; break; } }
+    var box = $("sim-resultat"); box.innerHTML = "";
+    if (!lettre) { box.textContent = pts(total); return; }
+    /* Toute l'échelle, la lettre obtenue mise en avant, avec la plage de points de chaque lettre. */
+    var L = document.createElement("div"); L.className = "echelle-bac";
+    V.lettres.forEach(function (x, i) {
+      var de = i === 0 ? 0 : V.lettres[i - 1].max + 1;
+      var c = document.createElement("div"); c.className = "cran" + (x === lettre ? " actif" : "");
+      c.style.background = COULEURS[x.l] || "var(--vert)";
+      c.title = (x.lab || x.l);
+      var b = document.createElement("b"); b.textContent = x.l;
+      var s = document.createElement("small"); s.textContent = x.max === null ? de + " et +" : (de === x.max ? String(de) : de + "–" + x.max);
+      c.appendChild(b); c.appendChild(s); L.appendChild(c);
+    });
+    var t = document.createElement("div"); t.innerHTML = "<b></b><br>"; t.querySelector("b").textContent = (lettre.lab || lettre.l) + " — " + pts(total);
+    t.appendChild(document.createTextNode("Propreté " + p1 + " + Remplissage " + p2 + " + Récidive " + p3));
+    box.appendChild(L); box.appendChild(t);
+  }
+  /* Éditeur : jauges sur la version V ; en lecture seule pour une version en vigueur ou passée. */
+  function dessinerEditeur() {
+    var lecture = false; /* même en consultation, les jauges bougent pour simuler ; rien n'est enregistré */
+    var box = $("bac-criteres"); box.innerHTML = "";
+    CRITERES.forEach(function (cr) {
+      var id = cr[0], c = V[id], bo = BORNES[id];
+      var carte = document.createElement("div"); carte.className = "carte";
+      var h = document.createElement("h2"); h.textContent = c.libelle || cr[1]; carte.appendChild(h);
+      var lits = [];
+      c.paliers.forEach(function (p, i) {
+        var div = document.createElement("div"); div.className = "palier";
+        var t = document.createElement("div"); t.className = "lit"; t.textContent = lit(id, c.paliers, i); lits.push(t); div.appendChild(t);
+        var maj = function () { lits.forEach(function (x, k) { x.textContent = lit(id, c.paliers, k); }); simuler(); };
+        if (p.max !== null) {
+          div.appendChild(jauge("Seuil", 0, bo.max, bo.pas, p.max, function (v) { return fmt(id, v); }, function (v) {
+            var bas = i > 0 ? c.paliers[i - 1].max + bo.pas : 0;
+            var haut = (i + 1 < c.paliers.length && c.paliers[i + 1].max !== null) ? c.paliers[i + 1].max - bo.pas : bo.max;
+            v = Math.round(Math.max(bas, Math.min(haut, v)) * 10000) / 10000; p.max = v; maj(); return v;
+          }, lecture));
+        }
+        div.appendChild(jauge("Points", 0, 10, 1, p.points, pts, function (v) { p.points = v; maj(); return v; }, lecture));
+        carte.appendChild(div);
+      });
+      box.appendChild(carte);
+    });
+    var bl = $("bac-lettres"); bl.innerHTML = "";
+    var textes = [];
+    V.lettres.forEach(function (x, i) {
+      var div = document.createElement("div"); div.className = "palier";
+      var t = document.createElement("div"); t.className = "lit"; textes.push(t); div.appendChild(t);
+      if (x.max !== null) {
+        div.appendChild(jauge("Jusqu'à", 0, 30, 1, x.max, pts, function (v) {
+          var bas = i > 0 ? V.lettres[i - 1].max + 1 : 0;
+          var haut = (i + 1 < V.lettres.length && V.lettres[i + 1].max !== null) ? V.lettres[i + 1].max - 1 : 30;
+          x.max = Math.max(bas, Math.min(haut, v)); ecrireLettres(); simuler(); return x.max;
+        }, lecture));
+      }
+      bl.appendChild(div);
+    });
+    function ecrireLettres() {
+      V.lettres.forEach(function (x, i) {
+        var de = i === 0 ? 0 : V.lettres[i - 1].max + 1;
+        textes[i].textContent = x.l + " « " + (x.lab || x.l) + " » : " + (x.max === null ? de + " points ou plus" : "de " + de + " à " + pts(x.max));
+      });
+    }
+    ecrireLettres();
+    var br = $("bac-reglages"); br.innerHTML = "";
+    /* Les deux forfaits se règlent dans le simulateur, sous leur case ; les autres réglages dans la carte Réglages. */
+    REGLAGES.forEach(function (g, k) {
+      var div = document.createElement("div"); div.className = "palier";
+      div.appendChild(jauge(g.lib, g.min, g.max, g.pas, Number(g.get(V)) || g.min, function (v) { return k < 2 ? pts(v) : String(v); }, function (v) { g.set(V, v); simuler(); return v; }, lecture));
+      if (k < 2) { var place = $(k === 0 ? "forfait-sanssac" : "forfait-inacc"); place.innerHTML = ""; div.className = ""; place.appendChild(div); }
+      else br.appendChild(div);
+    });
+    CHOIX.forEach(function (g) {
+      V.agregation = V.agregation || { ilot: "max", commune: "moyenne" };
+      var div = document.createElement("div"); div.className = "palier";
+      var l = document.createElement("label"); l.innerHTML = "<b></b>"; l.querySelector("b").textContent = g.lib;
+      var s = document.createElement("select"); s.disabled = lecture;
+      g.options.forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; if (String(V.agregation[g.cle]) === o[0]) op.selected = true; s.appendChild(op); });
+      s.addEventListener("change", function () { V.agregation[g.cle] = s.value; });
+      div.appendChild(l); div.appendChild(s); br.appendChild(div);
+    });
+    simuler();
+  }
+  /* Frise effective : modèle tant que la commune n'a pas sa version ; « modele » la ramène au modèle. */
+  function frise(modele, commune) {
+    var M = modele.filter(function (v) { return v.bareme && v.bareme !== "modele"; });
+    var C = commune || [];
+    var dates = M.map(function (v) { return v.depuis; }).concat(C.map(function (v) { return v.depuis; }))
+      .filter(function (d, i, a) { return a.indexOf(d) === i; }).sort();
+    var mode = null, dernier = "", out = [];
+    dates.forEach(function (d) {
+      var c = C.filter(function (v) { return v.depuis === d; }).pop();
+      if (c) mode = c.bareme === "modele" ? null : c;
+      var src = mode || M.filter(function (v) { return v.depuis <= d; }).pop();
+      if (!src) return;
+      var cle = (mode ? "C:" : "M:") + src.version;
+      if (cle === dernier) return;
+      dernier = cle;
+      out.push({ v: src, depuis: d, origine: mode ? "commune" : "modele" });
+    });
+    return out;
+  }
+  function etat(depuis, suivant) {
+    var auj = BACD.aujourdhui;
+    if (depuis > auj) return ["à venir", "#EEF1EF", "var(--doux)"];
+    if (!suivant || suivant > auj) return ["en vigueur", "#E7F3EC", "var(--ok)"];
+    return ["passée", "#F4F1EA", "var(--doux)"];
+  }
+  function dessinerFrise() {
+    var box = $("bac-frise"); box.innerHTML = "";
+    var com = $("bac-portee").value;
+    var lignes = com ? frise(BACD.modele, BACD.commune) : BACD.modele.map(function (v) { return { v: v, depuis: v.depuis, origine: "modele" }; });
+    var propres = com ? BACD.commune : BACD.modele;
+    if (com && !BACD.commune.length) {
+      var p = document.createElement("p"); p.textContent = "Cette commune suit le modèle commun : elle n'a pas encore de version à elle."; box.appendChild(p);
+    }
+    lignes.forEach(function (x, i) {
+      var st = etat(x.depuis, lignes[i + 1] && lignes[i + 1].depuis);
+      var l = document.createElement("div");
+      l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--trait)";
+      var chip = document.createElement("span"); chip.textContent = st[0];
+      chip.style.cssText = "font-size:12px;font-weight:700;padding:2px 8px;border-radius:20px;background:" + st[1] + ";color:" + st[2];
+      var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:160px";
+      var b = document.createElement("b"); b.textContent = x.v.nom || x.v.version; b.style.cssText = "display:block;color:var(--encre);font-size:14px";
+      var s = document.createElement("span"); s.textContent = jourFR(x.depuis) + (com ? " · " + (x.origine === "commune" ? "version de la commune" : "modèle commun") : "");
+      t.appendChild(b); t.appendChild(s);
+      l.appendChild(chip); l.appendChild(t);
+      var voir = document.createElement("button"); voir.type = "button"; voir.className = "second"; voir.textContent = "Voir";
+      voir.style.cssText = "padding:6px 10px;font-size:13px";
+      voir.addEventListener("click", function () { ouvrir("voir", x.v); });
+      l.appendChild(voir);
+      var aMoi = propres.indexOf(x.v) >= 0;
+      if (aMoi && x.depuis > BACD.aujourdhui) {
+        var m = document.createElement("button"); m.type = "button"; m.className = "second"; m.textContent = "Modifier";
+        m.style.cssText = "padding:6px 10px;font-size:13px";
+        m.addEventListener("click", function () { ouvrir("modifier", x.v); });
+        var sup = document.createElement("button"); sup.type = "button"; sup.className = "second"; sup.textContent = "Supprimer";
+        sup.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
+        sup.addEventListener("click", function () {
+          if (!confirm("Supprimer la version « " + (x.v.nom || x.v.version) + " » prévue " + jourFR(x.depuis) + " ?")) return;
+          envoyer({ op: "supprimer", version: x.v.version }, "Version supprimée.");
+        });
+        l.appendChild(m); l.appendChild(sup);
+      }
+      box.appendChild(l);
+    });
+    /* Retours au modèle prévus (lignes « modele » à venir) : on peut les annuler. */
+    if (com) BACD.commune.filter(function (v) { return v.bareme === "modele" && v.depuis > BACD.aujourdhui; }).forEach(function (v) {
+      var l = document.createElement("div"); l.style.cssText = "display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--trait)";
+      var t = document.createElement("span"); t.style.flex = "1"; t.textContent = "Retour au modèle prévu " + jourFR(v.depuis);
+      var sup = document.createElement("button"); sup.type = "button"; sup.className = "second"; sup.textContent = "Annuler";
+      sup.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
+      sup.addEventListener("click", function () { envoyer({ op: "supprimer", version: v.version }, "Retour au modèle annulé."); });
+      l.appendChild(t); l.appendChild(sup); box.appendChild(l);
+    });
+    $("bac-retour").style.display = com && BACD.commune.some(function (v) { return v.bareme !== "modele"; }) ? "" : "none";
+  }
+  function versionDuJour() {
+    var com = $("bac-portee").value;
+    var lignes = com ? frise(BACD.modele, BACD.commune) : BACD.modele.map(function (v) { return { v: v, depuis: v.depuis }; });
+    var x = lignes.filter(function (l) { return l.depuis <= BACD.aujourdhui; }).pop() || lignes[0];
+    return x ? x.v : null;
+  }
+  function ouvrir(mode, v) {
+    ED = { mode: mode, version: v ? v.version : "" };
+    V = copie(v.bareme);
+    cacher("msg-bac-ed");
+    var lecture = mode === "voir";
+    $("bac-editeur").style.display = "block";
+    $("bac-champs").style.display = lecture ? "none" : "block";
+    $("bac-lecture").style.display = lecture ? "block" : "none";
+    $("bac-enregistrer").style.display = "";
+    $("bac-enregistrer").textContent = lecture ? "Nouvelle version avec ces réglages" : "Enregistrer la version";
+    $("bac-entete").classList.toggle("edition", !lecture);
+    if (lecture) {
+      $("bac-titre").textContent = "« " + (v.nom || v.version) + " »";
+      $("bac-lecture").textContent = (v.depuis > BACD.aujourdhui ? "Version à venir (" + jourFR(v.depuis) + ") : utilisez « Modifier » pour la corriger." : "Version " + jourFR(v.depuis) + " : en vigueur ou passée, elle ne se modifie plus pour que les notes publiées restent vraies. Créez une nouvelle version pour changer le barème.") + " Vous pouvez bouger les jauges pour simuler : rien n'est enregistré. « Nouvelle version avec ces réglages » reprend vos essais dans une version datée à partir de demain.";
+    } else {
+      $("bac-titre").textContent = mode === "creer" ? "Nouvelle version" + ($("bac-portee").value ? " pour " + $("bac-portee").selectedOptions[0].textContent : " du modèle commun") : "Modifier « " + (v.nom || v.version) + " »";
+      $("bac-nom").value = mode === "creer" ? "" : (v.nom || "");
+      $("bac-depuis").min = demain();
+      $("bac-depuis").value = mode === "creer" ? demain() : v.depuis;
+    }
+    dessinerEditeur();
+    $("bac-titre").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function envoyer(donnees, ok) {
+    var corps = Object.assign({ commune: $("bac-portee").value }, donnees);
+    msg("msg-bac", "Enregistrement…");
+    return api("bareme-ecrire", corps).then(function () {
+      msg("msg-bac", ok + " Publication sous 15 minutes.", "ok");
+      return chargerBac(true);
+    }).catch(function (er) { msg("msg-bac", er.message, "ko"); throw er; });
+  }
+  function chargerBac(garderMessage) {
+    if (!garderMessage) cacher("msg-bac");
+    $("bac-frise").textContent = "Chargement…";
+    return api("bareme", { commune: $("bac-portee").value }).then(function (j) {
+      BACD = j; dessinerFrise();
+    }).catch(function (er) { $("bac-frise").textContent = ""; msg("msg-bac", er.message, "ko"); });
+  }
+  function remplirPortee() {
+    var s = $("bac-portee"), avant = s.value;
+    s.innerHTML = "";
+    var o = document.createElement("option"); o.value = ""; o.textContent = "Modèle commun (toutes les communes)"; s.appendChild(o);
+    LISTE_COMMUNES.forEach(function (c) {
+      var op = document.createElement("option"); op.value = c.commune; op.textContent = c.nom || c.commune;
+      if (c.commune === avant) op.selected = true;
+      s.appendChild(op);
+    });
+  }
+  $("bac-portee").addEventListener("change", function () { $("bac-editeur").style.display = "none"; $("bac-retour-form").style.display = "none"; chargerBac(); });
+  ["sim-sacs", "sim-plein", "sim-rec"].forEach(function (id) { $(id).addEventListener("input", simuler); });
+  ["sim-sanssac", "sim-inacc"].forEach(function (id) { $(id).addEventListener("change", simuler); });
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
+    if (b.dataset.onglet === "bac") b.addEventListener("click", function () { remplirPortee(); if (!BACD) chargerBac(); });
+  });
+  $("bac-nouvelle").addEventListener("click", function () {
+    if (!BACD) return;
+    var v = versionDuJour();
+    if (!v) { msg("msg-bac", "Aucune version de départ.", "ko"); return; }
+    ouvrir("creer", v);
+  });
+  $("bac-retour").addEventListener("click", function () {
+    var f = $("bac-retour-form"); f.style.display = f.style.display === "none" ? "block" : "none";
+    $("bac-retour-date").min = demain(); $("bac-retour-date").value = demain();
+  });
+  $("bac-retour-ok").addEventListener("click", function () {
+    var d = $("bac-retour-date").value;
+    if (!d || d <= BACD.aujourdhui) { msg("msg-bac", "Choisissez une date à partir de demain.", "ko"); return; }
+    envoyer({ op: "creer", depuis: d, nom: "Retour au modèle commun", bareme: "modele" }, "Retour au modèle enregistré.")
+      .then(function () { $("bac-retour-form").style.display = "none"; }).catch(function () {});
+  });
+  $("bac-fermer").addEventListener("click", function () { $("bac-editeur").style.display = "none"; V = null; ED = null; });
+  $("bac-enregistrer").addEventListener("click", function () {
+    this.classList.remove("a-valider");
+    if (!V || !ED) return;
+    if (ED.mode === "voir") {
+      /* On repart des réglages essayés pour une nouvelle version, datée au plus tôt demain. */
+      ED = { mode: "creer", version: "" };
+      $("bac-champs").style.display = "block"; $("bac-lecture").style.display = "none";
+      $("bac-entete").classList.add("edition");
+      $("bac-titre").textContent = "Nouvelle version" + ($("bac-portee").value ? " pour " + $("bac-portee").selectedOptions[0].textContent : " du modèle commun");
+      $("bac-nom").value = ""; $("bac-depuis").min = demain(); $("bac-depuis").value = demain();
+      this.textContent = "Enregistrer la version";
+      $("bac-titre").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    var nom = $("bac-nom").value.trim(), d = $("bac-depuis").value;
+    if (!nom) { msg("msg-bac-ed", "Donnez un nom à la version (par exemple « Barème 2027 »).", "ko"); return; }
+    if (!d || d <= BACD.aujourdhui) { msg("msg-bac-ed", "La date d'entrée en vigueur doit être au plus tôt demain.", "ko"); return; }
+    var b = this; b.disabled = true; msg("msg-bac-ed", "Enregistrement…");
+    envoyer({ op: ED.mode, version: ED.version, depuis: d, nom: nom, bareme: V }, "Version « " + nom + " » enregistrée, " + jourFR(d) + ".")
+      .then(function () { $("bac-editeur").style.display = "none"; V = null; ED = null; cacher("msg-bac-ed"); })
+      .catch(function (er) { msg("msg-bac-ed", er.message, "ko"); })
+      .then(function () { b.disabled = false; });
+  });
+  /* — Pré-remplissage des points : OpenStreetMap ou fichier de la collectivité. Création « à vérifier ». — */
+  var POINTS_COMMUNE = [], CANDIDATS = [];
+  function distM(a, b) { var r = Math.PI / 180, x = (b.lon - a.lon) * r * Math.cos((a.lat + b.lat) / 2 * r), y = (b.lat - a.lat) * r; return Math.sqrt(x * x + y * y) * 6371000; }
+  function libFlux(id) { var f = FLUX.filter(function (x) { return x.id === id; })[0]; return f ? f.libelle : id; }
+  function dessinerCandidats(source) {
+    var box = $("candidats"); box.innerHTML = "";
+    if (!CANDIDATS.length) { box.textContent = "Aucun point trouvé."; $("candidats-creer").style.display = "none"; return; }
+    var connus = FLUX.map(function (f) { return f.id; });
+    CANDIDATS.forEach(function (c, i) {
+      var proche = POINTS_COMMUNE.filter(function (p) { return distM(c, { lat: Number(String(p.lat).replace(",", ".")), lon: Number(String(p.lon).replace(",", ".")) }) < 40; })[0];
+      var u = {}; Object.keys(c.unites || {}).forEach(function (f) { if (connus.indexOf(f) >= 0 && c.unites[f] > 0) u[f] = c.unites[f]; });
+      c.aConfirmer = !Object.keys(u).length;
+      if (c.aConfirmer) FLUX.forEach(function (f) { u[f.id] = 1; });
+      c.unitesFinales = u; if (c.coche === undefined) c.coche = !proche;
+      var l = document.createElement("div");
+      l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--trait)";
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = c.coche; cb.style.cssText = "width:20px;height:20px;flex:none";
+      cb.addEventListener("change", function () { c.coche = cb.checked; compter(); });
+      var t = document.createElement("div"); t.style.cssText = "flex:1;min-width:180px";
+      var n = document.createElement("input"); n.type = "text"; n.value = c.nom; n.style.cssText = "margin:0 0 4px";
+      n.addEventListener("input", function () { c.nom = n.value; });
+      var s = document.createElement("span");
+      s.textContent = (c.aConfirmer ? "flux inconnus : 1 conteneur par flux, à corriger sur place" : Object.keys(u).map(function (f) { return libFlux(f) + " × " + u[f]; }).join(", "))
+        + (c.adresse ? " — " + c.adresse : "") + (proche ? " — déjà présent ? " + proche.code + " à moins de 40 m" : "");
+      if (proche) s.style.color = "var(--ko)";
+      t.appendChild(n); t.appendChild(s);
+      var a = document.createElement("a"); a.textContent = "carte"; a.href = "#";
+      a.addEventListener("click", function (ev) { ev.preventDefault(); window.ouvrirCarte(c.lat, c.lon, c.nom); });
+      l.appendChild(cb); l.appendChild(t); l.appendChild(a); box.appendChild(l);
+    });
+    compter();
+    function compter() {
+      var k = CANDIDATS.filter(function (c) { return c.coche; }).length;
+      $("candidats-creer").style.display = "block"; $("candidats-creer").disabled = !k;
+      $("candidats-creer").textContent = k ? "Créer " + k + " point" + (k > 1 ? "s" : "") + " (à vérifier sur le terrain)" : "Cochez au moins un point";
+    }
+    msg("msg-prerempli", CANDIDATS.length + " point(s) proposé(s) depuis " + source + ". Décochez ceux qui n'existent pas ou sont déjà saisis, renommez si besoin.", "ok");
+  }
+  function chargerExistants(com) {
+    if (estBrouillon(com)) { var b = brouillonDe(com); POINTS_COMMUNE = b ? pointsDuBrouillon(b) : []; return Promise.resolve(); }
+    return api("points", { commune: com }).then(function (j) { POINTS_COMMUNE = j.points || []; });
+  }
+  /* Jauge de travail : la recherche OpenStreetMap n'indique pas sa progression ; la jauge avance au temps écoulé (environ une minute au pire). */
+  var JAUGE = null;
+  function jaugeOSM(actif) {
+    var j = $("osm-jauge"); clearInterval(JAUGE);
+    if (!actif) { j.hidden = true; return; }
+    var t0 = Date.now(), etapes = [[0, "Interrogation de 5 serveurs OpenStreetMap en parallèle…"], [8, "Recherche des conteneurs sur la commune…"], [25, "Les serveurs publics sont chargés, encore un peu de patience…"]];
+    j.hidden = false;
+    JAUGE = setInterval(function () {
+      var s = (Date.now() - t0) / 1000, p = Math.min(95, 100 * (1 - Math.exp(-s / 22)));
+      j.firstElementChild.firstElementChild.style.width = p.toFixed(0) + "%";
+      var e = etapes.filter(function (x) { return s >= x[0]; }).pop();
+      j.lastElementChild.textContent = e[1] + " " + Math.round(s) + " s";
+    }, 250);
+  }
+  var CAND_COM = "";
+  function chercherOSM(insee) {
+    var com = $("commune-point").value, bt = $("osm-chercher"); if (!com) return Promise.reject(new Error("choisissez d'abord la commune"));
+    bt.disabled = true; $("candidats").innerHTML = ""; $("candidats-creer").style.display = "none"; cacher("msg-prerempli");
+    jaugeOSM(true);
+    var brx = estBrouillon(com) ? brouillonDe(com) : null, pb = brx ? (brx.donnees.params || {}) : {};
+    return Promise.all([api("osm-chercher", { commune: com, brouillon: !!brx,
+      ville: $("osm-ville").value.trim() || (brx ? (pb["commune.nom"] || brx.nom) : ""),
+      departement: $("osm-dep").value.trim() || (brx ? (pb["commune.departement"] || "") : ""),
+      insee: insee || (brx ? (pb["commune.codeInsee"] || "") : "") }), chargerExistants(com)]).then(function (r) {
+      var j = r[0];
+      if (j.choix && j.choix.length) {
+        msg("msg-prerempli", "Plusieurs communes s'appellent « " + j.commune + " ». Laquelle ?", "ok");
+        var box = $("candidats"); box.innerHTML = "";
+        j.choix.forEach(function (c) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "second"; b.style.cssText = "margin:4px 6px 0 0";
+          b.textContent = c.nom + " (" + c.departement + ", INSEE " + c.insee + ")";
+          b.addEventListener("click", function () { $("osm-dep").value = c.departement; chercherOSM(c.insee); });
+          box.appendChild(b);
+        });
+        return "plusieurs communes portent ce nom : " + j.choix.map(function (c) { return c.nom + " (" + c.departement + ", INSEE " + c.insee + ")"; }).join(", ") + " — relancer avec l'INSEE voulu";
+      }
+      CANDIDATS = j.candidats || []; CAND_COM = com;
+      dessinerCandidats("OpenStreetMap (" + j.objets + " conteneur(s) ou emplacement(s) cartographié(s) à " + j.commune + ")");
+      return CANDIDATS.length + " point(s) proposé(s) depuis OpenStreetMap à " + j.commune;
+    }).then(function (x) { jaugeOSM(false); bt.disabled = false; return x; },
+      function (er) { msg("msg-prerempli", er.message, "ko"); jaugeOSM(false); bt.disabled = false; throw er; });
+  }
+  $("osm-chercher").addEventListener("click", function () { chercherOSM("").catch(function () {}); });
+  /* Utilisés après la création d'une commune et par l'assistant : tout reste à cocher puis à valider par l'administrateur. */
+  function afficherPoints(com) {
+    var b = document.querySelector('nav button[data-onglet="points"]'); if (b && !b.classList.contains("actif")) b.click();
+    COMMUNE = com;
+    Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) { s.value = com; });
+    listerPoints();
+  }
+  function preparerOSM(com, ville, dep, insee) {
+    afficherPoints(com);
+    $("osm-ville").value = ville || ""; $("osm-dep").value = dep || "";
+    $("osm-chercher").scrollIntoView({ behavior: "smooth", block: "center" });
+    return chercherOSM(insee || "");
+  }
+  function ajouterCandidats(com, liste, source) {
+    return chargerExistants(com).then(function () {
+      if (CAND_COM !== com) CANDIDATS = [];
+      CAND_COM = com;
+      CANDIDATS = CANDIDATS.concat(liste);
+      dessinerCandidats(source);
+      var b = $("candidats-creer"); b.classList.remove("a-valider"); void b.offsetWidth; b.classList.add("a-valider");
+      b.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+  /* Fichier : GeoJSON (points) ou CSV avec colonnes lat/lon (ou latitude/longitude, y/x), nom et type de déchet si présents. */
+  function fluxDepuis(texte) {
+    var t = String(texte || "").toLowerCase(), u = {};
+    if (/verre/.test(t)) u.verre = 1;
+    if (/emball|plast|multi|jaune|recycl/.test(t)) u.emballages = 1;
+    if (/papier|journa/.test(t)) u.papier = 1;
+    if (/textile|vêtement|vetement/.test(t)) u.textile = 1;
+    if (/ordure|om\b|résiduel|residuel|gris/.test(t)) u.ordures_menageres = 1;
+    return u;
+  }
+  function ajouterAuGroupe(liste, p) {
+    var g = liste.filter(function (x) { return distM(x, p) < 30; })[0];
+    if (!g) { liste.push({ nom: p.nom, lat: p.lat, lon: p.lon, unites: p.unites, n: 1 }); return; }
+    Object.keys(p.unites).forEach(function (f) { g.unites[f] = (g.unites[f] || 0) + p.unites[f]; });
+    g.n += 1;
+  }
+  function lireCSV(texte) {
+    var lignes = texte.replace(/^﻿/, "").split(/\r?\n/).filter(function (l) { return l.trim(); });
+    if (lignes.length < 2) throw new Error("fichier vide");
+    var sep = [";", ",", "\t"].sort(function (a, b) { return lignes[0].split(b).length - lignes[0].split(a).length; })[0];
+    var tete = lignes[0].split(sep).map(function (h) { return h.trim().replace(/^"|"$/g, "").toLowerCase(); });
+    function col(re) { for (var i = 0; i < tete.length; i++) if (re.test(tete[i])) return i; return -1; }
+    var iLat = col(/^(lat|latitude|y)$|_lat|latitude/), iLon = col(/^(lon|lng|long|longitude|x)$|_lon|_lng|longitude/);
+    var iNom = col(/nom|name|libell|adresse|rue|lieu/), iType = col(/type|flux|dechet|déchet|nature|collecte|conteneur/);
+    if (iLat < 0 || iLon < 0) throw new Error("colonnes latitude / longitude introuvables");
+    var res = [];
+    lignes.slice(1).forEach(function (l, k) {
+      var c = l.split(sep).map(function (v) { return v.trim().replace(/^"|"$/g, ""); });
+      var lat = Number(String(c[iLat]).replace(",", ".")), lon = Number(String(c[iLon]).replace(",", "."));
+      if (!isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90) return;
+      ajouterAuGroupe(res, { nom: (iNom >= 0 && c[iNom]) ? "Îlot " + c[iNom] : "Îlot importé " + (k + 1), lat: lat, lon: lon, unites: fluxDepuis(iType >= 0 ? c[iType] : "") });
+    });
+    return res;
+  }
+  function lireGeoJSON(j) {
+    var res = [];
+    (j.features || []).forEach(function (f, k) {
+      var g = f.geometry || {}, p = f.properties || {};
+      var xy = g.type === "Point" ? g.coordinates : (g.type === "MultiPoint" && g.coordinates[0]);
+      if (!xy) return;
+      var nomP = p.nom || p.name || p.libelle || p.adresse || p.lieu;
+      ajouterAuGroupe(res, { nom: nomP ? "Îlot " + nomP : "Îlot importé " + (k + 1), lat: Number(xy[1]), lon: Number(xy[0]), unites: fluxDepuis(JSON.stringify(p)) });
+    });
+    return res;
+  }
+  $("import-choisir").addEventListener("click", function () { $("import-fichier").value = ""; $("import-fichier").click(); });
+  $("import-fichier").addEventListener("change", function () {
+    var f = this.files[0], com = $("commune-point").value; if (!f || !com) return;
+    var lecteur = new FileReader();
+    lecteur.onload = function () {
+      try {
+        var t = String(lecteur.result), liste;
+        if (/^\s*[\[{]/.test(t)) liste = lireGeoJSON(JSON.parse(t)); else liste = lireCSV(t);
+        if (!liste.length) throw new Error("aucun point lisible");
+        liste.forEach(function (p) { p.lat = Math.round(p.lat * 1e6) / 1e6; p.lon = Math.round(p.lon * 1e6) / 1e6; });
+        chargerExistants(com).then(function () { CANDIDATS = liste; CAND_COM = com; dessinerCandidats("le fichier « " + f.name + " »"); })
+          .catch(function (er) { msg("msg-prerempli", er.message, "ko"); });
+      } catch (er) { msg("msg-prerempli", "Fichier illisible : " + er.message + ".", "ko"); }
+    };
+    lecteur.readAsText(f);
+  });
+  $("candidats-creer").addEventListener("click", function () {
+    var com = $("commune-point").value, bt = this;
+    var choix = CANDIDATS.filter(function (c) { return c.coche; }).map(function (c) { return { nom: c.nom, lat: c.lat, lon: c.lon, unites: c.unitesFinales }; });
+    if (estBrouillon(com)) {
+      var brc = brouillonDe(com); if (!brc || !choix.length) return;
+      var liste = (brc.donnees.points = brc.donnees.points || []);
+      choix.forEach(function (p) { liste.push(p); });
+      bt.disabled = true;
+      sauverBrouillon(brc.id, brc.donnees).then(function () {
+        CANDIDATS = []; $("candidats").innerHTML = ""; bt.style.display = "none";
+        msg("msg-prerempli", choix.length + " point(s) ajouté(s) au brouillon « " + brc.nom + " ». Ils seront créés « à vérifier » à la validation de la commune.", "ok");
+        listerPoints();
+      }).catch(function (er) { choix.forEach(function () { liste.pop(); }); msg("msg-prerempli", er.message, "ko"); }).then(function () { bt.disabled = false; });
+      return;
+    }
+    if (!choix.length || !confirm("Créer " + choix.length + " point(s) « à vérifier » pour cette commune ?")) return;
+    bt.disabled = true; msg("msg-prerempli", "Création…");
+    api("points-importer", { commune: com, points: choix }).then(function (j) {
+      CANDIDATS = []; $("candidats").innerHTML = ""; bt.style.display = "none";
+      msg("msg-prerempli", j.codes.length + " point(s) créé(s) : " + j.codes[0] + (j.codes.length > 1 ? " à " + j.codes[j.codes.length - 1] : "") + ". Ils apparaîtront aux agents comme « à vérifier ».", "ok");
+      listerPoints();
+    }).catch(function (er) { msg("msg-prerempli", er.message, "ko"); bt.disabled = false; });
+  });
+
+  /* — Assistant (Claude, via n8n) : visible sur tous les onglets. Il agit sur l'écran avec des outils ;
+       tout enregistrement reste un clic de l'administrateur. — */
+  var CHAT = [];
+  function ongletActif() { var b = document.querySelector("nav button.actif"); return b ? b.dataset.onglet : ""; }
+  function allerOnglet(o) { var b = document.querySelector('nav button[data-onglet="' + o + '"]'); if (!b) throw new Error("onglet inconnu : " + o); b.click(); }
+  function etatConsole() {
+    var o = ongletActif();
+    var e = { onglet: o, aujourdhui: BACD ? BACD.aujourdhui : new Date().toISOString().slice(0, 10),
+      communes: LISTE_COMMUNES.map(function (c) { return { id: c.commune, nom: c.nom || c.commune }; }),
+      brouillons: BROUILLONS.map(function (b) { return { id: "brouillon:" + b.id, nom: b.nom, points: (b.donnees.points || []).length, agents: (b.donnees.agents || []).length }; }),
+      brouillonOuvert: BROUILLON_ID ? "brouillon:" + BROUILLON_ID : "", communeChoisie: COMMUNE || "" };
+    if (o === "bac") {
+      e.bac = { portee: $("bac-portee").value || "modele" };
+      if (BACD) e.bac.versions = $("bac-portee").value
+        ? frise(BACD.modele, BACD.commune).map(function (x) { return { version: x.v.version, nom: x.v.nom, depuis: x.depuis, origine: x.origine }; })
+        : BACD.modele.map(function (v) { return { version: v.version, nom: v.nom, depuis: v.depuis, origine: "modele" }; });
+      if (V && ED && $("bac-editeur").style.display !== "none") e.bac.editeur = {
+        mode: ED.mode === "voir" ? "consultation (jauges libres pour simuler, non enregistrable)" : ED.mode, version: ED.version,
+        nom: $("bac-nom").value, depuis: $("bac-depuis").value, bareme: V,
+        simulation: { sacs: Number($("sim-sacs").value), plein: Number($("sim-plein").value), passages: Number($("sim-rec").value),
+          sansSac: $("sim-sanssac").checked, inaccessible: $("sim-inacc").checked, resultat: $("sim-resultat").innerText.replace(/\s+/g, " ").trim() } };
+    } else {
+      var champs = {}, sec = document.getElementById(o);
+      if (sec) Array.prototype.forEach.call(sec.querySelectorAll("input[id], select[id], textarea[id]"), function (i) {
+        if (i.type === "file" || i.type === "password" || i.type === "range") return;
+        champs[i.id] = i.type === "checkbox" ? i.checked : i.value;
+      });
+      e.champs = champs;
+      if (o === "points") {
+        e.points = $("liste-points").innerText.slice(0, 3000);
+        if (CANDIDATS.length) e.candidats = CANDIDATS.slice(0, 80).map(function (c, i) {
+          return { numero: i + 1, nom: c.nom, coche: !!c.coche, conteneurs: c.unitesFinales || c.unites || {}, fluxInconnus: !!c.aConfirmer, adresse: c.adresse || "" };
+        });
+      }
+      if (o === "agents") e.agents = $("liste-agents").innerText.replace(/[A-Z]{2,5}-[A-Z0-9]{6}/g, "[code]").slice(0, 3000);
+    }
+    return e;
+  }
+  function communeDe(q0) {
+    var q = String(q0 || COMMUNE || "").toLowerCase();
+    var c = LISTE_COMMUNES.filter(function (x) { return x.commune === q || (x.nom || "").toLowerCase() === q; })[0];
+    if (!c) {
+      var bq = BROUILLONS.filter(function (b) { return "brouillon:" + b.id === q || b.id === q || (b.nom || "").toLowerCase() === q || (b.nom || "").toLowerCase() + " (brouillon)" === q; })[0];
+      if (bq) return { commune: "brouillon:" + bq.id, nom: bq.nom };
+      throw new Error("commune inconnue : " + q0);
+    }
+    return c;
+  }
+  function exigeV() { if (!V || !ED || $("bac-editeur").style.display === "none") throw new Error("aucune version ouverte : utilisez d'abord bac_ouvrir"); }
+  function escalierOk(p) { var prec = -1; for (var i = 0; i < p.length - 1; i++) { if (p[i].max === null || !(p[i].max > prec)) return false; prec = p[i].max; } return p[p.length - 1].max === null; }
+  function lettresOk(l) { var prec = -1; for (var i = 0; i < l.length - 1; i++) { if (l[i].max === null || !(l[i].max > prec)) return false; prec = l[i].max; } return l[l.length - 1].max === null; }
+  var OUTILS = {
+    aller_onglet: function (a) { allerOnglet(a.onglet); return "onglet « " + a.onglet + " » affiché"; },
+    choisir_commune: function (a) {
+      var q = String(a.commune || "").toLowerCase();
+      var c = LISTE_COMMUNES.filter(function (x) { return x.commune === q || (x.nom || "").toLowerCase() === q; })[0];
+      if (!c) throw new Error("commune inconnue : " + a.commune);
+      COMMUNE = c.commune;
+      Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) { s.value = c.commune; });
+      var o = ongletActif();
+      if (o === "points") listerPoints(); else if (o === "agents") listerAgents(); else if (o === "modifier") chargerCommune();
+      return "commune " + (c.nom || c.commune) + " choisie";
+    },
+    remplir_champ: function (a) {
+      var i = $(a.champ);
+      if (!i || i.type === "password" || i.type === "file") throw new Error("champ introuvable : " + a.champ);
+      if (i.readOnly) throw new Error("champ en lecture seule : " + a.champ);
+      if (i.type === "checkbox") i.checked = String(a.valeur) === "true"; else i.value = a.valeur;
+      i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true }));
+      return a.champ + " = " + a.valeur;
+    },
+    point_conteneurs: function (a) {
+      var i = $("grille-flux").querySelector('input[data-flux="' + a.flux + '"]');
+      if (!i) throw new Error("flux inconnu : " + a.flux);
+      i.value = Math.max(0, Math.min(20, Math.round(Number(a.nombre) || 0)));
+      return a.flux + " : " + i.value + " conteneur(s)";
+    },
+    points_osm: function (a) {
+      var c = communeDe(a.commune);
+      return preparerOSM(c.commune, a.ville || c.nom || "", a.departement || "", a.insee || "").then(function (r) {
+        var b = $("candidats-creer"); b.classList.remove("a-valider"); void b.offsetWidth; b.classList.add("a-valider");
+        return r + " (rien n'est encore créé : l'administrateur décoche ce qui n'existe pas puis clique « Créer les points cochés »)";
+      });
+    },
+    points_proposer: function (a) {
+      var c = communeDe(a.commune), liste = Array.isArray(a.points) ? a.points : [];
+      if (!liste.length) throw new Error("aucun point à proposer");
+      afficherPoints(c.commune);
+      var ok = [], ko = [];
+      return liste.reduce(function (p, x) {
+        return p.then(function () {
+          var unites = {};
+          Object.keys(x.flux || {}).forEach(function (f) { var n = Math.round(Number(x.flux[f]) || 0); if (n > 0) unites[f] = Math.min(20, n); });
+          var nom = String(x.nom || "").trim() || "Nouveau point";
+          var lat = Number(x.lat), lon = Number(x.lon);
+          if (isFinite(lat) && isFinite(lon) && x.lat !== undefined && x.lon !== undefined) { ok.push({ nom: nom, lat: lat, lon: lon, unites: unites, adresse: "position donnée" }); return; }
+          if (!x.adresse) { ko.push(nom + " (ni adresse ni position)"); return; }
+          var q = String(x.adresse) + " " + (c.nom || c.commune);
+          return fetch("https://api-adresse.data.gouv.fr/search/?limit=1&q=" + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (j) {
+            var f = j.features && j.features[0];
+            if (!f || f.properties.score < 0.4) { ko.push(nom + " (adresse introuvable : " + x.adresse + ")"); return; }
+            ok.push({ nom: nom, lat: Math.round(f.geometry.coordinates[1] * 1e6) / 1e6, lon: Math.round(f.geometry.coordinates[0] * 1e6) / 1e6, unites: unites,
+              adresse: "adresse trouvée : " + f.properties.label });
+          }, function () { ko.push(nom + " (service d'adresses injoignable)"); });
+        });
+      }, Promise.resolve()).then(function () {
+        if (!ok.length) throw new Error("aucun point placé : " + ko.join(" ; "));
+        return ajouterCandidats(c.commune, ok, "l'assistant").then(function () {
+          return ok.length + " point(s) ajouté(s) à la liste : " + ok.map(function (p) { return p.nom + " — " + p.adresse; }).join(" ; ")
+            + (ko.length ? ". Non placés : " + ko.join(" ; ") : "") + ". Rien n'est encore créé : l'administrateur vérifie (lien carte) puis clique « Créer les points cochés ».";
+        });
+      });
+    },
+    brouillon_enregistrer: function () {
+      allerOnglet("commune");
+      return enregistrerBrouillonAuto().then(function (b) { var d = b.donnees || {}; return "brouillon « " + b.nom + " » enregistré : " + (d.points || []).length + " point(s) (îlots OpenStreetMap intégrés d’office) et " + (d.agents || []).length + " agent(s). Pour la suite, utiliser la commune « " + b.nom + " »."; });
+    },
+    agents_preparer: function (a) {
+      var c = communeDe(a.commune), n = Math.round(Number(a.nombre) || 0), base = String(a.base || "agent").trim() || "agent";
+      if (n < 1 || n > 50) throw new Error("nombre d'agents : de 1 à 50");
+      allerOnglet("agents");
+      COMMUNE = c.commune;
+      Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) { s.value = c.commune; });
+      listerAgents();
+      var source = estBrouillon(c.commune) ? Promise.resolve({ agents: ((brouillonDe(c.commune) || { donnees: {} }).donnees.agents || []).map(function (n) { return { nom: n }; }) }) : api("agents", { commune: c.commune });
+      return source.then(function (j) {
+        var max = 0, re = new RegExp("^" + base.toLowerCase() + "\\s*(\\d+)$");
+        (j.agents || []).forEach(function (ag) { var m = String(ag.nom || "").toLowerCase().match(re); if (m) max = Math.max(max, Number(m[1])); });
+        var noms = []; for (var i = 1; i <= n; i++) noms.push(base + (max + i)); if (n === 1 && base.toLowerCase() !== "agent" && max === 0) noms = [base];
+        preparerAgentsLot(c.commune, noms);
+        return creerLotAuto().then(function () { return noms.length + " agent(s) créé(s) (" + noms[0] + (noms.length > 1 ? " à " + noms[noms.length - 1] : "") + ") pour " + (c.nom || c.commune) + (estBrouillon(c.commune) ? " : ajoutés au brouillon, leurs codes seront créés à la validation de la commune." : " : codes créés avec le préfixe de la commune, visibles dans la liste des agents (ne pas les recopier)."); });
+        return noms.length + " agents prêts (" + noms[0] + (noms.length > 1 ? " à " + noms[noms.length - 1] : "") + ") pour " + (c.nom || c.commune)
+          + " : rien n'est encore créé, l'administrateur clique « Créer les codes »" + (estBrouillon(c.commune) ? " (ils seront ajoutés au brouillon)" : "") + ". Les codes porteront le préfixe de la commune.";
+      });
+    },
+    candidats_modifier: function (a) {
+      if (!CANDIDATS.length) throw new Error("aucun point proposé à l'écran");
+      var nums = Array.isArray(a.numeros) && a.numeros.length ? a.numeros : CANDIDATS.map(function (x, i) { return i + 1; });
+      var faits = [];
+      nums.forEach(function (n) {
+        var c = CANDIDATS[Number(n) - 1]; if (!c) throw new Error("numéro inconnu : " + n);
+        if (a.coche !== undefined && a.coche !== null) c.coche = !!a.coche;
+        if (a.nom && nums.length === 1) c.nom = String(a.nom);
+        if (a.flux && typeof a.flux === "object") { c.unites = {}; Object.keys(a.flux).forEach(function (f) { var k = Math.round(Number(a.flux[f]) || 0); if (k > 0) c.unites[f] = Math.min(20, k); }); }
+        faits.push(n);
+      });
+      dessinerCandidats("la liste préparée");
+      return "point(s) " + faits.join(", ") + " modifié(s) ; " + CANDIDATS.filter(function (c) { return c.coche; }).length + " coché(s) sur " + CANDIDATS.length;
+    },
+    bac_ouvrir: function (a) {
+      allerOnglet("bac");
+      var portee = !a.portee || a.portee === "modele" ? "" : String(a.portee).toLowerCase();
+      if (portee && !LISTE_COMMUNES.some(function (c) { return c.commune === portee; })) throw new Error("commune inconnue : " + a.portee);
+      var p = Promise.resolve();
+      if (!BACD || $("bac-portee").value !== portee) { remplirPortee(); $("bac-portee").value = portee; $("bac-editeur").style.display = "none"; p = chargerBac(); }
+      return p.then(function () {
+        if (!BACD) throw new Error("barème illisible");
+        if (a.mode === "nouvelle") { var v = versionDuJour(); if (!v) throw new Error("aucune version de départ"); ouvrir("creer", v); return "nouvelle version ouverte, à partir de « " + (v.nom || v.version) + " »"; }
+        var liste = (portee ? BACD.commune : []).concat(BACD.modele);
+        var v2 = liste.filter(function (x) { return x.version === a.version || x.nom === a.version; })[0];
+        if (!v2) throw new Error("version introuvable : " + a.version);
+        var m = a.mode === "modifier" && v2.depuis > BACD.aujourdhui ? "modifier" : "voir";
+        ouvrir(m, v2);
+        return "version « " + (v2.nom || v2.version) + " » ouverte (" + (m === "voir" ? "consultation" : "modification") + ")";
+      });
+    },
+    bac_palier: function (a) {
+      exigeV();
+      var c = V[a.critere]; if (!c) throw new Error("critère inconnu : " + a.critere);
+      var p = c.paliers[a.palier]; if (!p) throw new Error("palier inconnu : " + a.palier);
+      var avant = copie(c.paliers);
+      if (a.seuil !== undefined && a.seuil !== null && p.max !== null) p.max = Number(a.seuil);
+      if (a.points !== undefined && a.points !== null) p.points = Math.max(0, Number(a.points));
+      if (!escalierOk(c.paliers)) { c.paliers = avant; throw new Error("seuils non croissants : palier non modifié"); }
+      dessinerEditeur();
+      return a.critere + ", palier " + (a.palier + 1) + " : " + lit(a.critere, c.paliers, a.palier);
+    },
+    bac_lettre: function (a) {
+      exigeV();
+      var x = V.lettres.filter(function (l) { return l.l === String(a.lettre).toUpperCase(); })[0];
+      if (!x || x.max === null) throw new Error("lettre non réglable : " + a.lettre);
+      var avant = x.max; x.max = Number(a.max);
+      if (!lettresOk(V.lettres)) { x.max = avant; throw new Error("seuils des lettres non croissants : non modifié"); }
+      dessinerEditeur();
+      return "lettre " + x.l + " jusqu'à " + x.max + " points";
+    },
+    bac_reglage: function (a) {
+      exigeV();
+      var v = a.valeur, n = Number(v);
+      V.agregation = V.agregation || { ilot: "max", commune: "moyenne" };
+      switch (a.cle) {
+        case "depotSansSac": V.proprete.depotSansSac = n; break;
+        case "inaccessible": V.remplissage.inaccessible = n; break;
+        case "fenetreJours": V.recidive.fenetreJours = n; break;
+        case "passageMinutes": V.passage = V.passage || {}; V.passage.minutes = n; break;
+        case "agregationIlot": if (v !== "max" && v !== "moyenne") throw new Error("max ou moyenne"); V.agregation.ilot = v; break;
+        case "agregationCommune": if (v !== "max" && v !== "moyenne") throw new Error("max ou moyenne"); V.agregation.commune = v; break;
+        default: throw new Error("réglage inconnu : " + a.cle);
+      }
+      if (a.cle.indexOf("agregation") < 0 && !(n >= 0)) throw new Error("valeur invalide");
+      dessinerEditeur();
+      return a.cle + " = " + v;
+    },
+    bac_simuler: function (a) {
+      exigeV();
+      if (a.sacs != null) $("sim-sacs").value = a.sacs;
+      if (a.plein != null) $("sim-plein").value = a.plein;
+      if (a.passages != null) $("sim-rec").value = a.passages;
+      if (a.sansSac != null) $("sim-sanssac").checked = !!a.sansSac;
+      if (a.inaccessible != null) $("sim-inacc").checked = !!a.inaccessible;
+      simuler();
+      return "simulation : " + $("sim-resultat").innerText.replace(/\s+/g, " ").trim();
+    },
+    bac_preparer_enregistrement: function (a) {
+      exigeV();
+      if (ED.mode === "voir") $("bac-enregistrer").click();
+      if (a.nom) $("bac-nom").value = a.nom;
+      if (a.depuis) {
+        if (!BACD || a.depuis <= BACD.aujourdhui) throw new Error("la date doit être au plus tôt demain");
+        $("bac-depuis").value = a.depuis;
+      }
+      var b = $("bac-enregistrer"); b.classList.remove("a-valider"); void b.offsetWidth; b.classList.add("a-valider");
+      b.scrollIntoView({ behavior: "smooth", block: "center" });
+      return "prêt : l'administrateur doit vérifier puis cliquer « Enregistrer la version » (rien n'est encore enregistré)";
+    }
+  };
+  function bulle(texte, genre) {
+    var b = document.createElement("div"); b.className = "bulle " + genre; b.textContent = texte;
+    $("chat-fil").appendChild(b); $("chat-fil").scrollTop = $("chat-fil").scrollHeight; return b;
+  }
+  function texteDe(blocs) { return blocs.filter(function (x) { return x.type === "text"; }).map(function (x) { return x.text; }).join("\n").trim(); }
+  /* Si l’assistant prépare les points ou les agents d’une commune saisie dans l’onglet Créer mais pas encore enregistrée,
+     on enregistre d’abord le brouillon (les îlots OpenStreetMap y sont intégrés d’office), puis on relance l’outil. */
+  function nomFormulaire() { var e = document.getElementById("p-commune.nom"); return e ? String(e.value || "").trim() : ""; }
+  function enregistrerBrouillonAuto() {
+    var bt = $("brouillon-enregistrer");
+    if (!nomFormulaire()) return Promise.reject(new Error("aucun nom de commune dans l’onglet Créer"));
+    return new Promise(function (ok, ko) {
+      bt.click(); var t0 = Date.now();
+      (function att() {
+        if (!bt.disabled && Date.now() - t0 > 400) { var b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null; return b ? ok(b) : ko(new Error($("msg-commune").textContent || "brouillon non enregistré")); }
+        if (Date.now() - t0 > 120000) return ko(new Error("délai dépassé pour l’enregistrement du brouillon"));
+        setTimeout(att, 300);
+      })();
+    });
+  }
+  function reessaiBrouillon(er, a, f) {
+    var q = String((a.input || {}).commune || "").trim().toLowerCase().replace(/ [(]brouillon[)]$/, "");
+    if (!/commune inconnue/.test(er.message) || !q || nomFormulaire().toLowerCase() !== q) throw er;
+    bulle("Enregistrement du brouillon « " + nomFormulaire() + " » (îlots OpenStreetMap intégrés d’office)…", "action");
+    return enregistrerBrouillonAuto().then(function () { return f(a.input || {}); });
+  }
+  function executerAppels(appels) {
+    var res = [];
+    return appels.reduce(function (p, a) {
+      return p.then(function () {
+        var f = OUTILS[a.name];
+        return Promise.resolve().then(function () { if (!f) throw new Error("outil inconnu : " + a.name); return f(a.input || {}); }).catch(function (er) { return reessaiBrouillon(er, a, f); })
+          .then(function (r) { bulle("✓ " + r, "action"); res.push({ type: "tool_result", tool_use_id: a.id, content: String(r) }); },
+            function (er) { bulle("✗ " + er.message, "erreur"); res.push({ type: "tool_result", tool_use_id: a.id, content: er.message, is_error: true }); });
+      });
+    }, Promise.resolve()).then(function () { return res; });
+  }
+  function tour(n) {
+    return api("assistant", { messages: CHAT, contexte: etatConsole() }).then(function (j) {
+      var blocs = j.contenu || [];
+      CHAT.push({ role: "assistant", content: blocs });
+      var t = texteDe(blocs); if (t) bulle(t, "lui");
+      var appels = blocs.filter(function (x) { return x.type === "tool_use"; });
+      if (!appels.length) return;
+      return executerAppels(appels).then(function (res) {
+        CHAT.push({ role: "user", content: res });
+        if (n >= 10) { bulle("J'arrête là pour cette demande : trop d'étapes d'affilée.", "erreur"); return; }
+        return tour(n + 1);
+      });
+    });
+  }
+  $("chat-ouvrir").addEventListener("click", function () {
+    $("chat").hidden = false; $("chat-ouvrir").style.display = "none";
+    if (!$("chat-fil").children.length) bulle("Bonjour ! Je peux expliquer la console et préparer les actions : régler une nouvelle version du Bac-Score, simuler une note, préparer des points de collecte (depuis OpenStreetMap ou d'après vos adresses), remplir un formulaire d'agent ou de commune. J'agis sur l'écran ; c'est toujours vous qui cliquez pour enregistrer.", "lui");
+    $("chat-texte").focus();
+  });
+  $("chat-fermer").addEventListener("click", function () { $("chat").hidden = true; $("chat-ouvrir").style.display = ""; });
+  $("chat-vider").addEventListener("click", function () { CHAT = []; $("chat-fil").innerHTML = ""; bulle("Nouvelle conversation. Que puis-je préparer ?", "lui"); });
+  $("chat-texte").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("chat-form").requestSubmit(); } });
+  $("chat-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var t = $("chat-texte").value.trim(); if (!t) return;
+    $("chat-texte").value = ""; bulle(t, "moi");
+    var avant = CHAT.length, der = CHAT[CHAT.length - 1];
+    if (der && der.role === "user" && Array.isArray(der.content)) der.content.push({ type: "text", text: t });
+    else CHAT.push({ role: "user", content: t });
+    var attente = bulle("…", "lui"), bt = this.querySelector("button"); bt.disabled = true;
+    tour(1).catch(function (er) { bulle(er.message, "erreur"); CHAT.length = avant; if (der && der.role === "user" && Array.isArray(der.content)) der.content.pop(); })
+      .then(function () { attente.remove(); bt.disabled = false; });
+  });
+})();
+</script>
+<div id="carte-fond" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:12px;width:min(720px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #ddd;flex-wrap:wrap">
+      <b id="carte-titre" style="flex:1;font-size:15px;min-width:120px"></b>
+      <span id="carte-gps" style="font-size:13px;color:#555"></span>
+      <button type="button" id="carte-fond-plan" class="second" style="padding:6px 10px;font-size:13px">Plan</button>
+      <button type="button" id="carte-fond-photo" class="second" style="padding:6px 10px;font-size:13px">Photo aérienne</button>
+      <button type="button" id="carte-streetview" class="second" style="padding:6px 10px;font-size:13px" title="Vue de rue Google à cet endroit (si Google y est passé)">Street View</button>
+      <button type="button" id="carte-sv-copier" class="second" style="padding:6px 10px;font-size:13px" title="Copie le lien Street View, à coller dans un nouvel onglet">Copier le lien</button>
+      <button type="button" id="carte-fermer" class="second" style="padding:6px 12px">Fermer</button>
+    </div>
+    <div id="carte-zone" style="position:relative;width:100%;height:min(480px,65vh);overflow:hidden;background:#e8e4da;cursor:grab;touch-action:none">
+      <div id="carte-tuiles" style="position:absolute;inset:0"></div>
+      <iframe id="carte-sv" title="Street View" style="display:none;position:absolute;inset:0;width:100%;height:100%;border:0;z-index:2;background:#ddd"></iframe>
+      <div id="carte-marque" style="position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#d6336c;border:3px solid #fff;box-shadow:0 0 0 2px #d6336c,0 2px 6px rgba(0,0,0,.4);pointer-events:none"></div>
+      <div style="position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:4px">
+        <button type="button" id="carte-plus" class="second" style="width:36px;height:36px;padding:0;font-size:20px">+</button>
+        <button type="button" id="carte-moins" class="second" style="width:36px;height:36px;padding:0;font-size:20px">−</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:#666;padding:6px 14px">Fond de carte © IGN — Géoplateforme. Glissez pour déplacer, + et − pour zoomer.</div>
+  </div>
+</div>
+<script>
+(function () {
+  var fond = document.getElementById("carte-fond"), zone = document.getElementById("carte-zone"), tuiles = document.getElementById("carte-tuiles"), marque = document.getElementById("carte-marque");
+  var COUCHES = {
+    plan: { nom: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2", format: "image/png", max: 19 },
+    photo: { nom: "ORTHOIMAGERY.ORTHOPHOTOS", format: "image/jpeg", max: 20 }
+  };
+  // Carte faite maison avec les tuiles IGN : openstreetmap.org refuse de servir ses tuiles depuis la console.
+  var etat = { lat: 0, lon: 0, z: 18, couche: "plan", dx: 0, dy: 0 };
+  function versPixels(lat, lon, z) {
+    var n = 256 * Math.pow(2, z), r = lat * Math.PI / 180;
+    return { x: (lon + 180) / 360 * n, y: (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n };
+  }
+  function dessiner() {
+    var c = COUCHES[etat.couche], z = etat.z, w = zone.clientWidth, h = zone.clientHeight;
+    var p = versPixels(etat.lat, etat.lon, z);
+    var cx = p.x - etat.dx, cy = p.y - etat.dy;
+    var x0 = cx - w / 2, y0 = cy - h / 2, n = Math.pow(2, z);
+    var html = "";
+    for (var tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + w) / 256); tx++) {
+      for (var ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + h) / 256); ty++) {
+        if (ty < 0 || ty >= n) continue;
+        var col = ((tx % n) + n) % n;
+        var url = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=" + c.nom + "&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=" + z + "&TILEROW=" + ty + "&TILECOL=" + col + "&FORMAT=" + encodeURIComponent(c.format);
+        html += '<img alt="" draggable="false" src="' + url + '" style="position:absolute;width:256px;height:256px;left:' + Math.round(tx * 256 - x0) + 'px;top:' + Math.round(ty * 256 - y0) + 'px">';
+      }
+    }
+    tuiles.innerHTML = html;
+    marque.style.left = Math.round(p.x - x0) + "px"; marque.style.top = Math.round(p.y - y0) + "px";
+    document.getElementById("carte-fond-plan").style.fontWeight = etat.couche === "plan" ? "700" : "400";
+    document.getElementById("carte-fond-photo").style.fontWeight = etat.couche === "photo" ? "700" : "400";
+  }
+  function zoomer(k) {
+    var z2 = Math.max(6, Math.min(COUCHES[etat.couche].max, etat.z + k));
+    if (z2 === etat.z) return;
+    var f = Math.pow(2, z2 - etat.z); etat.dx *= f; etat.dy *= f; etat.z = z2; dessiner();
+  }
+  var glisse = null;
+  zone.addEventListener("pointerdown", function (e) { if (e.target.tagName === "BUTTON") return; glisse = { x: e.clientX, y: e.clientY, dx: etat.dx, dy: etat.dy }; zone.style.cursor = "grabbing"; try { zone.setPointerCapture(e.pointerId); } catch (er) {} });
+  zone.addEventListener("pointermove", function (e) { if (!glisse) return; etat.dx = glisse.dx + (e.clientX - glisse.x); etat.dy = glisse.dy + (e.clientY - glisse.y); dessiner(); });
+  function lacher() { glisse = null; zone.style.cursor = "grab"; }
+  zone.addEventListener("pointerup", lacher); zone.addEventListener("pointercancel", lacher);
+  zone.addEventListener("wheel", function (e) { e.preventDefault(); zoomer(e.deltaY < 0 ? 1 : -1); }, { passive: false });
+  document.getElementById("carte-plus").addEventListener("click", function () { zoomer(1); });
+  document.getElementById("carte-moins").addEventListener("click", function () { zoomer(-1); });
+  document.getElementById("carte-fond-plan").addEventListener("click", function () { if (etat.z > 19) { etat.dx /= 2; etat.dy /= 2; etat.z = 19; } etat.couche = "plan"; montrerSV(false); dessiner(); });
+  document.getElementById("carte-fond-photo").addEventListener("click", function () { etat.couche = "photo"; montrerSV(false); dessiner(); });
+  function fermer() { fond.style.display = "none"; tuiles.innerHTML = ""; if (typeof montrerSV === "function") montrerSV(false); }
+  document.getElementById("carte-fermer").addEventListener("click", fermer);
+  /* Fenêtre modale : un clic à côté ne la ferme pas (seulement « Fermer » ou la touche Échap). */
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && fond.style.display !== "none") fermer(); });
+  window.addEventListener("resize", function () { if (fond.style.display !== "none") dessiner(); });
+  /* Street View : Google Maps en vue de rue à l'emplacement du point (lien gratuit, sans clé). */
+  function lienSV() { return "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + etat.lat.toFixed(6) + "," + etat.lon.toFixed(6); }
+  /* Street View affiché dans la fenêtre (Google refuse de s'ouvrir dans un onglet depuis la console). */
+  var sv = document.getElementById("carte-sv"), btSV = document.getElementById("carte-streetview");
+  function montrerSV(oui) {
+    sv.style.display = oui ? "block" : "none";
+    if (oui) sv.src = "https://maps.google.com/maps?layer=c&cbll=" + etat.lat.toFixed(6) + "," + etat.lon.toFixed(6) + "&cbp=11,0,0,0,0&output=svembed";
+    else sv.src = "about:blank";
+    btSV.textContent = oui ? "Revenir à la carte" : "Street View";
+    btSV.style.fontWeight = oui ? "700" : "400";
+  }
+  btSV.addEventListener("click", function () { montrerSV(sv.style.display === "none"); });
+  document.getElementById("carte-sv-copier").addEventListener("click", function () {
+    var b = this, t = lienSV();
+    var fini = function () { b.textContent = "Lien copié ✓"; setTimeout(function () { b.textContent = "Copier le lien"; }, 2000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(fini, function () { prompt("Copiez ce lien :", t); });
+    else prompt("Copiez ce lien :", t);
+  });
+  window.ouvrirCarte = function (lat, lon, titre) {
+    var la = parseFloat(String(lat).replace(",", ".")), lo = parseFloat(String(lon).replace(",", "."));
+    if (!isFinite(la) || !isFinite(lo)) { alert("Coordonnées GPS absentes pour ce point."); return; }
+    etat.lat = la; etat.lon = lo; etat.z = 18; etat.dx = 0; etat.dy = 0;
+    document.getElementById("carte-titre").textContent = titre || "Point";
+    document.getElementById("carte-gps").textContent = la.toFixed(6) + ", " + lo.toFixed(6);
+    fond.style.display = "flex";
+    if (typeof montrerSV === "function") montrerSV(false);
+    dessiner();
+  };
+})();
+</script>
+<style>.pm{display:inline-flex;align-items:center;gap:4px}.pm button{width:34px;height:34px;border-radius:8px;border:1px solid #bbb;background:#f4f4f4;color:#222;font-size:20px;line-height:1;cursor:pointer;padding:0;flex:none}.pm button:active{background:#ddd}.pm input{width:3.2em;text-align:center}</style>
+<script>/* Boutons − / + autour des champs numériques (nombre d'unités par flux). */
+(function(){
+function pm(i){
+  if(i.dataset.pm||(i.step&&i.step!=='1')||(i.parentNode&&i.parentNode.classList&&i.parentNode.classList.contains('pm')))return;
+  i.dataset.pm='1';
+  const s=document.createElement('span');s.className='pm';i.parentNode.insertBefore(s,i);
+  const b=(t,d)=>{const x=document.createElement('button');x.type='button';x.textContent=t;x.setAttribute('aria-label',d>0?'Ajouter une unité':'Retirer une unité');
+    x.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(i.disabled||i.readOnly)return;
+      const mn=i.min!==''?+i.min:0,mx=i.max!==''?+i.max:Infinity;
+      let v=(parseInt(i.value,10)||0)+d;v=Math.max(mn,Math.min(mx,v));i.value=v;
+      i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));});return x;};
+  s.append(b('\u2212',-1),i,b('+',1));
+}
+const scan=r=>r.querySelectorAll('input[type=number]').forEach(pm);
+scan(document);
+new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==1)return;if(n.matches('input[type=number]'))pm(n);else scan(n);}))).observe(document.body,{childList:true,subtree:true});
+})();</script>
+<style>
+.jg-pm{display:flex;align-items:center;gap:6px}
+.jg-pm input[type=range]{flex:1;min-width:0;margin:0}
+.jg-pm>button{width:40px;height:40px;flex:none;padding:0;border:1px solid var(--trait);border-radius:9px;background:#fff;color:var(--vert);font:700 20px system-ui;line-height:1}
+.jg-pm>button:disabled{opacity:.4}
+.jg-pm.verrou input[type=range]{pointer-events:none;opacity:.6}
+.jg-pm.verrou{cursor:pointer}
+.jg-pm:not(.verrou) input[type=range]{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+</style>
+<script>/* Jauges (Bac-Score, simulateur) : un défilement du doigt ne doit plus changer une valeur.
+   Chaque jauge est verrouillée : − / + règlent pas à pas ; un appui sur la jauge la
+   déverrouille pour un réglage au doigt (5 s sans geste la reverrouillent). */
+(function(){
+  var ouverte = null, minuteur = null;
+  function verrouiller(z){ if(!z) return; z.classList.add('verrou'); if(ouverte===z) ouverte=null; }
+  function relancer(z){ clearTimeout(minuteur); minuteur=setTimeout(function(){ verrouiller(z); }, 5000); }
+  function regler(r, sens){
+    if (r.disabled || r.readOnly) return;
+    var pas = Number(r.step) || 1, mn = r.min !== '' ? Number(r.min) : 0, mx = r.max !== '' ? Number(r.max) : 100;
+    var v = Math.round(((Number(r.value) || 0) + sens * pas) * 1e6) / 1e6;
+    v = Math.max(mn, Math.min(mx, v)); if (String(v) === r.value) return;
+    r.value = v; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  function equiper(r){
+    if (r.dataset.jg || !r.parentNode) return; r.dataset.jg = '1';
+    var z = document.createElement('div'); z.className = 'jg-pm verrou';
+    z.title = 'Touchez la jauge pour la régler au doigt, ou utilisez − / +';
+    r.parentNode.insertBefore(z, r);
+    var m = document.createElement('button'), p = document.createElement('button');
+    m.type = p.type = 'button'; m.textContent = '−'; p.textContent = '+';
+    m.setAttribute('aria-label', 'Diminuer'); p.setAttribute('aria-label', 'Augmenter');
+    if (r.disabled) { m.disabled = p.disabled = true; }
+    m.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); regler(r, -1); });
+    p.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); regler(r, 1); });
+    z.appendChild(m); z.appendChild(r); z.appendChild(p);
+    z.addEventListener('click', function(e){
+      if (e.target.tagName === 'BUTTON' || r.disabled) return;
+      if (z.classList.contains('verrou')) { if (ouverte && ouverte !== z) verrouiller(ouverte); z.classList.remove('verrou'); ouverte = z; relancer(z); }
+    });
+    r.addEventListener('input', function(){ if (!z.classList.contains('verrou')) relancer(z); });
+  }
+  function scan(n){ if (n.matches && n.matches('input[type=range]')) equiper(n); else if (n.querySelectorAll) n.querySelectorAll('input[type=range]').forEach(equiper); }
+  scan(document);
+  new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
+    .observe(document.body, { childList: true, subtree: true });
+})();</script>
+</body>
+</html>
