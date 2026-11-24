@@ -390,7 +390,14 @@
     var v = { commune: com, statut: gVal("gf-statut"), nom_officiel: gVal("gf-nom"), siret: gVal("gf-siret"), code_service_chorus: gVal("gf-chorus"), adresse_facturation: gVal("gf-adresse"), code_postal: gVal("gf-cp"), ville: gVal("gf-ville"), email_facturation: gVal("gf-email"), date_contrat: gVal("gf-date"), notes: gVal("gf-notes") };
     if (G_AUTO) G_INFOS.forEach(function (k) { if (G_AUTO[k] !== undefined) v[k] = String(G_AUTO[k]); });
     G_AUTO = null;
-    gEnvoyer({ op: "enregistrer", onglet: "Clients", valeurs: v }, "msg-fiche", "Fiche enregistrée.").catch(function () {});
+    // Le maire trouvé (Répertoire national des élus) est ajouté aux contacts s'il n'y est pas encore.
+    var x = Object.assign({}, gClient(com), v), maire = String(x.maire || "").trim();
+    var dejaLa = !maire || (G.Contacts || []).some(function (k) { return k.commune === com && String(k.nom || "").toLowerCase() === maire.toLowerCase(); });
+    gEnvoyer({ op: "enregistrer", onglet: "Clients", valeurs: v }, "msg-fiche", "Fiche enregistrée.").then(function () {
+      if (dejaLa) return;
+      return gEnvoyer({ op: "enregistrer", onglet: "Contacts", valeurs: { commune: com, nom: maire, fonction: "maire", email: x.email_mairie || "", telephone: x.telephone_mairie || "", facturation: "non", notes: "Ajouté depuis le Répertoire national des élus" + (x.maire_depuis ? " (maire depuis le " + gDateFR(x.maire_depuis) + ")" : "") } }, "msg-contact", "Maire ajouté aux contacts.")
+        .then(function () { msg("msg-fiche", "Fiche enregistrée, et " + maire + " ajouté(e) aux contacts comme maire.", "ok"); });
+    }).catch(function () {});
   });
   $("g-contacts").addEventListener("click", function (e) {
     var b = e.target.closest("[data-gcontact]"); if (!b) return;
