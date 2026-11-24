@@ -292,6 +292,11 @@
       <div class="carte" id="bac-entete">
         <h2 id="bac-titre">Version</h2>
         <div id="bac-champs">
+          <div id="bac-depart-bloc" style="display:none;margin-bottom:6px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px">
+            <label for="bac-depart" style="margin-top:0"><b>Modèle de départ</b></label>
+            <select id="bac-depart"></select>
+            <p class="petit" id="bac-depart-desc" style="margin:6px 0 0"></p>
+          </div>
           <label for="bac-nom"><b>Nom de la version</b></label>
           <input type="text" id="bac-nom" placeholder="Barème 2027">
           <label for="bac-depuis"><b>En vigueur à partir du</b> — au plus tôt demain</label>
@@ -1715,7 +1720,7 @@
   }
   function ouvrir(mode, v) {
     ED = { mode: mode, version: v ? v.version : "" };
-    V = copie(v.bareme);
+    V = copie(v.bareme); ED.base = copie(v.bareme); ED.depart = ""; majDepart();
     cacher("msg-bac-ed");
     var lecture = mode === "voir";
     $("bac-editeur").style.display = "block";
@@ -1767,6 +1772,19 @@
   Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
     if (b.dataset.onglet === "bac") b.addEventListener("click", function () { remplirPortee(); if (!BACD) chargerBac(); });
   });
+  /* Nouvelle version : choix du modèle de départ dans l'éditeur (réglages en vigueur ou modèle prêt à l'emploi). */
+  function majDepart() {
+    var bloc = $("bac-depart-bloc"), s = $("bac-depart"); if (!bloc || !s) return;
+    var creer = !!(ED && ED.mode === "creer");
+    bloc.style.display = creer ? "" : "none";
+    if (!creer) return;
+    s.innerHTML = "";
+    var o = document.createElement("option"); o.value = ""; o.textContent = "Réglages actuels (version en vigueur)"; s.appendChild(o);
+    (typeof MODELES_PRETS !== "undefined" ? MODELES_PRETS : []).forEach(function (m) { var x = document.createElement("option"); x.value = m.id; x.textContent = "Modèle prêt à l'emploi : " + m.nom; s.appendChild(x); });
+    s.value = ED.depart || "";
+    var m = (typeof MODELES_PRETS !== "undefined" ? MODELES_PRETS : []).filter(function (x) { return x.id === s.value; })[0];
+    $("bac-depart-desc").textContent = m ? m.desc : "La nouvelle version part des réglages en vigueur aujourd'hui. Choisissez un modèle prêt à l'emploi pour partir d'un autre profil.";
+  }
   /* Modèles de barème prêts à l'emploi : des profils complets (lettres, paliers, réglages) à partir
      desquels on prépare une nouvelle version, ajustable avant l'enregistrement. */
   var MODELES_PRETS = (function () {
@@ -1823,6 +1841,18 @@
     ];
   })();
   (function () {
+    var d = $("bac-depart"); if (!d) return;
+    d.addEventListener("change", function () {
+      if (!ED || ED.mode !== "creer") return;
+      var m = MODELES_PRETS.filter(function (x) { return x.id === d.value; })[0];
+      var avant = (MODELES_PRETS.filter(function (x) { return x.id === ED.depart; })[0] || {}).nom || "";
+      ED.depart = d.value;
+      V = copie(m ? m.bareme : ED.base);
+      if (!$("bac-nom").value.trim() || $("bac-nom").value === avant) $("bac-nom").value = m ? m.nom : "";
+      majDepart(); dessinerEditeur(); simuler();
+    });
+  })();
+  (function () {
     var s = $("bac-modele-pret"); if (!s) return;
     MODELES_PRETS.forEach(function (m) { var o = document.createElement("option"); o.value = m.id; o.textContent = m.nom; s.appendChild(o); });
     function decrire() { var m = MODELES_PRETS.filter(function (x) { return x.id === s.value; })[0]; $("bac-modele-desc").textContent = m ? m.desc : ""; }
@@ -1830,7 +1860,9 @@
     $("bac-modele-ok").addEventListener("click", function () {
       if (!BACD) { msg("msg-bac", "Barème pas encore chargé : réessayez dans un instant.", "ko"); return; }
       var m = MODELES_PRETS.filter(function (x) { return x.id === s.value; })[0]; if (!m) return;
+      var base = versionDuJour();
       ouvrir("creer", { bareme: copie(m.bareme), version: "" });
+      ED.base = copie(base ? base.bareme : m.bareme); ED.depart = m.id; majDepart();
       $("bac-nom").value = m.nom;
     });
   })();
