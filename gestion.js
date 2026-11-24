@@ -8,14 +8,14 @@
   // Onglets : boutons dans la barre, sections dans la page.
   var nav = document.querySelector("nav"), main = document.querySelector("main");
   if (!nav || !main) return;
-  [["clients", "Clients"], ["carte", "Carte"], ["agenda", "Agenda"], ["factu", "Factures"]].forEach(function (o) {
+  [["clients", "Clients"], ["carte", "Carte"], ["agenda", "Agenda"], ["tarifs", "Tarifs"], ["factu", "Factures"]].forEach(function (o) {
     var b = document.createElement("button"); b.dataset.onglet = o[0]; b.textContent = o[1]; nav.appendChild(b);
   });
   main.insertAdjacentHTML("beforeend", "  <section id=\"clients\">\n    <div class=\"carte\">\n      <h2>Suivi des communes <button class=\"second\" id=\"g-recharger\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Actualiser</button></h2>\n      <p class=\"petit\">Une ligne par commune : o\u00f9 en est la relation, et la prochaine action pr\u00e9vue.</p>\n      <div id=\"g-pipeline\" class=\"petit\">\u2014</div>\n      <div class=\"msg\" id=\"msg-gestion\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Fiche client</h2>\n      <label for=\"g-commune\"><b>Commune</b></label>\n      <select id=\"g-commune\"></select>\n      <div id=\"g-contrat\" class=\"petit\" style=\"margin-top:8px\"></div>\n      <div id=\"g-fiche\"></div>\n      <button class=\"principal\" id=\"g-fiche-ok\" type=\"button\">Enregistrer la fiche</button>\n      <div class=\"msg\" id=\"msg-fiche\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Contacts</h2>\n      <div id=\"g-contacts\" class=\"petit\"></div>\n      <div id=\"g-contact-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-contact\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>\u00c9changes</h2>\n      <p class=\"petit\">Appels, r\u00e9unions, d\u00e9monstrations, relances\u2026 et la prochaine action \u00e0 faire.</p>\n      <div id=\"g-echanges\" class=\"petit\"></div>\n      <div id=\"g-echange-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-echange\"></div>\n    </div>\n  </section>\n\n  <section id=\"factu\">\n    <div class=\"carte\">\n      <h2>\u00c9metteur des devis et factures</h2>\n      <p class=\"petit\">Ces informations figureront sur chaque document. Tant que des champs sont \u00ab \u00c0 REMPLIR \u00bb, les documents restent des brouillons sans valeur.</p>\n      <div id=\"g-emetteur\"></div>\n      <button class=\"principal\" id=\"g-emetteur-ok\" type=\"button\">Enregistrer l'\u00e9metteur</button>\n      <div class=\"msg\" id=\"msg-emetteur\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Devis <button class=\"second\" id=\"g-devis-nouveau\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouveau devis</button></h2>\n      <div id=\"g-devis-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\">\n      <h2>Factures <button class=\"second\" id=\"g-facture-nouvelle\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouvelle facture</button></h2>\n      <div id=\"g-factures-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\" id=\"g-doc\" hidden>\n      <h2 id=\"g-doc-titre\">Document</h2>\n      <div id=\"g-doc-entete\"></div>\n      <h2 style=\"margin-top:14px\">Lignes</h2>\n      <div id=\"g-doc-lignes\"></div>\n      <button class=\"second\" id=\"g-doc-ligne\" type=\"button\" style=\"margin-top:8px\">+ Ajouter une ligne</button>\n      <div id=\"g-doc-totaux\" class=\"petit\" style=\"margin-top:10px;text-align:right;font-size:15px\"></div>\n      <div class=\"msg\" id=\"msg-doc\"></div>\n      <div style=\"display:flex;gap:8px;margin-top:12px;flex-wrap:wrap\">\n        <button class=\"second\" id=\"g-doc-fermer\" type=\"button\" style=\"flex:1\">Fermer</button>\n        <button class=\"second\" id=\"g-doc-supprimer\" type=\"button\" style=\"flex:1;color:var(--ko)\">Supprimer le brouillon</button>\n        <button class=\"principal\" id=\"g-doc-ok\" type=\"button\" style=\"flex:2;margin-top:0\">Enregistrer</button>\n      </div>\n    </div>\n  </section>\n");
   // Bascule d'onglet pour les deux nouveaux boutons (les autres sont gérés par la console).
   Array.prototype.forEach.call(nav.querySelectorAll("button"), function (b) {
     b.addEventListener("click", function () {
-      if (["clients", "carte", "agenda", "factu"].indexOf(b.dataset.onglet) < 0) return;
+      if (["clients", "carte", "agenda", "tarifs", "factu"].indexOf(b.dataset.onglet) < 0) return;
       Array.prototype.forEach.call(nav.querySelectorAll("button"), function (x) { x.classList.toggle("actif", x === b); });
       Array.prototype.forEach.call(document.querySelectorAll("main > section"), function (s) { s.classList.toggle("actif", s.id === b.dataset.onglet); });
       if (!G_CHARGE) chargerGestion(); else if (b.dataset.onglet === "carte") ouvrirCarteProspects(); else if (b.dataset.onglet === "agenda") dessinerAgenda();
@@ -70,7 +70,7 @@
     var s = $("g-commune"), avant = s.value;
     s.innerHTML = gCommunes().map(function (c) { return '<option value="' + gEsc(c[0]) + '">' + gEsc(c[1]) + '</option>'; }).join("");
     if (avant && gCommunes().some(function (c) { return c[0] === avant; })) s.value = avant;
-    dessinerPipeline(); dessinerFiche(); dessinerEmetteur(); dessinerDocs(); dessinerAgenda();
+    dessinerPipeline(); dessinerFiche(); dessinerEmetteur(); dessinerDocs(); dessinerAgenda(); dessinerTarifs();
     if ($("carte") && $("carte").classList.contains("actif")) ouvrirCarteProspects();
   }
   function dessinerPipeline() {
@@ -88,7 +88,7 @@
     var pt = gPotentiel(com), el = $("g-potentiel");
     if (!el) { el = document.createElement("div"); el.id = "g-potentiel"; $("g-contrat").insertAdjacentElement("afterend", el); }
     el.innerHTML = '<div style="margin-top:8px;padding:8px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px;font-size:15px">Potentiel : <b>' + (pt.points || "?") + ' point(s)</b>' + (pt.estime ? ' <span class="petit">(estimé : ' + gEsc(pt.base) + ')</span>' : ' <span class="petit">(' + gEsc(pt.base) + ')</span>')
-      + (pt.tarif && pt.points ? ' · <b>' + gEuros(pt.points * pt.tarif) + ' HT/an</b> <span class="petit">à ' + gEuros(pt.tarif) + '/point</span>' : ' · <span class="petit">montant : renseignez « tarif_point_defaut » (onglet Factures) ou le tarif de la commune</span>') + '</div>';
+      + (pt.tarif && pt.points ? ' · <b>' + gEuros(pt.points * pt.tarif) + ' HT/an</b> <span class="petit">à ' + gEuros(pt.tarif) + '/point</span>' : ' · <span class="petit">montant : renseignez le prix de l\'abonnement dans l\'onglet Tarifs</span>') + '</div>';
   }
   var G_AUTO_FAIT = {};
   function dessinerFiche() {
@@ -105,10 +105,12 @@
       + gChamp("gf-email", "E-mail de facturation", c.email_facturation, "email")
       + gChamp("gf-date", "Date du contrat", c.date_contrat, "date")
       + gChamp("gf-notes", "Notes", c.notes, "zone")
+      + htmlConditions(c)
+      + ((G.communes || []).some(function (x) { return x.commune === com; }) ? '<p class="petit" style="margin-top:10px">✓ Commune déployée (application et météo en place).</p>' : '<button class="second" type="button" id="gf-deployer" style="margin-top:12px;width:100%">Lancer le déploiement de la commune</button><p class="petit">Ouvre l\'onglet « Créer » pré-rempli avec cette commune (recherche INSEE et mairie lancée) : vous complétez puis validez.</p>')
       + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
       + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
       + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
-    dessinerInfos(c);
+    dessinerInfos(c); dessinerConditions();
     dessinerContacts(); dessinerEchanges();
     // Fiche sans infos publiques : recherche lancée d'elle-même (une fois par commune et par session).
     if (!c.infos_maj && !(G_AUTO && G_AUTO.infos_maj) && !G_AUTO_FAIT[com]) { G_AUTO_FAIT[com] = 1; rechercherInfos(true); }
@@ -260,8 +262,7 @@
       + '<button class="principal" type="button" id="ge-ok" style="margin-top:0;flex:1">' + (x.id ? "Enregistrer" : "Ajouter") + '</button></div>';
   }
   // Réglages de prospection, rangés dans l'onglet Emetteur (créés à la première sauvegarde).
-  var G_REGLAGES = [["tarif_point_defaut", "", "Réglage : tarif annuel HT par point pour estimer le potentiel d'un prospect (€)"],
-    ["habitants_par_point", "300", "Réglage : habitants par point de collecte, pour estimer les points d'une commune non relevée"],
+  var G_REGLAGES = [["habitants_par_point", "300", "Réglage : habitants par point de collecte, pour estimer les points d'une commune non relevée"],
     ["carte_centre", "Albon", "Réglage : commune au centre de la carte des prospects"],
     ["carte_rayon_km", "20", "Réglage : rayon par défaut de la carte (km)"]];
   function gReglage(cle) {
@@ -390,6 +391,7 @@
   $("g-fiche-ok").addEventListener("click", function () {
     var com = $("g-commune").value; if (!com) return;
     var v = { commune: com, statut: gVal("gf-statut"), nom_officiel: gVal("gf-nom"), siret: gVal("gf-siret"), code_service_chorus: gVal("gf-chorus"), adresse_facturation: gVal("gf-adresse"), code_postal: gVal("gf-cp"), ville: gVal("gf-ville"), email_facturation: gVal("gf-email"), date_contrat: gVal("gf-date"), notes: gVal("gf-notes") };
+    Object.assign(v, lireConditions());
     if (G_AUTO) G_INFOS.forEach(function (k) { if (G_AUTO[k] !== undefined) v[k] = String(G_AUTO[k]); });
     G_AUTO = null;
     // Le maire trouvé (Répertoire national des élus) est ajouté aux contacts s'il n'y est pas encore.
@@ -474,7 +476,7 @@
     var c = Object.assign({}, gClient(com), (G_AUTO && $("g-commune").value === com) ? G_AUTO : {}), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     var connus = (Number(c.nb_points) || 0) + (Number(c.nb_points_a_verifier) || 0);
     var hpp = Number(String(gReglage("habitants_par_point")).replace(",", ".")) || 300;
-    var tarif = Number(String(ct.tarif_point || gReglage("tarif_point_defaut") || "").replace(",", ".")) || 0;
+    var tp = gTarifPoint(c, ct), tarif = tp.an * (1 - Math.min(100, gNum(c.remise_pct)) / 100);
     if (connus) return { points: connus, estime: false, base: "points du Referentiel", tarif: tarif };
     var pop = Number(c.population) || 0;
     if (pop) return { points: Math.max(1, Math.ceil(pop / hpp)), estime: true, base: pop.toLocaleString("fr-FR") + " hab. ÷ " + hpp, tarif: tarif };
@@ -510,17 +512,44 @@
     if (GK.chargeL) return GK.chargeL;
     GK.chargeL = new Promise(function (ok, ko) {
       var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(l);
-      var s = document.createElement("script"); s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; s.onload = ok; s.onerror = function () { ko(new Error("Carte indisponible (chargement de Leaflet).")); };
+      var s = document.createElement("script"); s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; s.onload = ok; s.onerror = function () { GK.chargeL = null; s.remove(); ko(new Error("Fond de carte indisponible (chargement de Leaflet) : réessayez.")); };
       document.head.appendChild(s);
     });
     return GK.chargeL;
   }
-  function toutesCommunes() {
-    if (GK.communes) return Promise.resolve(GK.communes);
-    msg("msg-carte", "Chargement des communes…");
-    return gJson("https://geo.api.gouv.fr/communes?fields=nom,code,centre,population,codeDepartement,codesPostaux&format=json").then(function (l) {
-      GK.communes = l.filter(function (c) { return c.centre && c.centre.coordinates; }); cacher("msg-carte"); return GK.communes;
+  // Communes chargées par département (seulement ceux que le cercle touche) : léger, même sur smartphone.
+  var GK_DEPS = {};
+  function gJsonRetry(u) { return gJson(u).catch(function () { return new Promise(function (r) { setTimeout(r, 800); }).then(function () { return gJson(u); }); }); }
+  function centreDepuisNom(nom) {
+    return gJsonRetry("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + "&fields=nom,centre&boost=population&limit=5").then(function (l) {
+      var c0 = l.filter(function (c) { return slugCommune(c.nom) === slugCommune(nom); })[0] || l[0];
+      if (!c0 || !c0.centre) throw new Error("Commune de centre introuvable : « " + nom + " ».");
+      return [c0.centre.coordinates[1], c0.centre.coordinates[0]];
     });
+  }
+  function communesAutour(centre, rayon) {
+    msg("msg-carte", "Chargement des communes…");
+    var pts = [centre];
+    for (var k = 0; k < 16; k++) [1, 0.5].forEach(function (f) {
+      var a = k * Math.PI / 8, dLat = rayon * f * Math.cos(a) / 111, dLon = rayon * f * Math.sin(a) / (111 * Math.cos(centre[0] * Math.PI / 180));
+      pts.push([centre[0] + dLat, centre[1] + dLon]);
+    });
+    return Promise.all(pts.map(function (p) {
+      return gJsonRetry("https://geo.api.gouv.fr/communes?lat=" + p[0].toFixed(5) + "&lon=" + p[1].toFixed(5) + "&fields=codeDepartement").then(function (l) { return (l[0] || {}).codeDepartement; }).catch(function () { return null; });
+    })).then(function (deps) {
+      deps = deps.filter(function (d, i) { return d && deps.indexOf(d) === i; });
+      if (!deps.length) throw new Error("Service des communes (geo.api.gouv.fr) injoignable : réessayez dans un instant.");
+      return Promise.all(deps.map(function (d) {
+        if (GK_DEPS[d]) return GK_DEPS[d];
+        return gJsonRetry("https://geo.api.gouv.fr/departements/" + d + "/communes?fields=nom,code,centre,population,codeDepartement,codesPostaux").then(function (l) {
+          GK_DEPS[d] = l.filter(function (c) { return c.centre && c.centre.coordinates; }); return GK_DEPS[d];
+        });
+      }));
+    }).then(function (listes) {
+      var vus = {}; GK.communes = [];
+      Object.keys(GK_DEPS).forEach(function (d) { GK_DEPS[d].forEach(function (c) { if (!vus[c.code]) { vus[c.code] = 1; GK.communes.push(c); } }); });
+      cacher("msg-carte"); return GK.communes;
+    }).catch(function (e) { throw new Error(/fetch/i.test(e.message) ? "Service des communes (geo.api.gouv.fr) injoignable depuis ce réseau : réessayez, ou désactivez un éventuel bloqueur." : e.message); });
   }
   function slugCommune(t) {
     return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -545,14 +574,9 @@
     $("gk-legende").innerHTML = [["aucun", "pas encore en relation"]].concat(G_STATUTS).map(function (s) {
       return '<span><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:' + G_COULEURS[s[0]] + ';margin-right:4px;vertical-align:-1px"></span>' + gEsc(s[1]) + '</span>';
     }).join("");
-    Promise.all([chargerLeaflet(), toutesCommunes()]).then(function () {
-      var rayon = Number($("gk-rayon").value) || 20, centre = centreForce || GK_CENTRE;
-      if (!centre) {
-        var nomC = slugCommune($("gk-centre").value);
-        var c0 = GK.communes.filter(function (c) { return slugCommune(c.nom) === nomC; }).sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
-        if (!c0) throw new Error("Commune de centre introuvable : « " + $("gk-centre").value + " ».");
-        centre = [c0.centre.coordinates[1], c0.centre.coordinates[0]];
-      }
+    var rayon = Number($("gk-rayon").value) || 20, centre = centreForce || GK_CENTRE;
+    var pCentre = centre ? Promise.resolve(centre) : centreDepuisNom($("gk-centre").value.trim() || "Albon");
+    Promise.all([chargerLeaflet(), pCentre]).then(function (r) { centre = r[1]; return communesAutour(centre, rayon); }).then(function () {
       GK_CENTRE = centre;
       if (!GK.carte) {
         GK.carte = L.map("gk-carte");
@@ -568,7 +592,7 @@
         var r = Math.max(5, Math.min(16, 3 + Math.sqrt(c.population || 0) / 9));
         var m = L.circleMarker(pos, { radius: r, color: s.statut === "aucun" ? "#7d857e" : "#fff", weight: s.statut === "aucun" ? 1 : 2, fillColor: G_COULEURS[s.statut] || G_COULEURS.aucun, fillOpacity: s.statut === "aucun" ? 0.45 : 0.95 }).addTo(GK.couche);
         m.on("mouseover", function () { this.openPopup(); });
-        var hpp = Number(gReglage("habitants_par_point")) || 300, tarif = Number(String(gReglage("tarif_point_defaut")).replace(",", ".")) || 0;
+        var hpp = Number(gReglage("habitants_par_point")) || 300, tarif = gTarifPoint(s.client, null).an * (1 - Math.min(100, gNum(s.client && s.client.remise_pct)) / 100);
         var pts = s.client && (Number(s.client.nb_points) || 0) ? Number(s.client.nb_points) : Math.max(1, Math.ceil((c.population || 0) / hpp));
         m.bindPopup('<b>' + gEsc(c.nom) + '</b> (' + gEsc(c.codeDepartement) + ')<br>' + (c.population || 0).toLocaleString("fr-FR") + ' habitants · ' + x.d.toFixed(1) + ' km'
           + '<br>Statut : <b>' + gEsc(s.statut === "aucun" ? "pas en relation" : gLib(G_STATUTS, s.statut)) + '</b>'
@@ -674,5 +698,151 @@
   }
   $("ga-liste").addEventListener("click", ouvrirDepuisAgenda);
   $("ga-retard").addEventListener("click", ouvrirDepuisAgenda);
+
+
+  /* ——— Tarifs : facturation de base (mode par défaut) et catalogue (abonnement, options) ——— */
+  var G_UNITES = [["point_an", "par point et par an"], ["point_mois", "par point et par mois"], ["point", "par point (une fois)"], ["forfait", "forfait (une fois)"], ["an", "par an"], ["mois", "par mois"], ["jour", "par jour"], ["heure", "par heure"], ["unite", "à l'unité"]];
+  var G_RECURRENT = { point_an: 1, point_mois: 12, an: 1, mois: 12 };   // multiplicateur annuel ; absent = une fois
+  function gNum(v) { return Number(String(v == null ? "" : v).replace(/\s/g, "").replace(",", ".")) || 0; }
+  function gTarifs(cat) {
+    return (G.Tarifs || []).filter(function (t) { return t.actif !== "non" && (!cat || t.categorie === cat); })
+      .sort(function (a, b) { return gNum(a.ordre) - gNum(b.ordre) || String(a.libelle).localeCompare(b.libelle, "fr"); });
+  }
+  function gPrix(code) { var t = (G.Tarifs || []).filter(function (x) { return x.code === code; })[0]; return t ? gNum(t.prix_ht) : 0; }
+  function gModeDefaut() { return gReglage("mode_facturation_defaut") === "mensuel" ? "mensuel" : "annuel"; }
+  // Prix annuel d'un point pour une commune : contrat (onglet Communes), sinon catalogue selon le mode de facturation.
+  function gTarifPoint(c, ct) {
+    c = c || {}; ct = ct || {};
+    var mode = c.mode_facturation || gModeDefaut();
+    if (gNum(ct.tarif_point)) return { an: gNum(ct.tarif_point), mode: mode, source: "tarif du contrat" };
+    var an = gPrix("point_annuel"), mois = gPrix("point_mensuel");
+    if (mode === "mensuel" && mois) return { an: mois * 12, mois: mois, mode: mode, source: gEuros(mois) + "/point/mois" };
+    if (an) return { an: an, mode: mode, source: gEuros(an) + "/point/an" };
+    if (mois) return { an: mois * 12, mois: mois, mode: mode, source: gEuros(mois) + "/point/mois" };
+    var anc = gNum(gReglage("tarif_point_defaut"));
+    return { an: anc, mode: mode, source: anc ? gEuros(anc) + "/point/an" : "" };
+  }
+  // Options cochées d'une fiche : « code:quantité;code:quantité ».
+  function gLireOptions(t) { var o = {}; String(t || "").split(";").forEach(function (p) { var x = p.split(":"); if (x[0]) o[x[0].trim()] = gNum(x[1]) || 1; }); return o; }
+  // Proposition chiffrée : abonnement + options, remise appliquée.
+  function gProposition(com, c, opts) {
+    var ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
+    var pt = gPotentiel(com), tp = gTarifPoint(c, ct), remise = Math.min(100, Math.max(0, gNum(c.remise_pct)));
+    var l = [], rec = 0, une = 0;
+    if (pt.points && tp.an) { rec += pt.points * tp.an; l.push(["Abonnement : " + pt.points + " point(s) × " + tp.source, pt.points * tp.an, "an"]); }
+    gTarifs("option").forEach(function (t) {
+      if (!opts[t.code]) return;
+      var q = opts[t.code], m = G_RECURRENT[t.unite], mt = q * gNum(t.prix_ht);
+      if (m) { rec += mt * m; l.push([t.libelle + " : " + q + " × " + gEuros(t.prix_ht) + " " + gLib(G_UNITES, t.unite), mt * m, "an"]); }
+      else { une += mt; l.push([t.libelle + " : " + q + " × " + gEuros(t.prix_ht) + " " + gLib(G_UNITES, t.unite), mt, "une"]); }
+    });
+    var k = 1 - remise / 100;
+    return { lignes: l, recurrent: rec * k, uneFois: une * k, remise: remise, brut: rec + une, mode: tp.mode };
+  }
+  function dessinerConditions() {
+    var com = $("g-commune").value, box = $("gf-conditions"); if (!box || !com) return;
+    var opts = {}; Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) { if (i.checked) { var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); opts[i.dataset.opt] = gNum(q && q.value) || 1; } });
+    var c = Object.assign({}, gClient(com), { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise") });
+    var p = gProposition(com, c, opts);
+    $("gf-proposition").innerHTML = p.lignes.length
+      ? p.lignes.map(function (x) { return '<div style="display:flex;gap:8px"><span style="flex:1">' + gEsc(x[0]) + '</span><b>' + gEuros(x[1]) + (x[2] === "an" ? "/an" : "") + '</b></div>'; }).join("")
+        + '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--trait)">' + (p.remise ? 'Remise commerciale ' + p.remise + ' % appliquée.<br>' : '')
+        + 'Récurrent : <b>' + gEuros(p.recurrent) + ' HT/an</b>' + (p.mode === "mensuel" ? ' (soit ' + gEuros(p.recurrent / 12) + '/mois)' : '')
+        + (p.uneFois ? ' · Une fois : <b>' + gEuros(p.uneFois) + ' HT</b>' : '') + ' · <b>1re année : ' + gEuros(p.recurrent + p.uneFois) + ' HT</b></div>'
+      : 'Renseignez les prix dans l\'onglet Tarifs pour chiffrer la proposition.';
+  }
+  function htmlConditions(c) {
+    var opts = gLireOptions(c.options), pts = gPotentiel(c.commune).points || 1;
+    var options = gTarifs("option");
+    return '<div id="gf-conditions" style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Conditions commerciales</b>'
+      + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
+      + '<div>' + gChamp("gf-mode", "Facturation de l'abonnement", c.mode_facturation || "", null, [["", "Par défaut (" + (gModeDefaut() === "mensuel" ? "au mois" : "à l'année") + ")"], ["annuel", "À l'année"], ["mensuel", "Au mois"]]) + '</div>'
+      + '<div>' + gChamp("gf-remise", "Remise %", c.remise_pct || "", "number") + '</div></div>'
+      + '<div class="petit" style="margin-top:8px"><b>Options pour le devis</b></div>'
+      + (options.length ? options.map(function (t) {
+          var q = opts[t.code] || (/point/.test(t.unite) ? pts : 1);
+          return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" data-opt="' + gEsc(t.code) + '" id="gfo-' + gEsc(t.code) + '"' + (opts[t.code] ? ' checked' : '') + ' style="width:auto">'
+            + '<label for="gfo-' + gEsc(t.code) + '" style="flex:1;margin:0">' + gEsc(t.libelle) + ' <span class="petit">— ' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : 'prix à définir') + ' ' + gEsc(gLib(G_UNITES, t.unite)) + '</span></label>'
+            + '<input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '" style="width:70px" aria-label="Quantité"></div>';
+        }).join("") : '<p class="petit">Aucune option : ajoutez-en dans l\'onglet Tarifs.</p>')
+      + '<div id="gf-proposition" class="petit" style="margin-top:10px"></div></div>';
+  }
+  function lireConditions() {
+    var box = $("gf-conditions"), o = [];
+    if (!box) return {};
+    Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) { if (i.checked) { var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); o.push(i.dataset.opt + ":" + (gNum(q && q.value) || 1)); } });
+    return { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), options: o.join(";") };
+  }
+  $("g-fiche").addEventListener("input", function (e) { if (e.target.closest("#gf-conditions")) dessinerConditions(); });
+  $("g-fiche").addEventListener("change", function (e) { if (e.target.closest("#gf-conditions")) dessinerConditions(); });
+
+  /* ——— Déploiement depuis la fiche : ouvre « Créer » pré-rempli et lance la recherche de la commune ——— */
+  function lancerDeploiement() {
+    var com = $("g-commune").value, c = Object.assign({}, gClient(com), G_AUTO || {});
+    var nom = c.ville || (gCommunes().filter(function (x) { return x[0] === com; })[0] || [com, com])[1];
+    var insee = String(c.code_insee || ""), dep = insee ? (insee.slice(0, 2) === "97" ? insee.slice(0, 3) : insee.slice(0, 2)) : "";
+    var nb = document.querySelector('nav button[data-onglet="commune"]'); if (nb) nb.click();
+    var essais = 0;
+    (function remplir() {
+      var inp = document.getElementById("p-commune.nom");
+      if (!inp) { if (++essais < 40) setTimeout(remplir, 250); return; }
+      inp.value = nom; inp.dispatchEvent(new Event("input", { bubbles: true }));
+      var d = document.getElementById("p-commune.departement");
+      if (d && dep) { d.value = dep; d.dispatchEvent(new Event("input", { bubbles: true })); }
+      var bt = Array.prototype.filter.call(inp.parentNode.querySelectorAll("button"), function (b) { return /Rechercher la commune/.test(b.textContent); })[0];
+      if (bt) bt.click();
+      inp.scrollIntoView({ behavior: "smooth", block: "center" });
+    })();
+  }
+  $("g-fiche").addEventListener("click", function (e) { if (e.target.id === "gf-deployer") lancerDeploiement(); });
+
+  main.insertAdjacentHTML("beforeend",
+    '<section id="tarifs"><div class="carte"><h2>Facturation de base</h2>'
+    + '<label for="gt-mode"><b>Facturation de l\'abonnement par défaut</b></label><select id="gt-mode"><option value="annuel">À l\'année (prix par point et par an)</option><option value="mensuel">Au mois (prix par point et par mois)</option></select>'
+    + '<p class="petit">Chaque commune peut avoir son propre mode et un taux de remise commerciale : dans sa fiche (onglet Clients), bloc « Conditions commerciales ».</p>'
+    + '<button class="principal" id="gt-mode-ok" type="button">Enregistrer</button><div class="msg" id="msg-tarifs-base"></div></div>'
+    + '<div class="carte"><h2>Catalogue <button class="second" id="gt-nouveau" type="button" style="float:right;padding:4px 10px;font-size:13px">Nouvelle option</button></h2>'
+    + '<p class="petit">Abonnement par point (à l\'année ou au mois) et options proposées dans les devis : installation, formation, maintenance… Prix HT. Le tableau est aussi dans l\'onglet « Tarifs » du classeur commun.</p>'
+    + '<div id="gt-liste" class="petit">—</div><div id="gt-form" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)" hidden></div><div class="msg" id="msg-tarifs"></div></div></section>');
+  var GT = null;
+  function dessinerTarifs() {
+    if (!$("gt-liste") || !G) return;
+    $("gt-mode").value = gModeDefaut();
+    var tous = (G.Tarifs || []).slice().sort(function (a, b) { return gNum(a.ordre) - gNum(b.ordre); });
+    var bloc = function (cat, titre) {
+      var l = tous.filter(function (t) { return (t.categorie || "option") === cat; });
+      return '<b>' + titre + '</b>' + (l.length ? '<table class="dns"><tr><th style="text-align:left">Libellé</th><th style="text-align:right">Prix HT</th><th style="text-align:left">Unité</th></tr>' + l.map(function (t) {
+        return '<tr' + (t.actif === "non" ? ' style="opacity:.5"' : '') + '><td><a href="#" data-gt="' + gEsc(t.code) + '">' + gEsc(t.libelle) + '</a>' + (t.actif === "non" ? ' (inactif)' : '') + '</td><td style="text-align:right">' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : '<span style="color:var(--ko)">à définir</span>') + '</td><td>' + gEsc(gLib(G_UNITES, t.unite)) + '</td></tr>';
+      }).join("") + '</table>' : '<p>Aucun.</p>');
+    };
+    $("gt-liste").innerHTML = (G.Tarifs ? "" : '<p>Onglet Tarifs pas encore créé : cliquez « Actualiser » dans l\'onglet Clients.</p>') + bloc("abonnement", "Abonnement") + '<div style="height:10px"></div>' + bloc("option", "Options");
+  }
+  function formTarif(t) {
+    GT = t; var f = $("gt-form"); f.hidden = false; t = t || { categorie: "option", unite: "forfait", actif: "oui" };
+    f.innerHTML = '<b>' + (GT ? "Modifier « " + gEsc(t.libelle) + " »" : "Nouvelle option") + '</b>'
+      + gChamp("gt-libelle", "Libellé (repris sur le devis)", t.libelle)
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div>' + gChamp("gt-prix", "Prix HT (€)", t.prix_ht, "number") + '</div><div>' + gChamp("gt-unite", "Unité", t.unite, null, G_UNITES) + '</div></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px"><div>' + gChamp("gt-cat", "Catégorie", t.categorie, null, [["option", "Option"], ["abonnement", "Abonnement"]]) + '</div><div>' + gChamp("gt-actif", "Proposé", t.actif || "oui", null, [["oui", "Oui"], ["non", "Non (masqué)"]]) + '</div><div>' + gChamp("gt-ordre", "Ordre", t.ordre, "number") + '</div></div>'
+      + gChamp("gt-desc", "Description", t.description, "zone")
+      + '<div style="display:flex;gap:8px;margin-top:10px"><button class="second" type="button" id="gt-annuler" style="flex:1">Annuler</button>'
+      + (GT && !/^point_(annuel|mensuel)$/.test(GT.code) ? '<button class="second" type="button" id="gt-suppr" style="flex:1;color:var(--ko)">Supprimer</button>' : '')
+      + '<button class="principal" type="button" id="gt-ok" style="flex:2;margin-top:0">Enregistrer</button></div>';
+    f.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  $("gt-liste").addEventListener("click", function (e) { var a = e.target.closest("[data-gt]"); if (!a) return; e.preventDefault(); formTarif((G.Tarifs || []).filter(function (t) { return t.code === a.dataset.gt; })[0]); });
+  $("gt-nouveau").addEventListener("click", function () { formTarif(null); });
+  $("gt-form").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.id === "gt-annuler") { $("gt-form").hidden = true; GT = null; return; }
+    if (b.id === "gt-suppr") { if (!confirm("Supprimer « " + GT.libelle + " » du catalogue ?")) return; gEnvoyer({ op: "supprimer", onglet: "Tarifs", cle: GT.code }, "msg-tarifs", "Supprimé du catalogue.").then(function () { $("gt-form").hidden = true; GT = null; }).catch(function () {}); return; }
+    if (b.id === "gt-ok") {
+      if (!gVal("gt-libelle")) { msg("msg-tarifs", "Indiquez un libellé.", "ko"); return; }
+      var v = { code: GT ? GT.code : "", libelle: gVal("gt-libelle"), prix_ht: gVal("gt-prix").replace(",", "."), unite: gVal("gt-unite"), categorie: gVal("gt-cat"), actif: gVal("gt-actif"), ordre: gVal("gt-ordre"), description: gVal("gt-desc") };
+      gEnvoyer({ op: "enregistrer", onglet: "Tarifs", valeurs: v }, "msg-tarifs", "Tarif enregistré.").then(function () { $("gt-form").hidden = true; GT = null; }).catch(function () {});
+    }
+  });
+  $("gt-mode-ok").addEventListener("click", function () {
+    gEnvoyer({ op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "mode_facturation_defaut", valeur: $("gt-mode").value, description: "annuel ou mensuel : facturation par défaut de l'abonnement" } }, "msg-tarifs-base", "Mode de facturation par défaut enregistré.").catch(function () {});
+  });
 
 })();
