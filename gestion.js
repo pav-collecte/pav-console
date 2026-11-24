@@ -75,7 +75,7 @@
       var afaire = (G.Echanges || []).filter(function (e) { return e.commune === c[0] && e.fait !== "oui" && (e.prochaine_action || e.echeance); })
         .sort(function (a, b) { return (a.echeance || "9999").localeCompare(b.echeance || "9999"); })[0];
       var retard = afaire && afaire.echeance && afaire.echeance < new Date().toISOString().slice(0, 10);
-      return '<tr><td><a href="#" data-gcom="' + gEsc(c[0]) + '">' + gEsc(c[1]) + '</a></td><td>' + gEsc(gLib(G_STATUTS, cl.statut || "prospect")) + '</td><td' + (retard ? ' style="color:var(--ko)"' : '') + '>'
+      return '<tr><td><a href="#" data-gcom="' + gEsc(c[0]) + '">' + gEsc(c[1]) + '</a>' + (cl.population ? '<br><span style="color:var(--doux)">' + Number(cl.population).toLocaleString("fr-FR") + ' hab.' + (cl.nb_points ? ' · ' + cl.nb_points + ' pts' : '') + '</span>' : '') + '</td><td>' + gEsc(gLib(G_STATUTS, cl.statut || "prospect")) + '</td><td' + (retard ? ' style="color:var(--ko)"' : '') + '>'
         + (afaire ? gEsc(afaire.prochaine_action || afaire.resume) + (afaire.echeance ? ' — ' + gDateFR(afaire.echeance) : '') : '<span style="color:var(--doux)">rien de prévu</span>') + '</td></tr>';
     });
     $("g-pipeline").innerHTML = lignes.length ? '<table class="dns"><tr><th style="text-align:left">Commune</th><th style="text-align:left">Statut</th><th style="text-align:left">Prochaine action</th></tr>' + lignes.join("") + '</table>' : "Aucune commune.";
@@ -92,9 +92,109 @@
       + '<div style="display:grid;grid-template-columns:120px 1fr;gap:8px">' + '<div>' + gChamp("gf-cp", "Code postal", c.code_postal) + '</div><div>' + gChamp("gf-ville", "Ville", c.ville) + '</div></div>'
       + gChamp("gf-email", "E-mail de facturation", c.email_facturation, "email")
       + gChamp("gf-date", "Date du contrat", c.date_contrat, "date")
-      + gChamp("gf-notes", "Notes", c.notes, "zone");
+      + gChamp("gf-notes", "Notes", c.notes, "zone")
+      + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
+      + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
+      + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
     cacher("msg-fiche");
+    dessinerInfos(c);
     dessinerContacts(); dessinerEchanges();
+  }
+  /* Infos publiques de la commune : geo.api.gouv.fr (INSEE, habitants, intercommunalité),
+     Annuaire de l'administration (téléphone, e-mail, site, adresse, horaires de la mairie),
+     Répertoire national des élus (maire), Recherche d'entreprises (SIRET de la commune),
+     et le Referentiel de la commune (points de collecte). Rien n'est enregistré sans « Enregistrer la fiche ». */
+  var G_AUTO = null;
+  var G_INFOS = ["code_insee", "population", "epci", "telephone_mairie", "email_mairie", "site_mairie", "horaires_mairie", "maire", "maire_depuis", "nb_points", "nb_points_a_verifier", "flux", "infos_maj"];
+  function dessinerInfos(c) {
+    var x = G_AUTO || c || {}, l = [];
+    if (x.code_insee) l.push("Code INSEE <b>" + gEsc(x.code_insee) + "</b>");
+    if (x.population) l.push("<b>" + Number(x.population).toLocaleString("fr-FR") + "</b> habitants");
+    if (x.epci) l.push("Intercommunalité : <b>" + gEsc(x.epci) + "</b>");
+    if (x.maire) l.push("Maire : <b>" + gEsc(x.maire) + "</b>" + (x.maire_depuis ? " (depuis le " + gDateFR(x.maire_depuis) + ")" : ""));
+    if (x.telephone_mairie) l.push("Mairie : <a href=\"tel:" + gEsc(x.telephone_mairie) + "\">" + gEsc(x.telephone_mairie) + "</a>");
+    if (x.email_mairie) l.push("<a href=\"mailto:" + gEsc(x.email_mairie) + "\">" + gEsc(x.email_mairie) + "</a>");
+    if (x.site_mairie) l.push("<a href=\"" + gEsc(x.site_mairie) + "\" target=\"_blank\" rel=\"noopener\">site de la mairie</a>");
+    if (x.horaires_mairie) l.push("Horaires : " + gEsc(x.horaires_mairie));
+    if (x.nb_points !== undefined && x.nb_points !== "") l.push("Points de collecte : <b>" + gEsc(x.nb_points) + "</b> actifs" + (Number(x.nb_points_a_verifier) ? ", " + gEsc(x.nb_points_a_verifier) + " à vérifier" : "") + (x.flux ? " — " + gEsc(x.flux) : ""));
+    var maireConnu = x.maire && (G.Contacts || []).some(function (k) { return k.commune === $("g-commune").value && /maire/i.test(k.fonction || "") && k.nom.toLowerCase() === String(x.maire).toLowerCase(); });
+    $("gf-infos").innerHTML = (l.length ? l.join("<br>") : "Aucune info publique enregistrée : cliquez sur « Rechercher automatiquement ».")
+      + (x.infos_maj ? '<br><span style="color:var(--doux)">Recherché le ' + gDateFR(x.infos_maj) + '</span>' : "")
+      + (G_AUTO ? '<br><b style="color:var(--accent)">Pas encore enregistré : cliquez sur « Enregistrer la fiche ».</b>' : "")
+      + (x.maire && !maireConnu ? '<br><button class="second" type="button" id="gf-maire" style="margin-top:6px;padding:4px 10px;font-size:13px">Ajouter le maire aux contacts</button>' : "");
+  }
+  function gJson(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function gHoraires(p) {
+    var l = []; try { l = typeof p === "string" ? JSON.parse(p) : (p || []); } catch (e) { return ""; }
+    var h = function (v) { return v ? String(v).slice(0, 5).replace(":", "h") : ""; };
+    return l.map(function (o) {
+      var j = o.nom_jour_debut + (o.nom_jour_fin && o.nom_jour_fin !== o.nom_jour_debut ? "–" + o.nom_jour_fin : "");
+      var c1 = o.valeur_heure_debut_1 ? h(o.valeur_heure_debut_1) + "-" + h(o.valeur_heure_fin_1) : "";
+      var c2 = o.valeur_heure_debut_2 ? h(o.valeur_heure_debut_2) + "-" + h(o.valeur_heure_fin_2) : "";
+      return j + " " + [c1, c2].filter(Boolean).join(", ");
+    }).join(" ; ");
+  }
+  function rechercherInfos() {
+    var com = $("g-commune").value; if (!com) return;
+    var nom = (gCommunes().filter(function (c) { return c[0] === com; })[0] || [com, com])[1];
+    var c = gClient(com), cp = gVal("gf-cp");
+    msg("msg-fiche", "Recherche des infos publiques de " + nom + "…");
+    gJson("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + "&fields=nom,code,codesPostaux,codeDepartement,population,epci&boost=population&limit=8").then(function (l) {
+      l = l.filter(function (x) { return x.nom.toLowerCase() === String(nom).toLowerCase(); }).concat(l.filter(function (x) { return x.nom.toLowerCase() !== String(nom).toLowerCase(); }));
+      var g = c.code_insee ? l.filter(function (x) { return x.code === c.code_insee; })[0] : null;
+      if (!g && cp) g = l.filter(function (x) { return (x.codesPostaux || []).indexOf(cp) >= 0; })[0];
+      if (!g && l.length > 1 && l[1].nom.toLowerCase() === l[0].nom.toLowerCase()) {
+        var choix = prompt("Plusieurs communes portent ce nom. Indiquez le numéro de la bonne :\n" + l.filter(function (x) { return x.nom.toLowerCase() === l[0].nom.toLowerCase(); }).map(function (x, i) { return (i + 1) + ". " + x.nom + " (" + x.codeDepartement + ") — " + (x.population || "?") + " hab."; }).join("\n"), "1");
+        if (!choix) throw new Error("Recherche annulée.");
+        g = l[Number(choix) - 1];
+      }
+      g = g || l[0];
+      if (!g) throw new Error("Commune introuvable dans geo.api.gouv.fr : vérifiez son nom.");
+      var insee = g.code, a = { code_insee: insee, population: g.population || "", epci: (g.epci && g.epci.nom) || "", infos_maj: new Date().toISOString().slice(0, 10) };
+      var annuaire = gJson("https://api-lannuaire.service-public.fr/api/explore/v2.1/catalog/datasets/api-lannuaire-administration/records?where=" + encodeURIComponent("code_insee_commune='" + insee + "' and pivot like 'mairie'") + "&limit=5").then(function (j) {
+        var m = (j.results || []).filter(function (x) { return /^Mairie -/i.test(x.nom || ""); })[0] || (j.results || [])[0]; if (!m) return;
+        var lire = function (v) { try { return typeof v === "string" ? JSON.parse(v) : (v || []); } catch (e) { return []; } };
+        a.telephone_mairie = (lire(m.telephone)[0] || {}).valeur || "";
+        a.email_mairie = m.adresse_courriel || "";
+        a.site_mairie = (lire(m.site_internet)[0] || {}).valeur || "";
+        a.horaires_mairie = gHoraires(m.plage_ouverture);
+        var ad = lire(m.adresse).filter(function (x) { return /adresse/i.test(x.type_adresse || ""); })[0] || lire(m.adresse)[0];
+        if (ad) { a._adresse = [ad.complement1, ad.numero_voie].filter(Boolean).join(", "); a._cp = ad.code_postal || ""; a._ville = ad.nom_commune || ""; }
+      }).catch(function () {});
+      var maire = gJson("https://www.data.gouv.fr/api/1/datasets/5c34c4d1634f4173183a64f1/").then(function (d) {
+        var rs = (d.resources || []).filter(function (r) { return /maire/i.test(r.title || ""); })[0]; if (!rs) return;
+        return gJson("https://tabular-api.data.gouv.fr/api/resources/" + rs.id + "/data/?" + encodeURIComponent("Code de la commune") + "__exact=" + encodeURIComponent(insee)).then(function (j) {
+          var e = (j.data || [])[0]; if (!e) return;
+          var pre = String(e["Prénom de l'élu"] || ""), nm = String(e["Nom de l'élu"] || "");
+          a.maire = (pre.charAt(0).toUpperCase() + pre.slice(1).toLowerCase() + " " + nm.toUpperCase()).trim();
+          var dd = String(e["Date de début de la fonction"] || ""), m2 = dd.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          a.maire_depuis = m2 ? m2[3] + "-" + m2[2] + "-" + m2[1] : dd;
+        });
+      }).catch(function () {});
+      var siret = gJson("https://recherche-entreprises.api.gouv.fr/search?q=commune&code_commune=" + encodeURIComponent(insee) + "&nature_juridique=7210&per_page=3").then(function (j) {
+        var e = (j.results || [])[0]; if (e && e.siege) a._siret = e.siege.siret || "";
+      }).catch(function () {});
+      var points = api("points", { commune: com }).then(function (j) {
+        var p = j.points || [], f = {};
+        a.nb_points = p.filter(function (x) { return !x.actif || x.actif === "oui"; }).length;
+        a.nb_points_a_verifier = p.filter(function (x) { return x.actif === "a_verifier"; }).length;
+        p.forEach(function (x) { if (x.actif === "non") return; (x.flux || []).forEach(function (k) { f[k] = (f[k] || 0) + 1; }); });
+        a.flux = Object.keys(f).sort().map(function (k) { return k.replace(/_/g, " ") + " " + f[k]; }).join(", ");
+      }).catch(function () {});
+      return Promise.all([annuaire, maire, siret, points]).then(function () { return a; });
+    }).then(function (a) {
+      // Champs de facturation : remplis seulement s'ils sont vides (vos saisies restent prioritaires).
+      var vide = function (id) { return $(id) && !gVal(id); }, faits = [];
+      if (vide("gf-nom")) { $("gf-nom").value = "Mairie de " + nom; faits.push("nom officiel"); }
+      if (a._siret && vide("gf-siret")) { $("gf-siret").value = a._siret; faits.push("SIRET"); }
+      if (a._adresse && vide("gf-adresse")) { $("gf-adresse").value = a._adresse; faits.push("adresse"); }
+      if (a._cp && vide("gf-cp")) $("gf-cp").value = a._cp;
+      if (a._ville && vide("gf-ville")) $("gf-ville").value = a._ville;
+      if (a.email_mairie && vide("gf-email")) { $("gf-email").value = a.email_mairie; faits.push("e-mail de facturation"); }
+      delete a._siret; delete a._adresse; delete a._cp; delete a._ville;
+      G_AUTO = a; dessinerInfos(gClient(com));
+      msg("msg-fiche", "Infos publiques trouvées" + (faits.length ? " ; complété : " + faits.join(", ") : "") + ". Vérifiez puis « Enregistrer la fiche ».", "ok");
+    }).catch(function (e) { msg("msg-fiche", e.message, "ko"); });
   }
   var G_CONTACT = null, G_ECHANGE = null;
   function dessinerContacts() {
@@ -243,15 +343,26 @@
   Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
     if (b.dataset.onglet === "clients" || b.dataset.onglet === "factu") b.addEventListener("click", function () { if (!G_CHARGE) chargerGestion(); });
   });
-  $("g-commune").addEventListener("change", function () { G_CONTACT = null; G_ECHANGE = null; dessinerFiche(); });
+  $("g-commune").addEventListener("change", function () { G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; dessinerFiche(); });
   $("g-pipeline").addEventListener("click", function (e) {
     var a = e.target.closest("[data-gcom]"); if (!a) return; e.preventDefault();
-    $("g-commune").value = a.dataset.gcom; G_CONTACT = null; G_ECHANGE = null; dessinerFiche();
+    $("g-commune").value = a.dataset.gcom; G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; dessinerFiche();
     $("g-commune").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  $("g-fiche").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.id === "gf-auto") { rechercherInfos(); return; }
+    if (b.id === "gf-maire") {
+      var x = G_AUTO || gClient($("g-commune").value);
+      gEnvoyer({ op: "enregistrer", onglet: "Contacts", valeurs: { commune: $("g-commune").value, nom: x.maire, fonction: "maire", email: x.email_mairie || "", telephone: x.telephone_mairie || "", facturation: "non", notes: "Ajouté depuis le Répertoire national des élus" + (x.maire_depuis ? " (maire depuis le " + gDateFR(x.maire_depuis) + ")" : "") } }, "msg-fiche", "Maire ajouté aux contacts.").catch(function () {});
+    }
   });
   $("g-fiche-ok").addEventListener("click", function () {
     var com = $("g-commune").value; if (!com) return;
-    gEnvoyer({ op: "enregistrer", onglet: "Clients", valeurs: { commune: com, statut: gVal("gf-statut"), nom_officiel: gVal("gf-nom"), siret: gVal("gf-siret"), code_service_chorus: gVal("gf-chorus"), adresse_facturation: gVal("gf-adresse"), code_postal: gVal("gf-cp"), ville: gVal("gf-ville"), email_facturation: gVal("gf-email"), date_contrat: gVal("gf-date"), notes: gVal("gf-notes") } }, "msg-fiche", "Fiche enregistrée.").catch(function () {});
+    var v = { commune: com, statut: gVal("gf-statut"), nom_officiel: gVal("gf-nom"), siret: gVal("gf-siret"), code_service_chorus: gVal("gf-chorus"), adresse_facturation: gVal("gf-adresse"), code_postal: gVal("gf-cp"), ville: gVal("gf-ville"), email_facturation: gVal("gf-email"), date_contrat: gVal("gf-date"), notes: gVal("gf-notes") };
+    if (G_AUTO) G_INFOS.forEach(function (k) { if (G_AUTO[k] !== undefined) v[k] = String(G_AUTO[k]); });
+    G_AUTO = null;
+    gEnvoyer({ op: "enregistrer", onglet: "Clients", valeurs: v }, "msg-fiche", "Fiche enregistrée.").catch(function () {});
   });
   $("g-contacts").addEventListener("click", function (e) {
     var b = e.target.closest("[data-gcontact]"); if (!b) return;
