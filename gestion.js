@@ -96,7 +96,6 @@
       + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
       + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
       + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
-    cacher("msg-fiche");
     dessinerInfos(c);
     dessinerContacts(); dessinerEchanges();
   }
@@ -343,7 +342,7 @@
   Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) {
     if (b.dataset.onglet === "clients" || b.dataset.onglet === "factu") b.addEventListener("click", function () { if (!G_CHARGE) chargerGestion(); });
   });
-  $("g-commune").addEventListener("change", function () { G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; dessinerFiche(); });
+  $("g-commune").addEventListener("change", function () { G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; cacher("msg-fiche"); dessinerFiche(); });
   $("g-pipeline").addEventListener("click", function (e) {
     var a = e.target.closest("[data-gcom]"); if (!a) return; e.preventDefault();
     $("g-commune").value = a.dataset.gcom; G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; dessinerFiche();
@@ -354,7 +353,10 @@
     if (b.id === "gf-auto") { rechercherInfos(); return; }
     if (b.id === "gf-maire") {
       var x = G_AUTO || gClient($("g-commune").value);
-      gEnvoyer({ op: "enregistrer", onglet: "Contacts", valeurs: { commune: $("g-commune").value, nom: x.maire, fonction: "maire", email: x.email_mairie || "", telephone: x.telephone_mairie || "", facturation: "non", notes: "Ajouté depuis le Répertoire national des élus" + (x.maire_depuis ? " (maire depuis le " + gDateFR(x.maire_depuis) + ")" : "") } }, "msg-fiche", "Maire ajouté aux contacts.").catch(function () {});
+      b.disabled = true; b.textContent = "Ajout en cours…";
+      gEnvoyer({ op: "enregistrer", onglet: "Contacts", valeurs: { commune: $("g-commune").value, nom: x.maire, fonction: "maire", email: x.email_mairie || "", telephone: x.telephone_mairie || "", facturation: "non", notes: "Ajouté depuis le Répertoire national des élus" + (x.maire_depuis ? " (maire depuis le " + gDateFR(x.maire_depuis) + ")" : "") } }, "msg-contact", "Maire ajouté aux contacts.")
+        .then(function () { msg("msg-fiche", "Maire ajouté aux contacts (carte Contacts ci-dessous).", "ok"); $("g-contacts").scrollIntoView({ behavior: "smooth", block: "center" }); })
+        .catch(function (er) { msg("msg-fiche", "Ajout du maire impossible : " + er.message, "ko"); b.disabled = false; b.textContent = "Ajouter le maire aux contacts"; });
     }
   });
   $("g-fiche-ok").addEventListener("click", function () {
