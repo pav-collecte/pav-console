@@ -8,16 +8,17 @@
   // Onglets : boutons dans la barre, sections dans la page.
   var nav = document.querySelector("nav"), main = document.querySelector("main");
   if (!nav || !main) return;
-  [["clients", "Clients"], ["factu", "Factures"]].forEach(function (o) {
+  [["clients", "Clients"], ["carte", "Carte"], ["agenda", "Agenda"], ["factu", "Factures"]].forEach(function (o) {
     var b = document.createElement("button"); b.dataset.onglet = o[0]; b.textContent = o[1]; nav.appendChild(b);
   });
   main.insertAdjacentHTML("beforeend", "  <section id=\"clients\">\n    <div class=\"carte\">\n      <h2>Suivi des communes <button class=\"second\" id=\"g-recharger\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Actualiser</button></h2>\n      <p class=\"petit\">Une ligne par commune : o\u00f9 en est la relation, et la prochaine action pr\u00e9vue.</p>\n      <div id=\"g-pipeline\" class=\"petit\">\u2014</div>\n      <div class=\"msg\" id=\"msg-gestion\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Fiche client</h2>\n      <label for=\"g-commune\"><b>Commune</b></label>\n      <select id=\"g-commune\"></select>\n      <div id=\"g-contrat\" class=\"petit\" style=\"margin-top:8px\"></div>\n      <div id=\"g-fiche\"></div>\n      <button class=\"principal\" id=\"g-fiche-ok\" type=\"button\">Enregistrer la fiche</button>\n      <div class=\"msg\" id=\"msg-fiche\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Contacts</h2>\n      <div id=\"g-contacts\" class=\"petit\"></div>\n      <div id=\"g-contact-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-contact\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>\u00c9changes</h2>\n      <p class=\"petit\">Appels, r\u00e9unions, d\u00e9monstrations, relances\u2026 et la prochaine action \u00e0 faire.</p>\n      <div id=\"g-echanges\" class=\"petit\"></div>\n      <div id=\"g-echange-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-echange\"></div>\n    </div>\n  </section>\n\n  <section id=\"factu\">\n    <div class=\"carte\">\n      <h2>\u00c9metteur des devis et factures</h2>\n      <p class=\"petit\">Ces informations figureront sur chaque document. Tant que des champs sont \u00ab \u00c0 REMPLIR \u00bb, les documents restent des brouillons sans valeur.</p>\n      <div id=\"g-emetteur\"></div>\n      <button class=\"principal\" id=\"g-emetteur-ok\" type=\"button\">Enregistrer l'\u00e9metteur</button>\n      <div class=\"msg\" id=\"msg-emetteur\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Devis <button class=\"second\" id=\"g-devis-nouveau\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouveau devis</button></h2>\n      <div id=\"g-devis-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\">\n      <h2>Factures <button class=\"second\" id=\"g-facture-nouvelle\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouvelle facture</button></h2>\n      <div id=\"g-factures-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\" id=\"g-doc\" hidden>\n      <h2 id=\"g-doc-titre\">Document</h2>\n      <div id=\"g-doc-entete\"></div>\n      <h2 style=\"margin-top:14px\">Lignes</h2>\n      <div id=\"g-doc-lignes\"></div>\n      <button class=\"second\" id=\"g-doc-ligne\" type=\"button\" style=\"margin-top:8px\">+ Ajouter une ligne</button>\n      <div id=\"g-doc-totaux\" class=\"petit\" style=\"margin-top:10px;text-align:right;font-size:15px\"></div>\n      <div class=\"msg\" id=\"msg-doc\"></div>\n      <div style=\"display:flex;gap:8px;margin-top:12px;flex-wrap:wrap\">\n        <button class=\"second\" id=\"g-doc-fermer\" type=\"button\" style=\"flex:1\">Fermer</button>\n        <button class=\"second\" id=\"g-doc-supprimer\" type=\"button\" style=\"flex:1;color:var(--ko)\">Supprimer le brouillon</button>\n        <button class=\"principal\" id=\"g-doc-ok\" type=\"button\" style=\"flex:2;margin-top:0\">Enregistrer</button>\n      </div>\n    </div>\n  </section>\n");
   // Bascule d'onglet pour les deux nouveaux boutons (les autres sont gérés par la console).
   Array.prototype.forEach.call(nav.querySelectorAll("button"), function (b) {
     b.addEventListener("click", function () {
-      if (b.dataset.onglet !== "clients" && b.dataset.onglet !== "factu") return;
+      if (["clients", "carte", "agenda", "factu"].indexOf(b.dataset.onglet) < 0) return;
       Array.prototype.forEach.call(nav.querySelectorAll("button"), function (x) { x.classList.toggle("actif", x === b); });
       Array.prototype.forEach.call(document.querySelectorAll("main > section"), function (s) { s.classList.toggle("actif", s.id === b.dataset.onglet); });
+      if (!G_CHARGE) chargerGestion(); else if (b.dataset.onglet === "carte") ouvrirCarteProspects(); else if (b.dataset.onglet === "agenda") dessinerAgenda();
     });
   });
   /* — Clients (CRM) et facturation : fiches, contacts, échanges, émetteur, devis, factures.
@@ -42,7 +43,7 @@
   function gCommunes() {
     var m = {};
     (G.communes || []).forEach(function (c) { if (c.commune) m[c.commune] = c.nom || c.commune; });
-    (G.Clients || []).forEach(function (c) { if (c.commune && !m[c.commune]) m[c.commune] = c.nom_officiel || c.commune; });
+    (G.Clients || []).forEach(function (c) { if (c.commune && !m[c.commune]) m[c.commune] = c.ville || String(c.nom_officiel || c.commune).replace(/^Mairie (de |d'|du |des )/i, ""); });
     return Object.keys(m).sort(function (a, b) { return m[a].localeCompare(m[b], "fr"); }).map(function (k) { return [k, m[k]]; });
   }
   function gClient(com) { return (G.Clients || []).filter(function (c) { return c.commune === com; })[0] || { commune: com }; }
@@ -67,7 +68,8 @@
     var s = $("g-commune"), avant = s.value;
     s.innerHTML = gCommunes().map(function (c) { return '<option value="' + gEsc(c[0]) + '">' + gEsc(c[1]) + '</option>'; }).join("");
     if (avant && gCommunes().some(function (c) { return c[0] === avant; })) s.value = avant;
-    dessinerPipeline(); dessinerFiche(); dessinerEmetteur(); dessinerDocs();
+    dessinerPipeline(); dessinerFiche(); dessinerEmetteur(); dessinerDocs(); dessinerAgenda();
+    if ($("carte") && $("carte").classList.contains("actif")) ouvrirCarteProspects();
   }
   function dessinerPipeline() {
     var lignes = gCommunes().map(function (c) {
@@ -84,6 +86,9 @@
     var com = $("g-commune").value; if (!com) { $("g-fiche").innerHTML = ""; return; }
     var c = gClient(com), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     $("g-contrat").innerHTML = "Contrat (onglet Communes) : tarif par point <b>" + (ct.tarif_point ? gEuros(ct.tarif_point) : "non renseigné") + "</b> · anniversaire <b>" + (gDateFR(ct.anniversaire) || "non renseigné") + "</b> · initialisation " + (ct.cloture_initialisation ? "clôturée le <b>" + gDateFR(ct.cloture_initialisation) + "</b>" : "<b>en cours</b>") + (ct.etat ? " · état : " + gEsc(ct.etat) : "");
+    var pt = gPotentiel(com);
+    $("g-contrat").innerHTML += '<div style="margin-top:8px;padding:8px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px;font-size:15px">Potentiel : <b>' + (pt.points || "?") + ' point(s)</b>' + (pt.estime ? ' <span class="petit">(estimé : ' + gEsc(pt.base) + ')</span>' : ' <span class="petit">(' + gEsc(pt.base) + ')</span>')
+      + (pt.tarif && pt.points ? ' · <b>' + gEuros(pt.points * pt.tarif) + ' HT/an</b> <span class="petit">à ' + gEuros(pt.tarif) + '/point</span>' : ' · <span class="petit">montant : renseignez « tarif_point_defaut » (onglet Factures) ou le tarif de la commune</span>') + '</div>';
     $("g-fiche").innerHTML = gChamp("gf-statut", "Statut de la relation", c.statut || "prospect", null, G_STATUTS)
       + gChamp("gf-nom", "Nom officiel (facturation)", c.nom_officiel, "text", null, "ex. Mairie d'Andancette")
       + gChamp("gf-siret", "SIRET de la mairie", c.siret)
@@ -243,11 +248,23 @@
       + '<div style="display:flex;gap:8px;margin-top:10px">' + (x.id ? '<button class="second" type="button" id="ge-suppr" style="color:var(--ko)">Supprimer</button><button class="second" type="button" id="ge-annuler">Annuler</button>' : '')
       + '<button class="principal" type="button" id="ge-ok" style="margin-top:0;flex:1">' + (x.id ? "Enregistrer" : "Ajouter") + '</button></div>';
   }
+  // Réglages de prospection, rangés dans l'onglet Emetteur (créés à la première sauvegarde).
+  var G_REGLAGES = [["tarif_point_defaut", "", "Réglage : tarif annuel HT par point pour estimer le potentiel d'un prospect (€)"],
+    ["habitants_par_point", "300", "Réglage : habitants par point de collecte, pour estimer les points d'une commune non relevée"],
+    ["carte_centre", "Albon", "Réglage : commune au centre de la carte des prospects"],
+    ["carte_rayon_km", "20", "Réglage : rayon par défaut de la carte (km)"]];
+  function gReglage(cle) {
+    var l = ((G && G.Emetteur) || []).filter(function (p) { return p.cle === cle; })[0], d = G_REGLAGES.filter(function (r) { return r[0] === cle; })[0];
+    var v = l && l.valeur && !/^À REMPLIR/i.test(l.valeur) ? l.valeur : "";
+    return v || (d ? d[1] : "");
+  }
   function dessinerEmetteur() {
+    G.Emetteur = G.Emetteur || [];
+    G_REGLAGES.forEach(function (r) { if (!G.Emetteur.some(function (p) { return p.cle === r[0]; })) G.Emetteur.push({ cle: r[0], valeur: r[1], description: r[2], local: true }); });
     $("g-emetteur").innerHTML = (G.Emetteur || []).map(function (p, i) {
       var vide = /^À REMPLIR/i.test(p.valeur || "");
       return '<label for="gm-' + i + '"><b>' + gEsc(p.cle) + '</b>' + (p.description ? ' <span class="petit">— ' + gEsc(p.description) + '</span>' : '') + '</label>'
-        + '<input id="gm-' + i + '" data-cle="' + gEsc(p.cle) + '" data-avant="' + gEsc(p.valeur) + '" value="' + (vide ? "" : gEsc(p.valeur)) + '" placeholder="' + (vide ? "À REMPLIR" : "") + '"' + (vide ? ' style="border-color:#E6C39E;background:#FFFBF5"' : '') + '>';
+        + '<input id="gm-' + i + '" data-cle="' + gEsc(p.cle) + '" data-avant="' + gEsc(p.local ? "" : p.valeur) + '" value="' + (vide ? "" : gEsc(p.valeur)) + '" placeholder="' + (vide ? "À REMPLIR" : "") + '"' + (vide ? ' style="border-color:#E6C39E;background:#FFFBF5"' : '') + '>';
     }).join("") || '<p class="petit">Onglet Emetteur vide.</p>';
   }
   function dessinerDocs() {
@@ -432,5 +449,211 @@
     if (!G_DOC || !G_DOC.d.numero || !confirm("Supprimer ce brouillon ?")) return;
     gEnvoyer({ op: "supprimer-document", type: G_DOC.type, numero: G_DOC.d.numero }, "msg-doc", "Brouillon supprimé.").then(function () { $("g-doc").hidden = true; G_DOC = null; }).catch(function () {});
   });
+
+
+  /* ——— Potentiel d'une commune : points connus (Referentiel) ou estimés (habitants), × tarif ——— */
+  function gPotentiel(com) {
+    var c = gClient(com), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
+    var connus = (Number(c.nb_points) || 0) + (Number(c.nb_points_a_verifier) || 0);
+    var hpp = Number(String(gReglage("habitants_par_point")).replace(",", ".")) || 300;
+    var tarif = Number(String(ct.tarif_point || gReglage("tarif_point_defaut") || "").replace(",", ".")) || 0;
+    if (connus) return { points: connus, estime: false, base: "points du Referentiel", tarif: tarif };
+    var pop = Number(c.population) || 0;
+    if (pop) return { points: Math.max(1, Math.ceil(pop / hpp)), estime: true, base: pop.toLocaleString("fr-FR") + " hab. ÷ " + hpp, tarif: tarif };
+    return { points: 0, estime: true, base: "population inconnue : « Rechercher automatiquement »", tarif: tarif };
+  }
+
+  /* ——— Sections Carte et Agenda ——— */
+  var G_COULEURS = { aucun: "#9AA39B", prospect: "#2F6EA8", demo: "#7B4FA3", devis: "#E08A00", client: "#2E7D4F", suspendu: "#B3261E", perdu: "#5E6B63" };
+  main.insertAdjacentHTML("beforeend",
+    '<section id="carte"><div class="carte">'
+    + '<h2>Communes autour de moi</h2>'
+    + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
+    + '<div><label for="gk-centre"><b>Centre</b></label><input id="gk-centre" placeholder="Albon"></div>'
+    + '<div><label for="gk-rayon"><b>Rayon</b></label><select id="gk-rayon">' + [5, 10, 15, 20, 30, 40, 50, 75].map(function (k) { return '<option value="' + k + '">' + k + ' km</option>'; }).join("") + '</select></div></div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px"><button class="second" type="button" id="gk-moi">Ma position</button><button class="principal" type="button" id="gk-ok" style="margin-top:0;flex:1">Afficher</button></div>'
+    + '<div id="gk-carte" style="height:62vh;min-height:360px;margin-top:12px;border-radius:10px;border:1px solid var(--trait)"></div>'
+    + '<div id="gk-legende" class="petit" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px"></div>'
+    + '<div class="msg" id="msg-carte"></div>'
+    + '<p class="petit" style="margin-top:8px">Un clic sur une commune affiche ses habitants et son potentiel ; « Ouvrir la fiche » la crée comme prospect si elle n\'est pas encore suivie (elle n\'est enregistrée qu\'avec « Enregistrer la fiche »).</p>'
+    + '</div></section>'
+    + '<section id="agenda"><div class="carte">'
+    + '<h2>Agenda des actions</h2>'
+    + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
+    + '<div id="ga-grille" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px"></div>'
+    + '<div id="ga-retard" style="margin-top:12px"></div>'
+    + '<div id="ga-liste" class="petit" style="margin-top:12px"></div>'
+    + '</div></section>');
+
+  /* ——— Carte : Leaflet (chargé à la demande), communes de geo.api.gouv.fr dans le rayon ——— */
+  var GK = { carte: null, couche: null, communes: null, chargeL: null };
+  function chargerLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (GK.chargeL) return GK.chargeL;
+    GK.chargeL = new Promise(function (ok, ko) {
+      var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(l);
+      var s = document.createElement("script"); s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; s.onload = ok; s.onerror = function () { ko(new Error("Carte indisponible (chargement de Leaflet).")); };
+      document.head.appendChild(s);
+    });
+    return GK.chargeL;
+  }
+  function toutesCommunes() {
+    if (GK.communes) return Promise.resolve(GK.communes);
+    msg("msg-carte", "Chargement des communes…");
+    return gJson("https://geo.api.gouv.fr/communes?fields=nom,code,centre,population,codeDepartement,codesPostaux&format=json").then(function (l) {
+      GK.communes = l.filter(function (c) { return c.centre && c.centre.coordinates; }); cacher("msg-carte"); return GK.communes;
+    });
+  }
+  function slugCommune(t) {
+    return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function distKm(a, b) {
+    var r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r;
+    var x = Math.sin(dLa / 2) * Math.sin(dLa / 2) + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) * Math.sin(dLo / 2);
+    return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  }
+  // Retrouve la fiche suivie d'une commune de la carte : par code INSEE, sinon par identifiant (nom normalisé).
+  function suivie(c) {
+    var cl = (G.Clients || []).filter(function (x) { return x.code_insee === c.code; })[0];
+    var id = cl ? cl.commune : slugCommune(c.nom);
+    var connue = (G.communes || []).some(function (x) { return x.commune === id; });
+    if (!cl) cl = (G.Clients || []).filter(function (x) { return x.commune === id && (!x.code_insee || x.code_insee === c.code); })[0];
+    return { id: id, client: cl || null, connue: connue, statut: cl ? (cl.statut || "prospect") : (connue ? "client" : "aucun") };
+  }
+  var GK_CENTRE = null;
+  function ouvrirCarteProspects(centreForce) {
+    if (!$("gk-centre").value) $("gk-centre").value = gReglage("carte_centre") || "Albon";
+    if (!$("gk-rayon").dataset.init) { $("gk-rayon").value = String(Number(gReglage("carte_rayon_km")) || 20); $("gk-rayon").dataset.init = "1"; }
+    $("gk-legende").innerHTML = [["aucun", "pas encore en relation"]].concat(G_STATUTS).map(function (s) {
+      return '<span><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:' + G_COULEURS[s[0]] + ';margin-right:4px;vertical-align:-1px"></span>' + gEsc(s[1]) + '</span>';
+    }).join("");
+    Promise.all([chargerLeaflet(), toutesCommunes()]).then(function () {
+      var rayon = Number($("gk-rayon").value) || 20, centre = centreForce || GK_CENTRE;
+      if (!centre) {
+        var nomC = slugCommune($("gk-centre").value);
+        var c0 = GK.communes.filter(function (c) { return slugCommune(c.nom) === nomC; }).sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
+        if (!c0) throw new Error("Commune de centre introuvable : « " + $("gk-centre").value + " ».");
+        centre = [c0.centre.coordinates[1], c0.centre.coordinates[0]];
+      }
+      GK_CENTRE = centre;
+      if (!GK.carte) {
+        GK.carte = L.map("gk-carte");
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(GK.carte);
+      }
+      if (GK.couche) GK.couche.remove();
+      GK.couche = L.layerGroup().addTo(GK.carte);
+      L.circle(centre, { radius: rayon * 1000, color: "#1F3A2E", weight: 1, fill: false, dashArray: "4 4" }).addTo(GK.couche);
+      var proches = GK.communes.map(function (c) { return { c: c, d: distKm(centre, [c.centre.coordinates[1], c.centre.coordinates[0]]) }; })
+        .filter(function (x) { return x.d <= rayon; });
+      proches.forEach(function (x) {
+        var c = x.c, s = suivie(c), pos = [c.centre.coordinates[1], c.centre.coordinates[0]];
+        var r = Math.max(5, Math.min(16, 3 + Math.sqrt(c.population || 0) / 9));
+        var m = L.circleMarker(pos, { radius: r, color: s.statut === "aucun" ? "#7d857e" : "#fff", weight: s.statut === "aucun" ? 1 : 2, fillColor: G_COULEURS[s.statut] || G_COULEURS.aucun, fillOpacity: s.statut === "aucun" ? 0.45 : 0.95 }).addTo(GK.couche);
+        var hpp = Number(gReglage("habitants_par_point")) || 300, tarif = Number(String(gReglage("tarif_point_defaut")).replace(",", ".")) || 0;
+        var pts = s.client && (Number(s.client.nb_points) || 0) ? Number(s.client.nb_points) : Math.max(1, Math.ceil((c.population || 0) / hpp));
+        m.bindPopup('<b>' + gEsc(c.nom) + '</b> (' + gEsc(c.codeDepartement) + ')<br>' + (c.population || 0).toLocaleString("fr-FR") + ' habitants · ' + x.d.toFixed(1) + ' km'
+          + '<br>Statut : <b>' + gEsc(s.statut === "aucun" ? "pas en relation" : gLib(G_STATUTS, s.statut)) + '</b>'
+          + '<br>Potentiel : ' + pts + ' point(s)' + (tarif ? ' ≈ ' + gEuros(pts * tarif) + ' HT/an' : '')
+          + '<br><button type="button" class="second" data-gk-ouvrir="' + gEsc(c.code) + '" style="margin-top:6px;padding:4px 10px;font-size:13px">Ouvrir la fiche</button>');
+      });
+      GK.carte.setView(centre, rayon <= 10 ? 12 : rayon <= 20 ? 11 : rayon <= 40 ? 10 : 9);
+      setTimeout(function () { GK.carte.invalidateSize(); }, 50);
+      msg("msg-carte", proches.length + " communes dans un rayon de " + rayon + " km, dont " + proches.filter(function (x) { return suivie(x.c).statut !== "aucun"; }).length + " suivies.", "info");
+    }).catch(function (e) { msg("msg-carte", e.message, "ko"); });
+  }
+  // « Ouvrir la fiche » : commune suivie → sa fiche ; sinon prospect préparé (non enregistré).
+  $("gk-carte").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-gk-ouvrir]"); if (!b) return;
+    var c = (GK.communes || []).filter(function (x) { return x.code === b.dataset.gkOuvrir; })[0]; if (!c) return;
+    var s = suivie(c);
+    if (!s.client && !s.connue) {
+      G.Clients.push({ commune: s.id, statut: "prospect", nom_officiel: "Mairie de " + c.nom, ville: c.nom, code_insee: c.code, population: String(c.population || ""), code_postal: (c.codesPostaux || [])[0] || "" });
+    }
+    dessinerGestion();
+    $("g-commune").value = s.id; G_CONTACT = null; G_ECHANGE = null;
+    G_AUTO = (!s.client && !s.connue) ? { code_insee: c.code, population: String(c.population || "") } : null; dessinerFiche();
+    var nb = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "clients"; })[0];
+    if (nb) nb.click();
+    if (!s.client && !s.connue) msg("msg-fiche", "Nouveau prospect préparé : « Rechercher automatiquement » puis « Enregistrer la fiche » pour le suivre.", "info");
+    $("g-commune").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  $("gk-ok").addEventListener("click", function () { GK_CENTRE = null; ouvrirCarteProspects(); });
+  $("gk-rayon").addEventListener("change", function () { ouvrirCarteProspects(); });
+  $("gk-moi").addEventListener("click", function () {
+    if (!navigator.geolocation) { msg("msg-carte", "Géolocalisation indisponible sur cet appareil.", "ko"); return; }
+    msg("msg-carte", "Recherche de votre position…");
+    navigator.geolocation.getCurrentPosition(function (p) { $("gk-centre").value = "Ma position"; GK_CENTRE = [p.coords.latitude, p.coords.longitude]; ouvrirCarteProspects(GK_CENTRE); },
+      function () { msg("msg-carte", "Position refusée ou indisponible.", "ko"); }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+  });
+
+  /* ——— Agenda : actions prévues (échanges), devis à relancer, factures à échéance, anniversaires de contrat ——— */
+  var GA_MOIS = new Date(); GA_MOIS.setDate(1);
+  function evenements() {
+    var ev = [], noms = {}; gCommunes().forEach(function (c) { noms[c[0]] = c[1]; });
+    var auj = new Date().toISOString().slice(0, 10);
+    (G.Echanges || []).forEach(function (e) {
+      if (e.echeance && e.fait !== "oui") ev.push({ date: e.echeance, type: "action", couleur: "#E08A00", titre: e.prochaine_action || e.resume, commune: e.commune, retard: e.echeance < auj, id: e.id });
+      if (e.date) ev.push({ date: e.date, type: "echange", couleur: "#2F6EA8", titre: gLib(G_TYPES_ECH, e.type) + (e.contact ? " avec " + e.contact : "") + " : " + e.resume, commune: e.commune, passe: true });
+      if (e.echeance && e.fait === "oui") ev.push({ date: e.echeance, type: "fait", couleur: "#2E7D4F", titre: "✓ " + (e.prochaine_action || e.resume), commune: e.commune, passe: true });
+    });
+    (G.Devis || []).forEach(function (d) { if (d.validite && (d.statut === "envoye" || d.statut === "brouillon")) ev.push({ date: d.validite, type: "devis", couleur: "#7B4FA3", titre: "Fin de validité du devis " + d.numero + (d.statut === "envoye" ? " — relancer" : " (brouillon)"), commune: d.commune, retard: d.validite < auj && d.statut === "envoye", doc: ["devis", d.numero] }); });
+    (G.Factures || []).forEach(function (f) { if (f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus")) ev.push({ date: f.echeance, type: "facture", couleur: "#B3261E", titre: "Échéance de la facture " + f.numero + " (" + gEuros(f.total_ttc) + ")", commune: f.commune, retard: f.echeance < auj, doc: ["facture", f.numero] }); });
+    (G.communes || []).forEach(function (c) {
+      if (!c.anniversaire) return;
+      var a = String(c.anniversaire).slice(5, 10), an = new Date().getFullYear();
+      [an, an + 1].forEach(function (y) { ev.push({ date: y + "-" + a, type: "anniversaire", couleur: "#2E7D4F", titre: "Anniversaire du contrat — forfait annuel à facturer", commune: c.commune }); });
+    });
+    ev.forEach(function (x) { x.nomCommune = noms[x.commune] || x.commune || ""; });
+    return ev.sort(function (a, b) { return a.date.localeCompare(b.date); });
+  }
+  function ligneEv(x) {
+    return '<div data-ga-com="' + gEsc(x.commune) + '"' + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + ' style="padding:6px 0;border-bottom:1px solid var(--trait);cursor:pointer' + (x.retard ? ';color:var(--ko)' : '') + '">'
+      + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + x.couleur + ';margin-right:6px"></span>'
+      + '<b>' + gDateFR(x.date) + '</b> · ' + gEsc(x.nomCommune) + ' — ' + gEsc(x.titre) + '</div>';
+  }
+  function dessinerAgenda() {
+    if (!$("ga-grille")) return;
+    var ev = evenements(), auj = new Date().toISOString().slice(0, 10);
+    var an = GA_MOIS.getFullYear(), mo = GA_MOIS.getMonth();
+    $("ga-mois").textContent = GA_MOIS.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    var premier = new Date(an, mo, 1), decal = (premier.getDay() + 6) % 7, nbj = new Date(an, mo + 1, 0).getDate();
+    var h = ["L", "M", "M", "J", "V", "S", "D"].map(function (j) { return '<div class="petit" style="text-align:center;font-weight:700">' + j + '</div>'; }).join("");
+    for (var i = 0; i < decal; i++) h += '<div></div>';
+    for (var j = 1; j <= nbj; j++) {
+      var d = an + "-" + String(mo + 1).padStart(2, "0") + "-" + String(j).padStart(2, "0");
+      var duJour = ev.filter(function (x) { return x.date === d; });
+      h += '<div data-ga-jour="' + d + '" style="min-height:44px;padding:3px;border-radius:7px;border:1px solid ' + (d === auj ? "var(--accent)" : "var(--trait)") + ';background:#fff;cursor:' + (duJour.length ? "pointer" : "default") + '">'
+        + '<div class="petit" style="font-weight:' + (d === auj ? 700 : 400) + '">' + j + '</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:2px">' + duJour.slice(0, 6).map(function (x) { return '<span title="' + gEsc(x.titre) + '" style="width:8px;height:8px;border-radius:50%;background:' + x.couleur + '"></span>'; }).join("") + '</div></div>';
+    }
+    $("ga-grille").innerHTML = h;
+    var retards = ev.filter(function (x) { return x.retard; });
+    $("ga-retard").innerHTML = retards.length ? '<b style="color:var(--ko)">En retard (' + retards.length + ')</b><div class="petit">' + retards.map(ligneEv).join("") + '</div>' : "";
+    var debut = an + "-" + String(mo + 1).padStart(2, "0") + "-01", fin = an + "-" + String(mo + 1).padStart(2, "0") + "-31";
+    var duMois = ev.filter(function (x) { return x.date >= debut && x.date <= fin; });
+    $("ga-liste").innerHTML = '<b>' + gEsc($("ga-mois").textContent) + ' — ' + duMois.length + ' élément(s)</b>' + (duMois.map(ligneEv).join("") || '<p>Rien ce mois-ci.</p>');
+  }
+  $("ga-prec").addEventListener("click", function () { GA_MOIS.setMonth(GA_MOIS.getMonth() - 1); dessinerAgenda(); });
+  $("ga-suiv").addEventListener("click", function () { GA_MOIS.setMonth(GA_MOIS.getMonth() + 1); dessinerAgenda(); });
+  $("ga-grille").addEventListener("click", function (e) {
+    var c = e.target.closest("[data-ga-jour]"); if (!c) return;
+    var d = c.dataset.gaJour, l = evenements().filter(function (x) { return x.date === d; });
+    if (!l.length) return;
+    $("ga-liste").innerHTML = '<b>' + gDateFR(d) + '</b>' + l.map(ligneEv).join("") + '<p><a href="#" id="ga-tout">Tout le mois</a></p>';
+  });
+  function ouvrirDepuisAgenda(e) {
+    if (e.target.id === "ga-tout") { e.preventDefault(); dessinerAgenda(); return; }
+    var l = e.target.closest("[data-ga-com]"); if (!l) return;
+    if (l.dataset.gaDoc) {
+      var nf = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "factu"; })[0];
+      if (nf) nf.click(); ouvrirDoc(l.dataset.gaDoc, l.dataset.gaNum); return;
+    }
+    var nb = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "clients"; })[0];
+    if (nb) nb.click();
+    $("g-commune").value = l.dataset.gaCom; G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; dessinerFiche();
+    $("g-echanges").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  $("ga-liste").addEventListener("click", ouvrirDepuisAgenda);
+  $("ga-retard").addEventListener("click", ouvrirDepuisAgenda);
 
 })();
