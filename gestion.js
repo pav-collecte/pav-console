@@ -497,6 +497,7 @@
     + '<div style="display:flex;gap:8px;margin-top:10px"><button class="second" type="button" id="gk-moi">Ma position</button><button class="principal" type="button" id="gk-ok" style="margin-top:0;flex:1">Afficher</button></div>'
     + '<div id="gk-carte" style="height:62vh;min-height:360px;margin-top:12px;border-radius:10px;border:1px solid var(--trait)"></div>'
     + '<div id="gk-legende" class="petit" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px"></div>'
+    + '<div id="gk-potentiel" class="petit" style="margin-top:12px"></div>'
     + '<div class="msg" id="msg-carte"></div>'
     + '<p class="petit" style="margin-top:8px">Un clic sur une commune affiche ses habitants et son potentiel ; « Ouvrir la fiche » la crée comme prospect si elle n\'est pas encore suivie (elle n\'est enregistrée qu\'avec « Enregistrer la fiche »).</p>'
     + '</div></section>'
@@ -595,9 +596,56 @@
       GK.carte.setView(centre, rayon <= 10 ? 12 : rayon <= 20 ? 11 : rayon <= 40 ? 10 : 9);
       setTimeout(function () { GK.carte.invalidateSize(); }, 50);
       msg("msg-carte", proches.length + " communes dans un rayon de " + rayon + " km, dont " + proches.filter(function (x) { return suivie(x.c).statut !== "aucun"; }).length + " suivies.", "info");
+      potentielCercle(proches, rayon);
     }).catch(function (e) { msg("msg-carte", e.message, "ko"); });
   }
   // « Ouvrir la fiche » : commune suivie → sa fiche ; sinon prospect préparé (non enregistré).
+  /* ——— Potentiel du cercle : abonnement HT/an, calculé en tâche de fond (par paquets, sans bloquer la carte) ——— */
+  var GK_CALCUL = 0;
+  function potentielCercle(proches, rayon) {
+    var num = ++GK_CALCUL, box = $("gk-potentiel");
+    box.innerHTML = '<i>Calcul du potentiel du cercle…</i>';
+    var hpp = Number(gReglage("habitants_par_point")) || 300, tDef = gTarifPoint(null, null).an;
+    var G4 = { client: [0, 0, 0], cours: [0, 0, 0], libre: [0, 0, 0], perdu: [0, 0, 0] }, top = [], i = 0;
+    var groupe = function (st) { return st === "client" ? "client" : /^(prospect|demo|devis)$/.test(st) ? "cours" : st === "aucun" ? "libre" : "perdu"; };
+    var lot = function () {
+      if (num !== GK_CALCUL) return;   // un nouveau cercle a été demandé : on abandonne ce calcul
+      var fin = Math.min(proches.length, i + 40);
+      for (; i < fin; i++) {
+        var c = proches[i].c, s = suivie(c), pts, eur;
+        if (s.client || s.connue) {
+          var cl = s.client || { commune: s.id };
+          var ct = (G.communes || []).filter(function (x) { return x.commune === s.id; })[0] || {};
+          var known = (Number(cl.nb_points) || 0) + (Number(cl.nb_points_a_verifier) || 0);
+          pts = known || Math.max(1, Math.ceil((Number(cl.population) || c.population || 0) / hpp));
+          eur = pts * gTarifPoint(cl, ct).an * (1 - Math.min(100, gNum(cl.remise_pct)) / 100);
+        } else { pts = Math.max(1, Math.ceil((c.population || 0) / hpp)); eur = pts * tDef; }
+        var g = G4[groupe(s.statut)]; g[0]++; g[1] += pts; g[2] += eur;
+        if (s.statut === "aucun" || /^(prospect|demo|devis)$/.test(s.statut)) top.push({ c: c, pts: pts, eur: eur, st: s.statut, d: proches[i].d });
+      }
+      if (i < proches.length) { (window.requestIdleCallback || setTimeout)(lot); return; }
+      var ligne = function (lib, g, coul) { return '<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + coul + ';margin-right:5px"></span>' + lib + '</td><td style="text-align:right">' + g[0] + '</td><td style="text-align:right">' + g[1] + '</td><td style="text-align:right"><b>' + (tDef || g[2] ? gEuros(g[2]) : '—') + '</b></td></tr>'; };
+      var tot = [G4.client[0] + G4.cours[0] + G4.libre[0], G4.client[1] + G4.cours[1] + G4.libre[1], G4.client[2] + G4.cours[2] + G4.libre[2]];
+      top.sort(function (a, b) { return b.pts - a.pts; });
+      box.innerHTML = '<div style="padding:10px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px">'
+        + '<b style="font-size:15px">Potentiel du cercle de ' + rayon + ' km — abonnement HT/an</b>'
+        + '<table class="dns" style="margin-top:6px"><tr><th style="text-align:left"></th><th style="text-align:right">Communes</th><th style="text-align:right">Points</th><th style="text-align:right">€ HT/an</th></tr>'
+        + ligne("Clients (acquis)", G4.client, G_COULEURS.client) + ligne("En cours (prospect, démo, devis)", G4.cours, G_COULEURS.devis) + ligne("Pas encore en relation", G4.libre, G_COULEURS.aucun)
+        + '<tr><td><b>Total du cercle</b></td><td style="text-align:right"><b>' + tot[0] + '</b></td><td style="text-align:right"><b>' + tot[1] + '</b></td><td style="text-align:right"><b>' + (tDef || tot[2] ? gEuros(tot[2]) : '—') + '</b></td></tr></table>'
+        + (G4.perdu[0] ? '<div>Hors total : ' + G4.perdu[0] + ' commune(s) perdue(s) ou suspendue(s), ' + gEuros(G4.perdu[2]) + '/an.</div>' : '')
+        + (tDef ? '' : '<div style="color:var(--ko);margin-top:4px">Prix de l\'abonnement non renseigné : complétez l\'onglet Tarifs pour chiffrer.</div>')
+        + '<div style="margin-top:4px;color:var(--doux)">Points connus quand la commune est relevée, sinon estimés à 1 pour ' + hpp + ' habitants ; remises des fiches appliquées ; options (installation, formation…) non comprises.</div>'
+        + (top.length ? '<div style="margin-top:8px"><b>Plus gros potentiels à travailler</b>' + top.slice(0, 8).map(function (x) {
+            return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--trait)"><span style="width:9px;height:9px;border-radius:50%;background:' + (G_COULEURS[x.st] || G_COULEURS.aucun) + '"></span><span style="flex:1">' + gEsc(x.c.nom) + ' <span style="color:var(--doux)">' + x.d.toFixed(0) + ' km · ' + (x.c.population || 0).toLocaleString("fr-FR") + ' hab.</span></span><span>' + x.pts + ' pts' + (x.eur ? ' · ' + gEuros(x.eur) : '') + '</span><a href="#" data-gk-ouvrir="' + gEsc(x.c.code) + '">Fiche</a></div>';
+          }).join("") + '</div>' : '')
+        + '</div>';
+    };
+    setTimeout(lot, 0);
+  }
+  $("gk-potentiel").addEventListener("click", function (e) {
+    var a = e.target.closest("[data-gk-ouvrir]"); if (!a) return; e.preventDefault();
+    var b = document.createElement("button"); b.dataset.gkOuvrir = a.dataset.gkOuvrir; b.hidden = true; $("gk-carte").appendChild(b); b.click(); b.remove();
+  });
   $("gk-carte").addEventListener("click", function (e) {
     var b = e.target.closest("[data-gk-ouvrir]"); if (!b) return;
     var c = (GK.communes || []).filter(function (x) { return x.code === b.dataset.gkOuvrir; })[0]; if (!c) return;
