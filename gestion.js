@@ -1355,7 +1355,7 @@
      Priorité (haute / normale / basse), case « traité », note de suivi (colonne suite). */
   var GA_PRIO = [["haute", "Haute"], ["normale", "Normale"], ["basse", "Basse"]];
   var GA_ETATS = [["", "—"], ["a_faire", "À faire"], ["en_cours", "En cours"], ["realise", "Réalisé"], ["abandonne", "Abandonné"]];
-  var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »" };
+  var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »", console: "Console" };
   var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {}, GA_EDIT = null;
   main.insertAdjacentHTML("beforeend",
     '<section id="avis"><div class="carte"><h2>Avis des utilisateurs <button class="second" id="gav-recharger" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>'
