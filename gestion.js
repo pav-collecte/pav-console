@@ -916,14 +916,15 @@
     var opts = gLireOptions(c.options), pts = gPotentiel(c.commune).points || 1, off = {};
     String(c.options_offertes || "").split(";").forEach(function (k) { if (k) off[k] = 1; });
     var options = gTarifs("option");
-    return '<div id="gf-conditions" style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Conditions commerciales</b>'
+    return '<div id="gf-conditions" style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Offre commerciale de la commune</b>'
+      + '<p class="petit" style="margin:4px 0 8px">Elle hérite de l\'offre de base (onglet Tarifs : ' + (gReglage("calcul_abonnement") === "tranches" ? "abonnement par tranches" : "prix unique par point") + ', facturation ' + (gModeDefaut() === "mensuel" ? "au mois" : "à l\'année") + '). Laissez « Par défaut » pour suivre la base, ou déclinez ici pour cette commune seulement : calcul, prix négocié, mode, remise, options, parrainage.</p>'
       + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
       + '<div>' + gChamp("gf-mode", "Facturation de l'abonnement", c.mode_facturation || "", null, [["", "Par défaut (" + (gModeDefaut() === "mensuel" ? "au mois" : "à l'année") + ")"], ["annuel", "À l'année"], ["mensuel", "Au mois"]]) + '</div>'
       + '<div>' + gChamp("gf-remise", "Remise %", c.remise_pct || "", "number") + '</div></div>'
       + gChamp("gf-calcul", "Calcul de l'abonnement", c.calcul_abonnement || "", null, [["", "Par défaut (" + (gReglage("calcul_abonnement") === "tranches" ? "par tranches" : "prix unique par point") + ", onglet Tarifs)"], ["point", "Prix unique par point (catalogue)"], ["tranches", "Par tranches"], ["negocie", "Prix négocié pour cette commune"]])
       + '<div id="gf-negocie" style="display:' + (c.calcul_abonnement === "negocie" ? "flex" : "none") + ';flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"><input id="gf-prixneg" type="number" min="0" step="any" placeholder="Prix" value="' + gEsc(c.prix_negocie || "") + '" style="width:100px;margin:0"> € HT '
       + '<select id="gf-uniteneg" style="flex:1;min-width:150px;margin:0">' + G_UNITES_TRANCHE.map(function (u) { return '<option value="' + u[0] + '"' + (u[0] === (c.unite_negociee || "point_an") ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") + '</select></div>'
-      + '<p class="petit" style="margin:4px 0 0">Par défaut, la fiche hérite des réglages de l\'onglet Tarifs ; chaque choix ici ne vaut que pour cette commune.</p>'
+
       + '<div class="petit" style="margin-top:8px"><b>Options pour le devis</b></div>'
       + (options.length ? options.map(function (t) {
           var q = opts[t.code] || (/point/.test(t.unite) ? pts : 1);
