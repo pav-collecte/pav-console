@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1F3A2E">
 <title>PAV — console d'installation</title>
@@ -22,8 +22,10 @@
     nav { overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
     nav::-webkit-scrollbar { display:none; }
     nav button { flex:0 0 auto; padding:8px 12px; }
-    #chat-ouvrir { right:10px; padding:9px 13px; font-size:13px; opacity:.92; }
-    main { padding-bottom:90px; }
+    body #chat-ouvrir { right:10px; padding:9px 13px; font-size:13px; opacity:.92; }
+    body #chat { right:0; left:0; bottom:0; width:100%; height:100dvh; max-height:100dvh; border-radius:0; }
+    body #chat .chat-tete { border-radius:0; }
+    body main { padding-bottom:90px; }
   }
   main { padding:14px 14px 80px; max-width:640px; margin:0 auto; }
   section { display:none; } section.actif { display:block; }
@@ -2580,5 +2582,19 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
 <script src="gestion.js?v=15" defer></script>
+<script>
+/* Smartphone : quand le clavier s'ouvre, l'assistant se cale sur la partie visible de l'écran (la saisie reste visible). */
+(function () {
+  var vv = window.visualViewport, chat = document.getElementById("chat"); if (!vv || !chat) return;
+  function caler() {
+    if (chat.hidden || window.innerWidth > 640) { chat.style.height = ""; chat.style.top = ""; chat.style.bottom = ""; return; }
+    chat.style.top = vv.offsetTop + "px"; chat.style.bottom = "auto"; chat.style.height = vv.height + "px";
+    var fil = document.getElementById("chat-fil"); if (fil) fil.scrollTop = fil.scrollHeight;
+  }
+  vv.addEventListener("resize", caler); vv.addEventListener("scroll", caler);
+  new MutationObserver(caler).observe(chat, { attributes: true, attributeFilter: ["hidden"] });
+  var t = document.getElementById("chat-texte"); if (t) t.addEventListener("focus", function () { setTimeout(caler, 300); });
+})();
+</script>
 </body>
 </html>
