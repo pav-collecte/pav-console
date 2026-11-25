@@ -1341,13 +1341,14 @@
   /* — Avis des utilisateurs (onglet Avis du classeur commun, alimenté par le workflow n8n « avis des utilisateurs ») —
      Priorité (haute / normale / basse), case « traité », note de suivi (colonne suite). */
   var GA_PRIO = [["haute", "Haute"], ["normale", "Normale"], ["basse", "Basse"]];
+  var GA_ETATS = [["", "—"], ["a_faire", "À faire"], ["en_cours", "En cours"], ["realise", "Réalisé"], ["abandonne", "Abandonné"]];
   var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »" };
-  var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {};
+  var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {}, GA_EDIT = null;
   main.insertAdjacentHTML("beforeend",
     '<section id="avis"><div class="carte"><h2>Avis des utilisateurs <button class="second" id="gav-recharger" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>'
-    + '<p class="petit">Envoyés depuis le bouton « Votre avis » de l\'appli de tournée, de la météo et de l\'encart des sites. Donnez une priorité, cochez quand c\'est traité ; la note de suivi reste dans le classeur (colonne « suite »).</p>'
+    + '<p class="petit">Envoyés depuis le bouton « Votre avis » de l\'appli de tournée, de la météo et de l\'encart des sites. Donnez une priorité, cochez « Validé » pour une idée retenue et « Traité » quand c\'est fait ; le crayon ✏️ permet de compléter l\'avis (précisions, note de suivi). Le texte d\'origine n\'est jamais modifié.</p>'
     + '<div id="gav-synthese"></div>'
-    + '<div class="gav-filtres"><div class="gav-seg" id="gav-vue"><button type="button" data-v="afaire">À traiter</button><button type="button" data-v="traite">Traités</button><button type="button" data-v="tous">Tous</button></div>'
+    + '<div class="gav-filtres"><div class="gav-seg" id="gav-vue"><button type="button" data-v="afaire">À traiter</button><button type="button" data-v="valide">Validés</button><button type="button" data-v="traite">Traités</button><button type="button" data-v="tous">Tous</button></div>'
     + '<select id="gav-commune" aria-label="Commune"></select><select id="gav-page" aria-label="Page"></select></div>'
     + '<div class="msg" id="msg-avis"></div><div id="gav-liste" class="petit">—</div></div></section>'
     + '<style>'
@@ -1363,6 +1364,11 @@
     + '.gav-b{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}.gav-b .gav-seg button{padding:6px 10px;font-size:13px}'
     + '.gav-b .gav-seg button.on[data-p=haute]{background:var(--ko)}.gav-b .gav-seg button.on[data-p=normale]{background:var(--accent)}.gav-b .gav-seg button.on[data-p=basse]{background:#6f8a7c}'
     + '.gav-ok{display:inline-flex;gap:6px;align-items:center;font-weight:600;color:var(--vert);cursor:pointer;margin:0;font-size:15px}.gav-ok input{width:22px;height:22px;margin:0;accent-color:var(--ok)}'
+    + '.gav-crayon{border:1px solid var(--trait);background:#fff;border-radius:8px;width:32px;height:30px;padding:0;cursor:pointer;font-size:15px}.gav-crayon:hover{border-color:var(--accent);background:#FFF4DF}'
+    + '.gav-et-a_faire{background:#FFF4DF;color:#8a5a00;border-color:#f0d9a8}.gav-et-en_cours{background:#E6F0FB;color:#1d4f86;border-color:#bcd3ee}.gav-et-realise{background:#E7F3EC;color:var(--ok);border-color:#bfdccb;font-weight:600}.gav-et-abandonne{background:#F3EFEA;color:var(--doux);text-decoration:line-through}'
+    + '.gav-v{background:#E7F3EC;color:var(--ok);border-color:#bfdccb;font-weight:600}'
+    + '.gav-comp{margin:6px 0 8px;padding:8px 10px;background:#FAF8F3;border-left:3px solid var(--accent);border-radius:6px;white-space:pre-wrap;font-size:14px}.gav-comp b{display:block;font-size:12px;color:var(--doux);font-weight:600}'
+    + '.gav-edit{margin-top:8px;padding:10px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px}.gav-edit textarea{font-size:15px}.gav-eb{display:flex;gap:8px;margin-top:10px}.gav-eb button{flex:1;margin-top:0}'
     + '.gav-suite{margin-top:8px;font-size:14px;min-height:38px;padding:8px 10px}.gav-meta{color:var(--doux);font-size:12px;margin-top:4px}'
     + '</style>');
   function gavListe() { return (G && G.Avis) || []; }
@@ -1386,6 +1392,7 @@
     $("gav-synthese").innerHTML = '<div class="gav-syn"><div><b>' + tous.filter(function (a) { return !gavFait(a); }).length + '</b>à traiter</div>'
       + '<div><b>' + tous.filter(function (a) { return !gavFait(a) && a.priorite === "haute"; }).length + '</b>priorité haute</div>'
       + '<div><b>' + (notes.length ? moy.toFixed(1).replace(".", ",") + ' ★' : '—') + '</b>note moyenne (' + notes.length + ')</div>'
+      + '<div><b>' + tous.filter(function (a) { return a.valide === "oui" && !gavFait(a); }).length + '</b>validés à faire</div>'
       + '<div><b>' + recents + '</b>sur 30 jours</div></div>';
     // Filtres
     Array.prototype.forEach.call($("gav-vue").querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.v === GA_FILTRE.vue); });
@@ -1397,6 +1404,7 @@
     var l = tous.filter(function (a) {
       if (GA_FILTRE.vue === "afaire" && gavFait(a)) return false;
       if (GA_FILTRE.vue === "traite" && !gavFait(a)) return false;
+      if (GA_FILTRE.vue === "valide" && a.valide !== "oui") return false;
       if (GA_FILTRE.commune && a.commune !== GA_FILTRE.commune) return false;
       if (GA_FILTRE.page && a.page !== GA_FILTRE.page) return false;
       return true;
@@ -1414,12 +1422,23 @@
       return '<div class="gav-a p-' + gEsc(p) + (gavFait(a) ? ' fait' : '') + '" data-gav="' + gEsc(id) + '">'
         + '<div class="gav-h">' + (n ? '<span class="et" title="Simplicité : ' + n + '/5">' + "★★★★★".slice(0, n) + '<span style="color:#d9d4c8">' + "★★★★★".slice(0, 5 - n) + '</span></span>' : '')
         + '<span class="gav-tag">' + gEsc(a.commune || "commune ?") + '</span><span class="gav-tag">' + gEsc(GA_PAGES[a.page] || a.page || "page ?") + '</span>'
-        + '<span class="d">' + gEsc(gavDate(a.date)) + '</span></div>'
+        + (a.valide === "oui" ? '<span class="gav-tag gav-v">✓ Validé</span>' : '')
+        + (a.etat_traitement ? '<span class="gav-tag gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : (a.version ? '<span class="gav-tag">' + gEsc(a.version) + '</span>' : ''))
+        + '<span class="d">' + gEsc(gavDate(a.date)) + '</span>'
+        + (id ? '<button type="button" class="gav-crayon" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button>' : '') + '</div>'
         + '<div class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</div>'
+        + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
         + (contact ? '<div>Contact : ' + contact + '</div>' : '')
+        + (GA_EDIT === id ? '<div class="gav-edit"><label>Précisions (contexte, reproduction, écran concerné, proposition…)</label>'
+          + '<textarea id="gav-e-comp" rows="4" maxlength="3000" placeholder="Ex. sur Android, le bouton est sous le pouce ; proposer un bouton flottant en bas au centre.">' + gEsc(a.complement || "") + '</textarea>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>État du traitement</label><select id="gav-e-etat">' + GA_ETATS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === (a.etat_traitement || "") ? ' selected' : '') + '>' + x[1] + '</option>'; }).join("") + '</select></div>'
+          + '<div><label>Version de réalisation</label><input id="gav-e-version" maxlength="40" placeholder="ex. V1.5.0" value="' + gEsc(a.version || "") + '"></div></div>'
+          + '<label>Note de suivi</label><textarea id="gav-e-suite" rows="2" maxlength="2000" placeholder="Réponse faite, correctif prévu, version…">' + gEsc(a.suite || "") + '</textarea>'
+          + '<div class="gav-eb"><button type="button" class="second" data-gav-annuler>Annuler</button><button type="button" class="principal" data-gav-ok>Enregistrer</button></div></div>' : '')
         + (id ? '<div class="gav-b"><div class="gav-seg" role="group" aria-label="Priorité">' + GA_PRIO.map(function (x) { return '<button type="button" data-p="' + x[0] + '"' + (x[0] === p ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join("") + '</div>'
+          + '<label class="gav-ok"><input type="checkbox" data-gav-valide' + (a.valide === "oui" ? ' checked' : '') + '> Validé</label>'
           + '<label class="gav-ok"><input type="checkbox" data-gav-fait' + (gavFait(a) ? ' checked' : '') + '> Traité</label></div>'
-          + '<textarea class="gav-suite" rows="1" placeholder="Note de suivi (réponse faite, correctif prévu…)" data-gav-suite>' + gEsc(a.suite || "") + '</textarea>'
+          + (a.suite && GA_EDIT !== id ? '<div class="gav-meta" style="color:var(--vert);font-size:13px">Suivi : ' + gEsc(a.suite) + '</div>' : '')
           : '<div class="gav-meta" style="color:var(--ko)">Avis sans identifiant : actualisez pour le numéroter.</div>')
         + (a.appareil ? '<div class="gav-meta">' + gEsc(gavAppareil(a.appareil)) + '</div>' : '')
         + '</div>';
@@ -1433,7 +1452,7 @@
   }
   function gavEnregistrer(id, valeurs, carte) {
     var a = gavListe().filter(function (x) { return x.id === id; })[0]; if (!a) return;
-    var avant = { priorite: a.priorite, traite: a.traite, suite: a.suite };
+    var avant = { priorite: a.priorite, traite: a.traite, suite: a.suite, valide: a.valide, complement: a.complement, etat_traitement: a.etat_traitement, version: a.version };
     Object.assign(a, valeurs); dessinerAvis();   // affichage immédiat
     GA_ENVOI[id] = (GA_ENVOI[id] || Promise.resolve()).then(function () {
       return api("gestion", { op: "enregistrer", onglet: "Avis", valeurs: Object.assign({ id: id }, valeurs) });
@@ -1445,6 +1464,14 @@
   $("gav-page").addEventListener("change", function () { GA_FILTRE.page = this.value; dessinerAvis(); });
   $("gav-recharger").addEventListener("click", function () { chargerGestion(); });
   $("gav-liste").addEventListener("click", function (e) {
+    var c0 = e.target.closest("[data-gav]");
+    if (c0 && e.target.closest("[data-gav-edit]")) { GA_EDIT = GA_EDIT === c0.dataset.gav ? null : c0.dataset.gav; dessinerAvis(); var t = $("gav-e-comp"); if (t) t.focus(); return; }
+    if (c0 && e.target.closest("[data-gav-annuler]")) { GA_EDIT = null; dessinerAvis(); return; }
+    if (c0 && e.target.closest("[data-gav-ok]")) {
+      var v = { complement: $("gav-e-comp").value.trim(), suite: $("gav-e-suite").value.trim(), etat_traitement: $("gav-e-etat").value, version: $("gav-e-version").value.trim() };
+      if (v.etat_traitement === "realise") v.traite = "oui";
+      GA_EDIT = null; gavEnregistrer(c0.dataset.gav, v); return;
+    }
     var b = e.target.closest("button[data-p]"); if (!b) return;
     var c = b.closest("[data-gav]"); if (!c || !c.dataset.gav) return;
     gavEnregistrer(c.dataset.gav, { priorite: b.dataset.p });
@@ -1452,6 +1479,7 @@
   $("gav-liste").addEventListener("change", function (e) {
     var c = e.target.closest("[data-gav]"); if (!c || !c.dataset.gav) return;
     if (e.target.matches("[data-gav-fait]")) gavEnregistrer(c.dataset.gav, { traite: e.target.checked ? "oui" : "non" });
+    else if (e.target.matches("[data-gav-valide]")) gavEnregistrer(c.dataset.gav, { valide: e.target.checked ? "oui" : "non" });
     else if (e.target.matches("[data-gav-suite]")) gavEnregistrer(c.dataset.gav, { suite: e.target.value.trim() });
   });
 
