@@ -272,7 +272,8 @@
   // Réglages de prospection, rangés dans l'onglet Emetteur (créés à la première sauvegarde).
   var G_REGLAGES = [["habitants_par_point", "300", "Réglage : habitants par point de collecte, pour estimer les points d'une commune non relevée"],
     ["carte_centre", "Albon", "Réglage : commune au centre de la carte des prospects"],
-    ["carte_rayon_km", "20", "Réglage : rayon par défaut de la carte (km)"]];
+    ["carte_rayon_km", "20", "Réglage : rayon par défaut de la carte (km)"],
+    ["rappel_echeance_jours", "30", "Réglage : rappel avant une échéance (facture, devis, anniversaire de contrat), en jours ; 0 = pas de rappel"]];
   function gReglage(cle) {
     var l = ((G && G.Emetteur) || []).filter(function (p) { return p.cle === cle; })[0], d = G_REGLAGES.filter(function (r) { return r[0] === cle; })[0];
     var v = l && l.valeur && !/^À REMPLIR/i.test(l.valeur) ? l.valeur : "";
@@ -514,6 +515,7 @@
     + '<h2>Agenda des actions</h2>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="principal" id="ga-sync" type="button" style="margin-top:0;flex:2">Synchroniser avec Google Agenda</button><button class="second" id="ga-ics" type="button" style="flex:1">Exporter (.ics)</button></div>'
     + '<p class="petit" style="margin-top:0">Les échéances vont dans l\'agenda Google « PAV — actions » (créé au premier envoi) ; elles se mettent aussi à jour toutes seules après chaque enregistrement d\'échange, de devis ou de facture. Une action faite disparaît de l\'agenda.</p>'
+    + '<div class="petit" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">Rappel avant chaque échéance (facture, devis, anniversaire de contrat) : <input id="ga-rappel" type="number" min="0" max="365" style="width:70px;margin:0"> jours <button class="second" id="ga-rappel-ok" type="button" style="padding:5px 10px;font-size:13px">Enregistrer</button></div>'
     + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
     + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
     + '<div id="ga-grille" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px"></div>'
@@ -747,6 +749,12 @@
       var a = String(c.anniversaire).slice(5, 10), an = new Date().getFullYear();
       [an, an + 1].forEach(function (y) { ev.push({ date: y + "-" + a, type: "anniversaire", couleur: "#2E7D4F", titre: "Anniversaire du contrat — forfait annuel à facturer", commune: c.commune }); });
     });
+    // Rappel J-N avant les échéances (factures, fins de validité de devis, anniversaires de contrat).
+    var nj = Math.max(0, Math.min(365, Number(gReglage("rappel_echeance_jours")) || 0));
+    if (nj) ev.filter(function (x) { return /^(devis|facture|anniversaire)$/.test(x.type); }).forEach(function (x) {
+      var d = new Date(x.date + "T12:00:00"); d.setDate(d.getDate() - nj);
+      ev.push({ date: d.toISOString().slice(0, 10), type: "rappel", couleur: "#C9752B", titre: "Rappel J-" + nj + " : " + x.titre + " (le " + gDateFR(x.date) + ")", commune: x.commune, doc: x.doc });
+    });
     ev.forEach(function (x) { x.nomCommune = noms[x.commune] || x.commune || ""; });
     return ev.sort(function (a, b) { return a.date.localeCompare(b.date); });
   }
@@ -783,6 +791,7 @@
   }
   function alerteAgenda(t) { var m = $("ga-info"); if (m) { m.textContent = t; m.hidden = false; } }
   function dessinerAgenda() {
+    if (typeof majRappelChamp === "function") majRappelChamp();
     if (!$("ga-grille")) return;
     var ev = evenements(), auj = new Date().toISOString().slice(0, 10);
     var an = GA_MOIS.getFullYear(), mo = GA_MOIS.getMonth();
@@ -1310,4 +1319,15 @@
     try { genererDevis(); } catch (er) { var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click(); ouvrirDoc("devis", ""); }
   });
 
+
+  /* Rappel avant échéance : réglage (onglet Emetteur), un événement « Rappel J-N » est aussi envoyé dans Google Agenda. */
+  function majRappelChamp() { if ($("ga-rappel") && G && document.activeElement !== $("ga-rappel")) $("ga-rappel").value = String(Number(gReglage("rappel_echeance_jours")) || 0); }
+  $("ga-rappel-ok").addEventListener("click", function () {
+    var n = Math.max(0, Math.min(365, Math.round(gNum($("ga-rappel").value))));
+    alerteAgenda("Enregistrement…");
+    api("gestion", { op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "rappel_echeance_jours", valeur: String(n), description: "Rappel avant une échéance (facture, devis, anniversaire de contrat), en jours ; 0 = pas de rappel" } })
+      .then(function () { return chargerGestion(true); })
+      .then(function () { alerteAgenda(n ? "Rappel J-" + n + " enregistré : envoi vers Google Agenda…" : "Rappels désactivés : mise à jour de Google Agenda…"); return syncAgenda(false); })
+      .catch(function (e) { alerteAgenda(e.message); });
+  });
 })();
