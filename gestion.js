@@ -8,17 +8,17 @@
   // Onglets : boutons dans la barre, sections dans la page.
   var nav = document.querySelector("nav"), main = document.querySelector("main");
   if (!nav || !main) return;
-  [["clients", "Clients"], ["carte", "Carte"], ["agenda", "Agenda"], ["tarifs", "Tarifs"], ["factu", "Factures"]].forEach(function (o) {
+  [["clients", "Clients"], ["carte", "Carte"], ["agenda", "Agenda"], ["tarifs", "Tarifs"], ["factu", "Factures"], ["avis", "Avis"]].forEach(function (o) {
     var b = document.createElement("button"); b.dataset.onglet = o[0]; b.textContent = o[1]; nav.appendChild(b);
   });
   main.insertAdjacentHTML("beforeend", "  <section id=\"clients\">\n    <div class=\"carte\">\n      <h2>Suivi des communes <button class=\"second\" id=\"g-recharger\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Actualiser</button></h2>\n      <p class=\"petit\">Une ligne par commune : o\u00f9 en est la relation, et la prochaine action pr\u00e9vue.</p>\n      <div id=\"g-pipeline\" class=\"petit\">\u2014</div>\n      <div class=\"msg\" id=\"msg-gestion\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Fiche client</h2>\n      <label for=\"g-commune\"><b>Commune</b></label>\n      <select id=\"g-commune\"></select>\n      <div id=\"g-contrat\" class=\"petit\" style=\"margin-top:8px\"></div>\n      <div id=\"g-fiche\"></div>\n      <button class=\"principal\" id=\"g-fiche-ok\" type=\"button\">Enregistrer la fiche</button>\n      <div class=\"msg\" id=\"msg-fiche\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Contacts</h2>\n      <div id=\"g-contacts\" class=\"petit\"></div>\n      <div id=\"g-contact-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-contact\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>\u00c9changes</h2>\n      <p class=\"petit\">Appels, r\u00e9unions, d\u00e9monstrations, relances\u2026 et la prochaine action \u00e0 faire.</p>\n      <div id=\"g-echanges\" class=\"petit\"></div>\n      <div id=\"g-echange-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-echange\"></div>\n    </div>\n  </section>\n\n  <section id=\"factu\">\n    <div class=\"carte\">\n      <h2>\u00c9metteur des devis et factures</h2>\n      <p class=\"petit\">Ces informations figureront sur chaque document. Tant que des champs sont \u00ab \u00c0 REMPLIR \u00bb, les documents restent des brouillons sans valeur.</p>\n      <div id=\"g-emetteur\"></div>\n      <button class=\"principal\" id=\"g-emetteur-ok\" type=\"button\">Enregistrer l'\u00e9metteur</button>\n      <div class=\"msg\" id=\"msg-emetteur\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Devis <button class=\"second\" id=\"g-devis-nouveau\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouveau devis</button></h2>\n      <div id=\"g-devis-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\">\n      <h2>Factures <button class=\"second\" id=\"g-facture-nouvelle\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouvelle facture</button></h2>\n      <div id=\"g-factures-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\" id=\"g-doc\" hidden>\n      <h2 id=\"g-doc-titre\">Document</h2>\n      <div id=\"g-doc-entete\"></div>\n      <h2 style=\"margin-top:14px\">Lignes</h2>\n      <div id=\"g-doc-lignes\"></div>\n      <button class=\"second\" id=\"g-doc-ligne\" type=\"button\" style=\"margin-top:8px\">+ Ajouter une ligne</button>\n      <div id=\"g-doc-totaux\" class=\"petit\" style=\"margin-top:10px;text-align:right;font-size:15px\"></div>\n      <div class=\"msg\" id=\"msg-doc\"></div>\n      <div style=\"display:flex;gap:8px;margin-top:12px;flex-wrap:wrap\">\n        <button class=\"second\" id=\"g-doc-fermer\" type=\"button\" style=\"flex:1\">Fermer</button>\n        <button class=\"second\" id=\"g-doc-supprimer\" type=\"button\" style=\"flex:1;color:var(--ko)\">Supprimer le brouillon</button>\n        <button class=\"principal\" id=\"g-doc-ok\" type=\"button\" style=\"flex:2;margin-top:0\">Enregistrer</button>\n      </div>\n    </div>\n  </section>\n");
   // Bascule d'onglet pour les deux nouveaux boutons (les autres sont gérés par la console).
   Array.prototype.forEach.call(nav.querySelectorAll("button"), function (b) {
     b.addEventListener("click", function () {
-      if (["clients", "carte", "agenda", "tarifs", "factu"].indexOf(b.dataset.onglet) < 0) return;
+      if (["clients", "carte", "agenda", "tarifs", "factu", "avis"].indexOf(b.dataset.onglet) < 0) return;
       Array.prototype.forEach.call(nav.querySelectorAll("button"), function (x) { x.classList.toggle("actif", x === b); });
       Array.prototype.forEach.call(document.querySelectorAll("main > section"), function (s) { s.classList.toggle("actif", s.id === b.dataset.onglet); });
-      if (!G_CHARGE) chargerGestion(); else if (b.dataset.onglet === "carte") ouvrirCarteProspects(); else if (b.dataset.onglet === "agenda") dessinerAgenda();
+      if (!G_CHARGE) chargerGestion(); else if (b.dataset.onglet === "carte") ouvrirCarteProspects(); else if (b.dataset.onglet === "agenda") dessinerAgenda(); else if (b.dataset.onglet === "avis") dessinerAvis();
     });
   });
   // Smartphone : la barre d'onglets défile, l'onglet choisi est ramené au centre.
@@ -75,7 +75,7 @@
     var s = $("g-commune"), avant = s.value;
     s.innerHTML = gCommunes().map(function (c) { return '<option value="' + gEsc(c[0]) + '">' + gEsc(c[1]) + '</option>'; }).join("");
     if (avant && gCommunes().some(function (c) { return c[0] === avant; })) s.value = avant;
-    dessinerPipeline(); dessinerFiche(); dessinerEmetteur(); dessinerDocs(); dessinerAgenda(); dessinerTarifs();
+    dessinerPipeline(); dessinerFiche(); dessinerEmetteur(); dessinerDocs(); dessinerAgenda(); dessinerTarifs(); dessinerAvis();
     if ($("carte") && $("carte").classList.contains("actif")) ouvrirCarteProspects();
   }
   function dessinerPipeline() {
@@ -1338,4 +1338,121 @@
       .then(function () { alerteAgenda(n ? "Rappel J-" + n + " enregistré : envoi vers Google Agenda…" : "Rappels désactivés : mise à jour de Google Agenda…"); return syncAgenda(false); })
       .catch(function (e) { alerteAgenda(e.message); });
   });
+  /* — Avis des utilisateurs (onglet Avis du classeur commun, alimenté par le workflow n8n « avis des utilisateurs ») —
+     Priorité (haute / normale / basse), case « traité », note de suivi (colonne suite). */
+  var GA_PRIO = [["haute", "Haute"], ["normale", "Normale"], ["basse", "Basse"]];
+  var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »" };
+  var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {};
+  main.insertAdjacentHTML("beforeend",
+    '<section id="avis"><div class="carte"><h2>Avis des utilisateurs <button class="second" id="gav-recharger" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>'
+    + '<p class="petit">Envoyés depuis le bouton « Votre avis » de l\'appli de tournée, de la météo et de l\'encart des sites. Donnez une priorité, cochez quand c\'est traité ; la note de suivi reste dans le classeur (colonne « suite »).</p>'
+    + '<div id="gav-synthese"></div>'
+    + '<div class="gav-filtres"><div class="gav-seg" id="gav-vue"><button type="button" data-v="afaire">À traiter</button><button type="button" data-v="traite">Traités</button><button type="button" data-v="tous">Tous</button></div>'
+    + '<select id="gav-commune" aria-label="Commune"></select><select id="gav-page" aria-label="Page"></select></div>'
+    + '<div class="msg" id="msg-avis"></div><div id="gav-liste" class="petit">—</div></div></section>'
+    + '<style>'
+    + '.gav-filtres{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.gav-filtres select{width:auto;flex:1;min-width:140px;padding:8px 10px;font-size:15px}'
+    + '.gav-seg{display:inline-flex;border:1px solid var(--trait);border-radius:9px;overflow:hidden}.gav-seg button{border:0;background:#fff;padding:8px 12px;font:600 14px system-ui;color:var(--vert);cursor:pointer}'
+    + '.gav-seg button+button{border-left:1px solid var(--trait)}.gav-seg button.on{background:var(--vert);color:#fff}'
+    + '.gav-syn{display:flex;gap:8px;flex-wrap:wrap}.gav-syn div{flex:1;min-width:90px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px;padding:8px 10px}.gav-syn b{display:block;font-size:20px;color:var(--vert)}'
+    + '.gav-a{border:1px solid var(--trait);border-left:5px solid #c9c2b4;border-radius:10px;padding:10px 12px;margin-top:10px;background:#fff;font-size:15px;color:var(--encre)}'
+    + '.gav-a.p-haute{border-left-color:var(--ko)}.gav-a.p-normale{border-left-color:var(--accent)}.gav-a.p-basse{border-left-color:#8fa79a}.gav-a.fait{opacity:.62}'
+    + '.gav-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.gav-h .et{color:#E08A00;letter-spacing:1px;font-size:16px}.gav-h .d{color:var(--doux);font-size:13px;margin-left:auto}'
+    + '.gav-tag{font-size:12px;padding:2px 8px;border-radius:999px;background:#EEF5F0;color:var(--vert);border:1px solid var(--trait)}'
+    + '.gav-idee{margin:8px 0;white-space:pre-wrap}.gav-idee.vide{color:var(--doux);font-style:italic}'
+    + '.gav-b{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}.gav-b .gav-seg button{padding:6px 10px;font-size:13px}'
+    + '.gav-b .gav-seg button.on[data-p=haute]{background:var(--ko)}.gav-b .gav-seg button.on[data-p=normale]{background:var(--accent)}.gav-b .gav-seg button.on[data-p=basse]{background:#6f8a7c}'
+    + '.gav-ok{display:inline-flex;gap:6px;align-items:center;font-weight:600;color:var(--vert);cursor:pointer;margin:0;font-size:15px}.gav-ok input{width:22px;height:22px;margin:0;accent-color:var(--ok)}'
+    + '.gav-suite{margin-top:8px;font-size:14px;min-height:38px;padding:8px 10px}.gav-meta{color:var(--doux);font-size:12px;margin-top:4px}'
+    + '</style>');
+  function gavListe() { return (G && G.Avis) || []; }
+  function gavDate(s) { var d = new Date(String(s || "").replace(" ", "T")); return isNaN(d) ? String(s || "") : d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
+  function gavTs(s) { var d = new Date(String(s || "").replace(" ", "T")); return isNaN(d) ? 0 : d.getTime(); }
+  function gavFait(a) { return a.traite === "oui"; }
+  function gavPrioRang(a) { return { haute: 0, normale: 1, basse: 2 }[a.priorite] != null ? { haute: 0, normale: 1, basse: 2 }[a.priorite] : 1; }
+  function majBadgeAvis() {
+    var b = document.querySelector('nav button[data-onglet="avis"]'); if (!b) return;
+    var n = gavListe().filter(function (a) { return !gavFait(a); }).length;
+    b.textContent = n ? "Avis (" + n + ")" : "Avis";
+  }
+  function dessinerAvis() {
+    majBadgeAvis();
+    if (!$("gav-liste") || !G) return;
+    var tous = gavListe();
+    // Synthèse
+    var notes = tous.map(function (a) { return Number(a.note); }).filter(function (n) { return n >= 1 && n <= 5; });
+    var moy = notes.length ? notes.reduce(function (s, n) { return s + n; }, 0) / notes.length : 0;
+    var recents = tous.filter(function (a) { return gavTs(a.date) > Date.now() - 30 * 864e5; }).length;
+    $("gav-synthese").innerHTML = '<div class="gav-syn"><div><b>' + tous.filter(function (a) { return !gavFait(a); }).length + '</b>à traiter</div>'
+      + '<div><b>' + tous.filter(function (a) { return !gavFait(a) && a.priorite === "haute"; }).length + '</b>priorité haute</div>'
+      + '<div><b>' + (notes.length ? moy.toFixed(1).replace(".", ",") + ' ★' : '—') + '</b>note moyenne (' + notes.length + ')</div>'
+      + '<div><b>' + recents + '</b>sur 30 jours</div></div>';
+    // Filtres
+    Array.prototype.forEach.call($("gav-vue").querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.v === GA_FILTRE.vue); });
+    var coms = {}; tous.forEach(function (a) { if (a.commune) coms[a.commune] = 1; });
+    $("gav-commune").innerHTML = '<option value="">Toutes les communes</option>' + Object.keys(coms).sort().map(function (c) { return '<option value="' + gEsc(c) + '"' + (c === GA_FILTRE.commune ? ' selected' : '') + '>' + gEsc(c) + '</option>'; }).join("");
+    var pages = {}; tous.forEach(function (a) { if (a.page) pages[a.page] = 1; });
+    $("gav-page").innerHTML = '<option value="">Toutes les pages</option>' + Object.keys(pages).sort().map(function (p) { return '<option value="' + gEsc(p) + '"' + (p === GA_FILTRE.page ? ' selected' : '') + '>' + gEsc(GA_PAGES[p] || p) + '</option>'; }).join("");
+    // Liste : priorité puis plus récent (les traités par date seulement)
+    var l = tous.filter(function (a) {
+      if (GA_FILTRE.vue === "afaire" && gavFait(a)) return false;
+      if (GA_FILTRE.vue === "traite" && !gavFait(a)) return false;
+      if (GA_FILTRE.commune && a.commune !== GA_FILTRE.commune) return false;
+      if (GA_FILTRE.page && a.page !== GA_FILTRE.page) return false;
+      return true;
+    }).sort(function (a, b) {
+      if (gavFait(a) !== gavFait(b)) return gavFait(a) ? 1 : -1;
+      if (!gavFait(a) && gavPrioRang(a) !== gavPrioRang(b)) return gavPrioRang(a) - gavPrioRang(b);
+      return gavTs(b.date) - gavTs(a.date);
+    });
+    if (!tous.length) { $("gav-liste").innerHTML = "Aucun avis reçu pour l'instant."; return; }
+    if (!l.length) { $("gav-liste").innerHTML = GA_FILTRE.vue === "afaire" ? "Rien à traiter 🎉" : "Aucun avis pour ce filtre."; return; }
+    $("gav-liste").innerHTML = l.map(function (a) {
+      var n = Math.max(0, Math.min(5, Math.round(Number(a.note) || 0)));
+      var p = a.priorite || "normale", id = a.id || "";
+      var contact = a.contact ? (/@/.test(a.contact) ? '<a href="mailto:' + gEsc(a.contact) + '">' + gEsc(a.contact) + '</a>' : /^[+\d][\d .]{6,}$/.test(a.contact) ? '<a href="tel:' + gEsc(a.contact.replace(/\s/g, "")) + '">' + gEsc(a.contact) + '</a>' : gEsc(a.contact)) : "";
+      return '<div class="gav-a p-' + gEsc(p) + (gavFait(a) ? ' fait' : '') + '" data-gav="' + gEsc(id) + '">'
+        + '<div class="gav-h">' + (n ? '<span class="et" title="Simplicité : ' + n + '/5">' + "★★★★★".slice(0, n) + '<span style="color:#d9d4c8">' + "★★★★★".slice(0, 5 - n) + '</span></span>' : '')
+        + '<span class="gav-tag">' + gEsc(a.commune || "commune ?") + '</span><span class="gav-tag">' + gEsc(GA_PAGES[a.page] || a.page || "page ?") + '</span>'
+        + '<span class="d">' + gEsc(gavDate(a.date)) + '</span></div>'
+        + '<div class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</div>'
+        + (contact ? '<div>Contact : ' + contact + '</div>' : '')
+        + (id ? '<div class="gav-b"><div class="gav-seg" role="group" aria-label="Priorité">' + GA_PRIO.map(function (x) { return '<button type="button" data-p="' + x[0] + '"' + (x[0] === p ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join("") + '</div>'
+          + '<label class="gav-ok"><input type="checkbox" data-gav-fait' + (gavFait(a) ? ' checked' : '') + '> Traité</label></div>'
+          + '<textarea class="gav-suite" rows="1" placeholder="Note de suivi (réponse faite, correctif prévu…)" data-gav-suite>' + gEsc(a.suite || "") + '</textarea>'
+          : '<div class="gav-meta" style="color:var(--ko)">Avis sans identifiant : actualisez pour le numéroter.</div>')
+        + (a.appareil ? '<div class="gav-meta">' + gEsc(gavAppareil(a.appareil)) + '</div>' : '')
+        + '</div>';
+    }).join("");
+  }
+  function gavAppareil(ua) {
+    ua = String(ua || "");
+    var os = /iPhone|iPad/.test(ua) ? "iPhone/iPad" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : "";
+    var nav = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+    return [os, nav].filter(Boolean).join(" · ") || ua.slice(0, 60);
+  }
+  function gavEnregistrer(id, valeurs, carte) {
+    var a = gavListe().filter(function (x) { return x.id === id; })[0]; if (!a) return;
+    var avant = { priorite: a.priorite, traite: a.traite, suite: a.suite };
+    Object.assign(a, valeurs); dessinerAvis();   // affichage immédiat
+    GA_ENVOI[id] = (GA_ENVOI[id] || Promise.resolve()).then(function () {
+      return api("gestion", { op: "enregistrer", onglet: "Avis", valeurs: Object.assign({ id: id }, valeurs) });
+    }).then(function () { msg("msg-avis", "Enregistré.", "ok"); setTimeout(function () { cacher("msg-avis"); }, 1500); })
+      .catch(function (e) { Object.assign(a, avant); dessinerAvis(); msg("msg-avis", e.message, "ko"); });
+  }
+  $("gav-vue").addEventListener("click", function (e) { var b = e.target.closest("button[data-v]"); if (!b) return; GA_FILTRE.vue = b.dataset.v; dessinerAvis(); });
+  $("gav-commune").addEventListener("change", function () { GA_FILTRE.commune = this.value; dessinerAvis(); });
+  $("gav-page").addEventListener("change", function () { GA_FILTRE.page = this.value; dessinerAvis(); });
+  $("gav-recharger").addEventListener("click", function () { chargerGestion(); });
+  $("gav-liste").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-p]"); if (!b) return;
+    var c = b.closest("[data-gav]"); if (!c || !c.dataset.gav) return;
+    gavEnregistrer(c.dataset.gav, { priorite: b.dataset.p });
+  });
+  $("gav-liste").addEventListener("change", function (e) {
+    var c = e.target.closest("[data-gav]"); if (!c || !c.dataset.gav) return;
+    if (e.target.matches("[data-gav-fait]")) gavEnregistrer(c.dataset.gav, { traite: e.target.checked ? "oui" : "non" });
+    else if (e.target.matches("[data-gav-suite]")) gavEnregistrer(c.dataset.gav, { suite: e.target.value.trim() });
+  });
+
 })();
