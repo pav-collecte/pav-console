@@ -647,11 +647,14 @@
     var ct = cl ? (G.communes || []).filter(function (k) { return k.commune === s.id; })[0] || {} : null;
     var known = cl ? (Number(cl.nb_points) || 0) + (Number(cl.nb_points_a_verifier) || 0) : 0;
     var pts = known || Math.max(1, Math.ceil(((cl && Number(cl.population)) || c.population || 0) / hpp));
-    return { c: c, s: s, d: x.d, pts: pts, estime: !known, eur: gAbonnement(pts, cl, ct).an };
+    // Calcul choisi au-dessus du potentiel du cercle (sauf prix négocié d'une fiche, qui reste prioritaire).
+    var clc = (GK_CALC && (cl || {}).calcul_abonnement !== "negocie") ? Object.assign({}, cl, { calcul_abonnement: GK_CALC }) : cl;
+    return { c: c, s: s, d: x.d, pts: pts, estime: !known, eur: gAbonnement(pts, clc, ct).an };
   }
   // « Ouvrir la fiche » : commune suivie → sa fiche ; sinon prospect préparé (non enregistré).
   /* ——— Potentiel du cercle : abonnement HT/an (calculé après l'affichage de la carte, sans la bloquer) ——— */
   var GK_CALCUL = 0;
+  var GK_CALC = "";
   function potentielCercle(proches, rayon, filtre) {
     var num = ++GK_CALCUL, box = $("gk-potentiel");
     box.innerHTML = '<i>Calcul du potentiel du cercle…</i>';
@@ -668,12 +671,14 @@
       top.sort(function (a, b) { return b.eur - a.eur || b.pts - a.pts; });
       box.innerHTML = '<div style="padding:10px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px">'
         + '<b style="font-size:15px">Potentiel du cercle de ' + rayon + ' km' + (filtre ? ' (communes filtrées)' : '') + ' — abonnement HT/an</b>'
+        + '<div class="gav-seg" id="gk-calcul" role="group" aria-label="Calcul du chiffre d\'affaires" style="display:flex;margin:8px 0 2px;width:100%">'
+        + [["", "Tarif de base"], ["point", "Par point"], ["tranches", "Par tranches"]].map(function (o) { return '<button type="button" data-gkc="' + o[0] + '" style="flex:1;padding:9px 6px;font-size:15px"' + (o[0] === GK_CALC ? ' class="on"' : '') + '>' + o[1] + '</button>'; }).join("") + '</div>'
         + '<table class="dns" style="margin-top:6px"><tr><th style="text-align:left"></th><th style="text-align:right">Communes</th><th style="text-align:right">Points</th><th style="text-align:right">€ HT/an</th></tr>'
         + ligne("Clients (acquis)", G4.client, G_COULEURS.client) + ligne("En cours (prospect, démo, devis)", G4.cours, G_COULEURS.devis) + ligne("Pas encore en relation", G4.libre, G_COULEURS.aucun)
         + '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + tot[0] + '</b></td><td style="text-align:right"><b>' + tot[1] + '</b></td><td style="text-align:right"><b>' + (chiffre || tot[2] ? gEuros(tot[2]) : '—') + '</b></td></tr></table>'
         + (G4.perdu[0] ? '<div>Hors total : ' + G4.perdu[0] + ' commune(s) perdue(s) ou suspendue(s), ' + gEuros(G4.perdu[2]) + '/an.</div>' : '')
         + (chiffre ? '' : '<div style="color:var(--ko);margin-top:4px">Prix de l\'abonnement non renseigné : complétez l\'onglet Tarifs pour chiffrer.</div>')
-        + '<div style="margin-top:4px;color:var(--doux)">Points connus quand la commune est relevée, sinon estimés à 1 pour ' + hpp + ' habitants ; tarif ' + (gReglage("calcul_abonnement") === "tranches" ? "par tranches" : "par point") + ' ; remises des fiches appliquées ; options non comprises.</div>'
+        + '<div style="margin-top:4px;color:var(--doux)">Points connus quand la commune est relevée, sinon estimés à 1 pour ' + hpp + ' habitants ; tarif ' + ((GK_CALC || (gReglage("calcul_abonnement") === "tranches" ? "tranches" : "point")) === "tranches" ? "par tranches" : "par point") + (GK_CALC ? "" : " (réglage de l\'onglet Tarifs)") + ' ; remises des fiches appliquées ; options non comprises.</div>'
         + (top.length ? '<div style="margin-top:8px"><b>Plus gros potentiels à travailler</b>' + top.slice(0, 8).map(function (x) {
             return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--trait)"><span style="width:9px;height:9px;border-radius:50%;background:' + (G_COULEURS[x.s.statut] || G_COULEURS.aucun) + '"></span><span style="flex:1">' + gEsc(x.c.nom) + ' <span style="color:var(--doux)">' + x.d.toFixed(0) + ' km · ' + (x.c.population || 0).toLocaleString("fr-FR") + ' hab.</span></span><span>' + x.pts + ' pts' + (x.eur ? ' · ' + gEuros(x.eur) : '') + '</span><a href="#" data-gk-ouvrir="' + gEsc(x.c.code) + '">Fiche</a></div>';
           }).join("") + '</div>' : '')
@@ -681,6 +686,8 @@
     }, 0);
   }
   $("gk-potentiel").addEventListener("click", function (e) {
+    var c = e.target.closest("[data-gkc]");
+    if (c) { GK_CALC = c.dataset.gkc; ouvrirCarteProspects(); return; }
     var a = e.target.closest("[data-gk-ouvrir]"); if (!a) return; e.preventDefault();
     var b = document.createElement("button"); b.dataset.gkOuvrir = a.dataset.gkOuvrir; b.hidden = true; $("gk-carte").appendChild(b); b.click(); b.remove();
   });
@@ -1354,6 +1361,8 @@
   /* — Avis des utilisateurs (onglet Avis du classeur commun, alimenté par le workflow n8n « avis des utilisateurs ») —
      Priorité (haute / normale / basse), case « traité », note de suivi (colonne suite). */
   var GA_PRIO = [["haute", "Haute"], ["normale", "Normale"], ["basse", "Basse"]];
+  var GA_CRIT = { simplicite: "Simplicité", fiabilite: "Fiabilité", rapidite: "Rapidité", clarte: "Clarté", utilite: "Utilité", justesse: "Justesse", gain_temps: "Gain de temps" };
+  function gavNotes(a) { var o = {}; String(a.notes_detail || "").split(";").forEach(function (x) { var p = x.split(":"); if (GA_CRIT[p[0]] && Number(p[1]) >= 1) o[p[0]] = Number(p[1]); }); return o; }
   var GA_ETATS = [["", "—"], ["a_faire", "À faire"], ["en_cours", "En cours"], ["realise", "Réalisé"], ["abandonne", "Abandonné"]];
   var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »", console: "Console" };
   var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {}, GA_EDIT = null;
@@ -1379,6 +1388,8 @@
     + '.gav-ok{display:inline-flex;gap:6px;align-items:center;font-weight:600;color:var(--vert);cursor:pointer;margin:0;font-size:15px}.gav-ok input{width:22px;height:22px;margin:0;accent-color:var(--ok)}'
     + '.gav-crayon{border:1px solid var(--trait);background:#fff;border-radius:8px;width:32px;height:30px;padding:0;cursor:pointer;font-size:15px}.gav-crayon:hover{border-color:var(--accent);background:#FFF4DF}'
     + '.gav-et-a_faire{background:#FFF4DF;color:#8a5a00;border-color:#f0d9a8}.gav-et-en_cours{background:#E6F0FB;color:#1d4f86;border-color:#bcd3ee}.gav-et-realise{background:#E7F3EC;color:var(--ok);border-color:#bfdccb;font-weight:600}.gav-et-abandonne{background:#F3EFEA;color:var(--doux);text-decoration:line-through}'
+    + '.gav-moy{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.gav-moy span{background:#FFF4DF;border:1px solid #f0d9a8;border-radius:999px;padding:4px 10px;font-size:14px}.gav-moy b{color:#8a5a00}.gav-moy i{color:var(--doux);font-style:normal;font-size:12px}'
+    + '.gav-crits{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.gav-crits span{font-size:13px;background:#FAF8F3;border:1px solid var(--trait);border-radius:7px;padding:2px 8px}.gav-crits b{color:#C77700}'
     + '.gav-v{background:#E7F3EC;color:var(--ok);border-color:#bfdccb;font-weight:600}'
     + '.gav-comp{margin:6px 0 8px;padding:8px 10px;background:#FAF8F3;border-left:3px solid var(--accent);border-radius:6px;white-space:pre-wrap;font-size:14px}.gav-comp b{display:block;font-size:12px;color:var(--doux);font-weight:600}'
     + '.gav-edit{margin-top:8px;padding:10px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px}.gav-edit textarea{font-size:15px}.gav-eb{display:flex;gap:8px;margin-top:10px}.gav-eb button{flex:1;margin-top:0}'
@@ -1406,7 +1417,13 @@
       + '<div><b>' + tous.filter(function (a) { return !gavFait(a) && a.priorite === "haute"; }).length + '</b>priorité haute</div>'
       + '<div><b>' + (notes.length ? moy.toFixed(1).replace(".", ",") + ' ★' : '—') + '</b>note moyenne (' + notes.length + ')</div>'
       + '<div><b>' + tous.filter(function (a) { return a.valide === "oui" && !gavFait(a); }).length + '</b>validés à faire</div>'
-      + '<div><b>' + recents + '</b>sur 30 jours</div></div>';
+      + '<div><b>' + recents + '</b>sur 30 jours</div></div>'
+      + (function () {
+        var som = {}, nb = {};
+        tous.forEach(function (a) { var n = gavNotes(a); Object.keys(n).forEach(function (k) { som[k] = (som[k] || 0) + n[k]; nb[k] = (nb[k] || 0) + 1; }); });
+        var k = Object.keys(GA_CRIT).filter(function (x) { return nb[x]; });
+        return k.length ? '<div class="gav-moy">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + (som[x] / nb[x]).toFixed(1).replace(".", ",") + ' ★</b> <i>(' + nb[x] + ')</i></span>'; }).join("") + '</div>' : '';
+      })();
     // Filtres
     Array.prototype.forEach.call($("gav-vue").querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.v === GA_FILTRE.vue); });
     var coms = {}; tous.forEach(function (a) { if (a.commune) coms[a.commune] = 1; });
@@ -1439,6 +1456,7 @@
         + (a.etat_traitement ? '<span class="gav-tag gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : (a.version ? '<span class="gav-tag">' + gEsc(a.version) + '</span>' : ''))
         + '<span class="d">' + gEsc(gavDate(a.date)) + '</span>'
         + (id ? '<button type="button" class="gav-crayon" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button>' : '') + '</div>'
+        + (function () { var n = gavNotes(a), k = Object.keys(n); return k.length ? '<div class="gav-crits">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + n[x] + '★</b></span>'; }).join("") + '</div>' : ''; })()
         + '<div class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</div>'
         + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
         + (contact ? '<div>Contact : ' + contact + '</div>' : '')
