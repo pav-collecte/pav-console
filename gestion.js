@@ -848,8 +848,14 @@
   function gAbonnement(points, c, ct) {
     c = c || {}; ct = ct || {}; points = Number(points) || 0;
     var brut = 0, source = "", mode = c.mode_facturation || gModeDefaut(), tr = gTranches();
-    if (gNum(ct.tarif_point)) { brut = points * gNum(ct.tarif_point); source = gEuros(ct.tarif_point) + "/point (contrat)"; }
-    else if (gReglage("calcul_abonnement") === "tranches" && tr.length) {
+    var calcul = c.calcul_abonnement || (gReglage("calcul_abonnement") === "tranches" ? "tranches" : "point");
+    if (calcul === "negocie" && gNum(c.prix_negocie)) {
+      var pn = gNum(c.prix_negocie), un = c.unite_negociee || "point_an";
+      brut = un === "point_an" ? points * pn : un === "point_mois" ? points * pn * 12 : un === "forfait_mois" ? pn * 12 : pn;
+      source = "prix négocié " + gEuros(pn) + " " + gLib(G_UNITES_TRANCHE, un); mode = /mois/.test(un) ? "mensuel" : "annuel";
+    }
+    else if (gNum(ct.tarif_point)) { brut = points * gNum(ct.tarif_point); source = gEuros(ct.tarif_point) + "/point (contrat)"; }
+    else if (calcul === "tranches" && tr.length) {
       var t = tr.filter(function (x) { return points >= gNum(x.de) && (!gNum(x.a) || points <= gNum(x.a)); })[0] || tr[tr.length - 1];
       var p = gNum(t.prix_ht), u = t.unite;
       brut = u === "point_an" ? points * p : u === "point_mois" ? points * p * 12 : u === "forfait_mois" ? p * 12 : p;
@@ -895,7 +901,8 @@
     var opts = {}; Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) { if (i.checked) { var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); opts[i.dataset.opt] = gNum(q && q.value) || 1; } });
     var lu = lireConditions(), off = {}; lu.options_offertes.split(";").forEach(function (k) { if (k) off[k] = 1; });
     Array.prototype.forEach.call(box.querySelectorAll("input[data-offert]"), function (i) { i.disabled = !lu.parrain || !box.querySelector('input[data-opt="' + i.dataset.offert + '"]').checked; });
-    var c = Object.assign({}, gClient(com), { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), parrain: lu.parrain });
+    $("gf-negocie").style.display = lu.calcul_abonnement === "negocie" ? "flex" : "none";
+    var c = Object.assign({}, gClient(com), lu);
     var p = gProposition(com, c, opts, off);
     $("gf-proposition").innerHTML = p.lignes.length
       ? p.lignes.map(function (x) { return '<div style="display:flex;gap:8px"><span style="flex:1">' + gEsc(x[0]) + '</span><b>' + (x[3] ? '<s style="color:var(--doux);font-weight:400">' + gEuros(x[3]) + '</s> 0 €' : gEuros(x[1]) + (x[2] === "an" ? "/an" : "")) + '</b></div>'; }).join("")
@@ -913,6 +920,10 @@
       + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
       + '<div>' + gChamp("gf-mode", "Facturation de l'abonnement", c.mode_facturation || "", null, [["", "Par défaut (" + (gModeDefaut() === "mensuel" ? "au mois" : "à l'année") + ")"], ["annuel", "À l'année"], ["mensuel", "Au mois"]]) + '</div>'
       + '<div>' + gChamp("gf-remise", "Remise %", c.remise_pct || "", "number") + '</div></div>'
+      + gChamp("gf-calcul", "Calcul de l'abonnement", c.calcul_abonnement || "", null, [["", "Par défaut (" + (gReglage("calcul_abonnement") === "tranches" ? "par tranches" : "prix unique par point") + ", onglet Tarifs)"], ["point", "Prix unique par point (catalogue)"], ["tranches", "Par tranches"], ["negocie", "Prix négocié pour cette commune"]])
+      + '<div id="gf-negocie" style="display:' + (c.calcul_abonnement === "negocie" ? "flex" : "none") + ';flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px"><input id="gf-prixneg" type="number" min="0" step="any" placeholder="Prix" value="' + gEsc(c.prix_negocie || "") + '" style="width:100px;margin:0"> € HT '
+      + '<select id="gf-uniteneg" style="flex:1;min-width:150px;margin:0">' + G_UNITES_TRANCHE.map(function (u) { return '<option value="' + u[0] + '"' + (u[0] === (c.unite_negociee || "point_an") ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") + '</select></div>'
+      + '<p class="petit" style="margin:4px 0 0">Par défaut, la fiche hérite des réglages de l\'onglet Tarifs ; chaque choix ici ne vaut que pour cette commune.</p>'
       + '<div class="petit" style="margin-top:8px"><b>Options pour le devis</b></div>'
       + (options.length ? options.map(function (t) {
           var q = opts[t.code] || (/point/.test(t.unite) ? pts : 1);
@@ -932,7 +943,9 @@
     var off = [];
     Array.prototype.forEach.call(box.querySelectorAll("input[data-offert]"), function (i) { if (i.checked && box.querySelector('input[data-opt="' + i.dataset.offert + '"]').checked) off.push(i.dataset.offert); });
     var parrain = gVal("gf-parrain");
-    return { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), options: o.join(";"), parrain: parrain, options_offertes: parrain ? off.join(";") : "" };
+    var calcul = gVal("gf-calcul");
+    return { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), options: o.join(";"), parrain: parrain, options_offertes: parrain ? off.join(";") : "",
+      calcul_abonnement: calcul, prix_negocie: calcul === "negocie" ? gVal("gf-prixneg").replace(",", ".") : "", unite_negociee: calcul === "negocie" ? gVal("gf-uniteneg") : "" };
   }
   $("g-fiche").addEventListener("input", function (e) { if (e.target.closest("#gf-conditions")) dessinerConditions(); });
   $("g-fiche").addEventListener("change", function (e) { if (e.target.closest("#gf-conditions")) dessinerConditions(); });
@@ -1157,6 +1170,9 @@
     var fixe = function (id, v) { var e = $(id); if (e && v !== undefined && v !== null) { e.value = String(v); e.dispatchEvent(new Event("change", { bubbles: true })); } };
     if (a.mode !== undefined) fixe("gf-mode", a.mode === "defaut" ? "" : a.mode);
     if (a.remise_pct !== undefined) fixe("gf-remise", a.remise_pct);
+    if (a.calcul !== undefined) fixe("gf-calcul", a.calcul === "defaut" ? "" : a.calcul);
+    if (a.prix_negocie !== undefined) { fixe("gf-calcul", "negocie"); fixe("gf-prixneg", a.prix_negocie); }
+    if (a.unite_negociee !== undefined) fixe("gf-uniteneg", a.unite_negociee);
     if (a.parrain !== undefined) {
       if (!a.parrain) fixe("gf-parrain", "");
       else { var s = slugCommune(a.parrain), p = gCommunes().filter(function (x) { return x[0] === a.parrain || slugCommune(x[1]) === s; })[0]; if (!p) throw new Error("parrain inconnu (doit être une commune suivie) : " + a.parrain); fixe("gf-parrain", p[0]); }
@@ -1212,7 +1228,7 @@
     },
     devis_preparer: function (a) {
       return ouvrirFiche(a.commune).then(function (id) {
-        if (a.mode !== undefined || a.remise_pct !== undefined || a.parrain !== undefined || Array.isArray(a.options)) appliquerConditions(a);
+        if (a.mode !== undefined || a.remise_pct !== undefined || a.parrain !== undefined || a.calcul !== undefined || a.prix_negocie !== undefined || Array.isArray(a.options)) appliquerConditions(a);
         var d = genererDevis();
         return "Devis brouillon préparé pour " + gNomCommune(id) + " (non enregistré) :\n" + d.lignes.map(function (l) { return "- " + l.designation + " : " + l.quantite + " × " + gEuros(l.prix_unitaire_ht); }).join("\n")
           + "\nTotal HT " + gEuros(d.ht) + ". L'administrateur vérifie puis clique « Enregistrer » (onglet Factures). Les conditions modifiées de la fiche ne sont pas enregistrées tant qu'il ne clique pas « Enregistrer la fiche ».";
