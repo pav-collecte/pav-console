@@ -115,7 +115,7 @@
       + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
       + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
       + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
-    dessinerInfos(c); dessinerConditions();
+    dessinerInfos(c); dessinerConditions(); dessinerDocsFiche();
     dessinerContacts(); dessinerEchanges();
     // Fiche sans infos publiques : recherche lancée d'elle-même (une fois par commune et par session).
     if (!c.infos_maj && !(G_AUTO && G_AUTO.infos_maj) && !G_AUTO_FAIT[com]) { G_AUTO_FAIT[com] = 1; rechercherInfos(true); }
@@ -1164,6 +1164,8 @@
     return "Fiche " + gNomCommune(id) + " (statut " + (c.statut || "prospect") + (G_AUTO ? ", infos publiques trouvées mais pas encore enregistrées" : "") + ")\n"
       + texte("g-potentiel", 300) + "\n" + texte("gf-infos", 700) + "\nChiffrage : " + texte("gf-proposition", 1200)
       + "\nContacts : " + ((G.Contacts || []).filter(function (k) { return k.commune === id; }).map(function (k) { return k.nom + (k.fonction ? " (" + k.fonction + ")" : ""); }).join(", ") || "aucun")
+      + "\nDevis : " + ((G.Devis || []).filter(function (d) { return d.commune === id; }).map(function (d) { return d.numero + " " + gLib(G_ST_DEVIS, d.statut) + " " + gEuros(d.total_ht) + " HT"; }).join(" ; ") || "aucun")
+      + "\nFactures : " + ((G.Factures || []).filter(function (f) { return f.commune === id; }).map(function (f) { return f.numero + " " + gLib(G_ST_FACT, f.statut) + " " + gEuros(f.total_ttc) + " TTC" + (f.echeance ? " échéance " + f.echeance : ""); }).join(" ; ") || "aucune")
       + "\nÀ faire : " + (ech.join(" ; ") || "rien") + ($("gf-deployer") ? "\nCommune pas encore déployée." : "\nCommune déployée.");
   }
   function appliquerConditions(a) {
@@ -1266,5 +1268,46 @@
     if (o === "factu") e.documents = texte("g-devis-liste", 1000) + "\n" + texte("g-factures-liste", 1000) + (G_DOC ? "\nDocument ouvert : " + texte("g-doc", 1500) : "");
     return { gestion: e };
   };
+
+
+  /* ——— Fiche : devis et factures de la commune, avec leur statut ——— */
+  var G_COUL_ST = { brouillon: "#9AA39B", envoye: "#2F6EA8", accepte: "#2E7D4F", refuse: "#B3261E", expire: "#5E6B63",
+    emise: "#E08A00", deposee_chorus: "#7B4FA3", payee: "#2E7D4F", annulee: "#5E6B63" };
+  (function () {
+    var carteFiche = $("g-fiche").closest(".carte"); if (!carteFiche) return;
+    carteFiche.insertAdjacentHTML("afterend", '<div class="carte"><h2>Devis et factures <button class="second" id="gfd-nouveau" type="button" style="float:right;padding:4px 10px;font-size:13px">Nouveau devis</button></h2><div id="g-fiche-docs" class="petit">—</div></div>');
+  })();
+  function badge(st, liste) { return '<span style="display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;background:' + (G_COUL_ST[st] || "#9AA39B") + '">' + gEsc(gLib(liste, st)) + '</span>'; }
+  function dessinerDocsFiche() {
+    var com = $("g-commune").value, box = $("g-fiche-docs"); if (!box) return;
+    if (!com) { box.textContent = "—"; return; }
+    var auj = new Date().toISOString().slice(0, 10), tri = function (a, b) { return (b.date || "").localeCompare(a.date || ""); };
+    var dv = (G.Devis || []).filter(function (d) { return d.commune === com; }).sort(tri);
+    var fa = (G.Factures || []).filter(function (f) { return f.commune === com; }).sort(tri);
+    var num = function (n) { return String(n || "").indexOf("BROUILLON") === 0 ? "brouillon" : n; };
+    var h = '<b>Devis (' + dv.length + ')</b>' + (dv.length ? '<table class="dns" style="margin-top:4px"><tr><th style="text-align:left">N°</th><th style="text-align:left">Date</th><th style="text-align:left">Objet</th><th style="text-align:left">Statut</th><th style="text-align:right">HT</th></tr>'
+      + dv.map(function (d) {
+          var info = d.statut === "accepte" && d.accepte_le ? " le " + gDateFR(d.accepte_le) : (d.statut === "envoye" && d.validite ? (d.validite < auj ? " — validité dépassée le " : " — valable jusqu'au ") + gDateFR(d.validite) : "");
+          return '<tr><td><a href="#" data-gdoc="devis" data-num="' + gEsc(d.numero) + '">' + gEsc(num(d.numero)) + '</a></td><td>' + gDateFR(d.date) + '</td><td>' + gEsc(d.objet || "") + '</td><td>' + badge(d.statut, G_ST_DEVIS) + '<span style="color:var(--doux)">' + gEsc(info) + '</span></td><td style="text-align:right">' + gEuros(d.total_ht) + '</td></tr>';
+        }).join("") + '</table>' : '<p>Aucun devis.</p>');
+    h += '<div style="height:10px"></div><b>Factures (' + fa.length + ')</b>' + (fa.length ? '<table class="dns" style="margin-top:4px"><tr><th style="text-align:left">N°</th><th style="text-align:left">Date</th><th style="text-align:left">Type</th><th style="text-align:left">Statut</th><th style="text-align:right">TTC</th></tr>'
+      + fa.map(function (f) {
+          var retard = (f.statut === "emise" || f.statut === "deposee_chorus") && f.echeance && f.echeance < auj;
+          var info = f.statut === "payee" && f.payee_le ? " le " + gDateFR(f.payee_le) : (f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus") ? (retard ? " — échue le " : " — échéance ") + gDateFR(f.echeance) : "");
+          return '<tr><td><a href="#" data-gdoc="facture" data-num="' + gEsc(f.numero) + '">' + gEsc(num(f.numero)) + '</a></td><td>' + gDateFR(f.date) + '</td><td>' + gEsc(gLib(G_TYPES_FACT, f.type)) + '</td><td>' + badge(f.statut, G_ST_FACT) + '<span style="color:' + (retard ? "var(--ko)" : "var(--doux)") + '">' + gEsc(info) + '</span></td><td style="text-align:right">' + gEuros(f.total_ttc) + '</td></tr>';
+        }).join("") + '</table>' : '<p>Aucune facture.</p>');
+    var paye = fa.filter(function (f) { return f.statut === "payee"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
+    var du = fa.filter(function (f) { return f.statut === "emise" || f.statut === "deposee_chorus"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
+    if (fa.length) h += '<p style="margin-top:6px">Encaissé : <b>' + gEuros(paye) + '</b> TTC · Reste à encaisser : <b' + (du ? ' style="color:var(--ko)"' : '') + '>' + gEuros(du) + '</b> TTC</p>';
+    box.innerHTML = h;
+  }
+  $("g-fiche-docs").addEventListener("click", function (e) {
+    var a = e.target.closest("[data-gdoc]"); if (!a) return; e.preventDefault();
+    var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click();
+    ouvrirDoc(a.dataset.gdoc, a.dataset.num);
+  });
+  $("gfd-nouveau").addEventListener("click", function () {
+    try { genererDevis(); } catch (er) { var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click(); ouvrirDoc("devis", ""); }
+  });
 
 })();
