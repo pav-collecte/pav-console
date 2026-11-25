@@ -1185,7 +1185,7 @@
       $("gk-potentiel").innerHTML = "";
       return (G_CHARGE ? Promise.resolve() : chargerGestion()).then(function () {
         ouvrirCarteProspects(GK_CENTRE);
-        return attendre(function () { return /Total/.test($("gk-potentiel").innerText) || /ko/.test($("msg-carte").className); }, 30000);
+        return new Promise(function (ok) { setTimeout(ok, 400); }).then(function () { return attendre(function () { var t = $("gk-potentiel").innerText; return (/Total/.test(t) && !/Calcul du potentiel/.test(t)) || /ko/.test($("msg-carte").className); }, 30000); });
       }).then(function () {
         if (/ko/.test($("msg-carte").className)) throw new Error($("msg-carte").textContent);
         return texte("msg-carte", 300) + "\n" + texte("gk-potentiel", 2500);
