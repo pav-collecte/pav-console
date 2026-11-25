@@ -1367,7 +1367,7 @@
   function gavNotes(a) { var o = {}; String(a.notes_detail || "").split(";").forEach(function (x) { var p = x.split(":"); if (GA_CRIT[p[0]] && Number(p[1]) >= 1) o[p[0]] = Number(p[1]); }); return o; }
   var GA_ETATS = [["", "—"], ["a_faire", "À faire"], ["en_cours", "En cours"], ["realise", "Réalisé"], ["abandonne", "Abandonné"]];
   var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »", console: "Console" };
-  var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {}, GA_EDIT = null;
+  var GA_FILTRE = { vue: "afaire", commune: "", page: "" }, GA_ENVOI = {}, GA_EDIT = null, GA_NUM = {};
   main.insertAdjacentHTML("beforeend",
     '<section id="avis"><div class="carte"><h2>Avis des utilisateurs <button class="second" id="gav-recharger" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>'
     + '<p class="petit">Envoyés depuis le bouton « Votre avis » de l\'appli de tournée, de la météo et de l\'encart des sites. Donnez une priorité, cochez « Validé » pour une idée retenue et « Traité » quand c\'est fait ; le crayon ✏️ permet de compléter l\'avis (précisions, note de suivi). Le texte d\'origine n\'est jamais modifié.</p>'
@@ -1392,6 +1392,7 @@
     + '.gav-et-a_faire{background:#FFF4DF;color:#8a5a00;border-color:#f0d9a8}.gav-et-en_cours{background:#E6F0FB;color:#1d4f86;border-color:#bcd3ee}.gav-et-realise{background:#E7F3EC;color:var(--ok);border-color:#bfdccb;font-weight:600}.gav-et-abandonne{background:#F3EFEA;color:var(--doux);text-decoration:line-through}'
     + '.gav-moy{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.gav-moy span{background:#FFF4DF;border:1px solid #f0d9a8;border-radius:999px;padding:4px 10px;font-size:14px}.gav-moy b{color:#8a5a00}.gav-moy i{color:var(--doux);font-style:normal;font-size:12px}'
     + '.gav-crits{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.gav-crits span{font-size:13px;background:#FAF8F3;border:1px solid var(--trait);border-radius:7px;padding:2px 8px}.gav-crits b{color:#C77700}'
+    + '.gav-num{font:700 13px system-ui;color:var(--doux);background:#F3EFEA;border-radius:6px;padding:2px 7px}'
     + '.gav-v{background:#E7F3EC;color:var(--ok);border-color:#bfdccb;font-weight:600}'
     + '.gav-comp{margin:6px 0 8px;padding:8px 10px;background:#FAF8F3;border-left:3px solid var(--accent);border-radius:6px;white-space:pre-wrap;font-size:14px}.gav-comp b{display:block;font-size:12px;color:var(--doux);font-weight:600}'
     + '.gav-edit{margin-top:8px;padding:10px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px}.gav-edit textarea{font-size:15px}.gav-eb{display:flex;gap:8px;margin-top:10px}.gav-eb button{flex:1;margin-top:0}'
@@ -1445,6 +1446,7 @@
       if (!gavFait(a) && gavPrioRang(a) !== gavPrioRang(b)) return gavPrioRang(a) - gavPrioRang(b);
       return gavTs(b.date) - gavTs(a.date);
     });
+    GA_NUM = {}; tous.slice().sort(function (a, b) { return gavTs(a.date) - gavTs(b.date); }).forEach(function (a, i) { if (a.id) GA_NUM[a.id] = i + 1; });
     if (!tous.length) { $("gav-liste").innerHTML = "Aucun avis reçu pour l'instant."; return; }
     if (!l.length) { $("gav-liste").innerHTML = GA_FILTRE.vue === "afaire" ? "Rien à traiter 🎉" : "Aucun avis pour ce filtre."; return; }
     $("gav-liste").innerHTML = l.map(function (a) {
@@ -1452,12 +1454,12 @@
       var p = a.priorite || "normale", id = a.id || "";
       var contact = a.contact ? (/@/.test(a.contact) ? '<a href="mailto:' + gEsc(a.contact) + '">' + gEsc(a.contact) + '</a>' : /^[+\d][\d .]{6,}$/.test(a.contact) ? '<a href="tel:' + gEsc(a.contact.replace(/\s/g, "")) + '">' + gEsc(a.contact) + '</a>' : gEsc(a.contact)) : "";
       return '<div class="gav-a p-' + gEsc(p) + (gavFait(a) ? ' fait' : '') + '" data-gav="' + gEsc(id) + '">'
-        + '<div class="gav-h">' + (n ? '<span class="et" title="Simplicité : ' + n + '/5">' + "★★★★★".slice(0, n) + '<span style="color:#d9d4c8">' + "★★★★★".slice(0, 5 - n) + '</span></span>' : '')
+        + '<div class="gav-h"><span class="gav-num">n° ' + (GA_NUM[id] || "?") + '</span>' + (n ? '<span class="et" title="Simplicité : ' + n + '/5">' + "★★★★★".slice(0, n) + '<span style="color:#d9d4c8">' + "★★★★★".slice(0, 5 - n) + '</span></span>' : '')
         + '<span class="gav-tag">' + gEsc(a.commune || "commune ?") + '</span><span class="gav-tag">' + gEsc(GA_PAGES[a.page] || a.page || "page ?") + '</span>'
         + (a.valide === "oui" ? '<span class="gav-tag gav-v">✓ Validé</span>' : '')
         + (a.etat_traitement ? '<span class="gav-tag gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : (a.version ? '<span class="gav-tag">' + gEsc(a.version) + '</span>' : ''))
         + '<span class="d">' + gEsc(gavDate(a.date)) + '</span>'
-        + (id ? '<button type="button" class="gav-crayon" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button>' : '') + '</div>'
+        + (id ? '<button type="button" class="gav-crayon" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button>' : '') + (id ? '<button type="button" class="gav-crayon" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button>' : '') + '</div>'
         + (function () { var n = gavNotes(a), k = Object.keys(n); return k.length ? '<div class="gav-crits">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + n[x] + (x === "global" ? '♥' : '★') + '</b></span>'; }).join("") + '</div>' : ''; })()
         + '<div class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</div>'
         + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
@@ -1500,6 +1502,14 @@
     var c0 = e.target.closest("[data-gav]");
     if (c0 && e.target.closest("[data-gav-edit]")) { GA_EDIT = GA_EDIT === c0.dataset.gav ? null : c0.dataset.gav; dessinerAvis(); var t = $("gav-e-comp"); if (t) t.focus(); return; }
     if (c0 && e.target.closest("[data-gav-annuler]")) { GA_EDIT = null; dessinerAvis(); return; }
+    if (c0 && e.target.closest("[data-gav-suppr]")) {
+      var idS = c0.dataset.gav;
+      if (!confirm("Supprimer définitivement l'avis n° " + (GA_NUM[idS] || "?") + " du classeur ?")) return;
+      api("gestion", { op: "supprimer", onglet: "Avis", cle: idS }).then(function () {
+        G.Avis = gavListe().filter(function (x) { return x.id !== idS; }); dessinerAvis(); msg("msg-avis", "Avis supprimé.", "ok");
+      }).catch(function (er) { msg("msg-avis", er.message, "ko"); });
+      return;
+    }
     if (c0 && e.target.closest("[data-gav-ok]")) {
       var v = { complement: $("gav-e-comp").value.trim(), suite: $("gav-e-suite").value.trim(), etat_traitement: $("gav-e-etat").value, version: $("gav-e-version").value.trim() };
       if (v.etat_traitement === "realise") v.traite = "oui";
@@ -1518,12 +1528,19 @@
 
   /* — Onglet Clients réorganisé : recherche en tête, une seule fiche en sous-onglets — */
   var GF_PANE = "fiche";
+  /* Logo : celui de l'appli de la commune (déployée), sinon l'icône du site de la mairie, sinon l'initiale. */
+  function gfLogo(com) {
+    var site = gSite(com), cl = gClient(com), nom = gNomCommune(com), init = gEsc(String(nom || "?").charAt(0).toUpperCase());
+    var src = site ? site + "/logo.png" : (cl.site_mairie ? "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(String(cl.site_mairie).replace(/^https?:\/\//, "").split("/")[0]) : "");
+    var rond = '<span class="gf-logo gf-init"' + (src ? ' style="display:none"' : '') + '>' + init + '</span>';
+    return (src ? '<img class="gf-logo" src="' + gEsc(src) + '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-grid\'">' : '') + rond;
+  }
   var GF_PANES = [["fiche", "Fiche"], ["offre", "Offre"], ["docs", "Devis & factures"], ["contacts", "Contacts"], ["echanges", "Échanges"], ["infos", "Infos & appli"]];
   function gfAppliquerPane() {
     Array.prototype.forEach.call(document.querySelectorAll("#clients .gf-pane"), function (p) { p.classList.toggle("on", p.dataset.p === GF_PANE); });
     Array.prototype.forEach.call(document.querySelectorAll("#gf-onglets button"), function (b) { b.classList.toggle("on", b.dataset.p === GF_PANE); });
     var ok = $("g-fiche-ok"); if (ok) ok.hidden = !(GF_PANE === "fiche" || GF_PANE === "offre");
-    var t = $("gf-titre"); if (t && G) { var com = $("g-commune").value, cl = gClient(com); t.innerHTML = com ? gEsc(gNomCommune(com)) + ' <span class="gf-statut">' + gEsc(gLib(G_STATUTS, cl.statut || "prospect")) + '</span>' : "Choisissez une commune"; }
+    var t = $("gf-titre"); if (t && G) { var com = $("g-commune").value, cl = gClient(com); t.innerHTML = com ? gfLogo(com) + gEsc(gNomCommune(com)) + ' <span class="gf-statut">' + gEsc(gLib(G_STATUTS, cl.statut || "prospect")) + '</span>' : "Choisissez une commune"; }
   }
   (function reorganiserClients() {
     var sec = $("clients"); if (!sec || !$("g-fiche-docs")) return;
@@ -1571,7 +1588,9 @@
       + ".gf-onglets button{flex:none;border:1px solid var(--trait);background:#fff;border-radius:9px 9px 0 0;padding:9px 12px;font:600 15px system-ui;color:var(--vert);cursor:pointer}"
       + ".gf-onglets button.on{background:var(--vert);color:#fff;border-color:var(--vert)}"
       + ".gf-statut{font-size:13px;font-weight:600;background:#EEF5F0;color:var(--vert);border:1px solid var(--trait);border-radius:999px;padding:3px 10px;vertical-align:middle}"
-      + "#g-pipeline tr[hidden]{display:none}";
+      + "#g-pipeline tr[hidden]{display:none}"
+      + "#gf-titre{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.gf-logo{width:52px;height:52px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--trait);padding:3px;flex:none}"
+      + ".gf-init{display:inline-grid;place-items:center;font:800 24px system-ui;color:#fff;background:var(--vert);border-color:var(--vert)}";
     document.head.appendChild(st);
     gfAppliquerPane();
   })();
