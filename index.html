@@ -2150,6 +2150,7 @@
       }
       if (o === "agents") e.agents = $("liste-agents").innerText.replace(/[A-Z]{2,5}-[A-Z0-9]{6}/g, "[code]").slice(0, 3000);
     }
+    if (window.PAV && PAV.etatGestion) { try { Object.assign(e, PAV.etatGestion(o)); } catch (x) {} }
     return e;
   }
   function communeDe(q0) {
@@ -2370,7 +2371,7 @@
     var res = [];
     return appels.reduce(function (p, a) {
       return p.then(function () {
-        var f = OUTILS[a.name];
+        var f = OUTILS[a.name] || (window.PAV && PAV.outils && PAV.outils[a.name]);
         return Promise.resolve().then(function () { if (!f) throw new Error("outil inconnu : " + a.name); return f(a.input || {}); }).catch(function (er) { return reessaiBrouillon(er, a, f); })
           .then(function (r) { bulle("✓ " + r, "action"); res.push({ type: "tool_result", tool_use_id: a.id, content: String(r) }); },
             function (er) { bulle("✗ " + er.message, "erreur"); res.push({ type: "tool_result", tool_use_id: a.id, content: er.message, is_error: true }); });
@@ -2581,7 +2582,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=15" defer></script>
+<script src="gestion.js?v=16" defer></script>
 <script>
 /* Smartphone : quand le clavier s'ouvre, l'assistant se cale sur la partie visible de l'écran (la saisie reste visible). */
 (function () {
