@@ -495,14 +495,16 @@
     + '<div><label for="gk-centre"><b>Centre</b></label><input id="gk-centre" placeholder="Albon"></div>'
     + '<div><label for="gk-rayon"><b>Rayon</b></label><select id="gk-rayon">' + [5, 10, 15, 20, 30, 40, 50, 75].map(function (k) { return '<option value="' + k + '">' + k + ' km</option>'; }).join("") + '</select></div></div>'
     + '<div style="display:flex;gap:8px;margin-top:10px"><button class="second" type="button" id="gk-moi">Ma position</button><button class="principal" type="button" id="gk-ok" style="margin-top:0;flex:1">Afficher</button></div>'
-    + '<div id="gk-carte" style="height:62vh;min-height:360px;margin-top:12px;border-radius:10px;border:1px solid var(--trait)"></div>'
+    + '<div style="position:relative"><div id="gk-carte" style="height:min(38vh,380px);min-height:230px;margin-top:12px;border-radius:10px;border:1px solid var(--trait)"></div>'
+    + '<button type="button" id="gk-bouger" class="second" hidden style="position:absolute;right:8px;bottom:8px;z-index:500;padding:5px 10px;font-size:12px">Déplacer la carte</button></div>'
     + '<div id="gk-legende" class="petit" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px"></div>'
     + '<div id="gk-potentiel" class="petit" style="margin-top:12px"></div>'
     + '<div class="msg" id="msg-carte"></div>'
     + '<p class="petit" style="margin-top:8px">Un clic sur une commune affiche ses habitants et son potentiel ; « Ouvrir la fiche » la crée comme prospect si elle n\'est pas encore suivie (elle n\'est enregistrée qu\'avec « Enregistrer la fiche »).</p>'
     + '</div></section>'
     + '<section id="agenda"><div class="carte">'
-    + '<h2>Agenda des actions</h2>'
+    + '<h2>Agenda des actions <button class="second" id="ga-ics" type="button" style="float:right;padding:4px 10px;font-size:13px">Exporter vers Google Agenda (.ics)</button></h2>'
+    + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
     + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
     + '<div id="ga-grille" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px"></div>'
     + '<div id="ga-retard" style="margin-top:12px"></div>'
@@ -573,7 +575,10 @@
     Promise.all([chargerLeaflet(), pCentre]).then(function (r) { centre = r[1]; return communesAutour(centre, rayon); }).then(function () {
       GK_CENTRE = centre;
       if (!GK.carte) {
-        GK.carte = L.map("gk-carte");
+        // Sur écran tactile, la carte ne capture pas le défilement de la page : déplacement activé à la demande.
+        var tactile = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+        GK.carte = L.map("gk-carte", { scrollWheelZoom: false, dragging: !tactile, tap: !tactile });
+        if (tactile) { $("gk-bouger").hidden = false; }
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(GK.carte);
       }
       if (GK.couche) GK.couche.remove();
@@ -661,6 +666,12 @@
     if (!s.client && !s.connue) msg("msg-fiche", "Nouveau prospect préparé : « Rechercher automatiquement » puis « Enregistrer la fiche » pour le suivre.", "info");
     $("g-commune").scrollIntoView({ behavior: "smooth", block: "center" });
   });
+  $("gk-bouger").addEventListener("click", function () {
+    if (!GK.carte) return;
+    var actif = GK.carte.dragging.enabled();
+    if (actif) GK.carte.dragging.disable(); else GK.carte.dragging.enable();
+    this.textContent = actif ? "Déplacer la carte" : "Fixer la carte";
+  });
   $("gk-ok").addEventListener("click", function () { GK_CENTRE = null; ouvrirCarteProspects(); });
   $("gk-rayon").addEventListener("change", function () { ouvrirCarteProspects(); });
   $("gk-moi").addEventListener("click", function () {
@@ -693,8 +704,35 @@
   function ligneEv(x) {
     return '<div data-ga-com="' + gEsc(x.commune) + '"' + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + ' style="padding:6px 0;border-bottom:1px solid var(--trait);cursor:pointer' + (x.retard ? ';color:var(--ko)' : '') + '">'
       + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + x.couleur + ';margin-right:6px"></span>'
-      + '<b>' + gDateFR(x.date) + '</b> · ' + gEsc(x.nomCommune) + ' — ' + gEsc(x.titre) + '</div>';
+      + '<b>' + gDateFR(x.date) + '</b> · ' + gEsc(x.nomCommune) + ' — ' + gEsc(x.titre)
+      + (x.passe ? '' : ' <a href="' + gEsc(lienGoogle(x)) + '" target="_blank" rel="noopener" data-gcal="1" style="white-space:nowrap;font-size:12px">+ Google Agenda</a>') + '</div>';
   }
+  /* Google Agenda : lien « ajouter » par événement (journée entière), et export .ics de toutes les échéances à venir. */
+  function gJourSuivant(d) { var x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); }
+  function titreEv(x) { return "PAV " + x.nomCommune + " — " + x.titre; }
+  function detailEv(x) { return "Commune : " + x.nomCommune + "\nConsole : " + location.origin + "/"; }
+  function lienGoogle(x) {
+    return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(titreEv(x))
+      + "&dates=" + x.date.replace(/-/g, "") + "/" + gJourSuivant(x.date).replace(/-/g, "") + "&details=" + encodeURIComponent(detailEv(x));
+  }
+  function exporterIcs() {
+    var auj = new Date(); auj.setDate(auj.getDate() - 30); var depuis = auj.toISOString().slice(0, 10);
+    var ev = evenements().filter(function (x) { return !x.passe && x.date >= depuis; });
+    if (!ev.length) { alerteAgenda("Aucune échéance à exporter."); return; }
+    var esc = function (t) { return String(t).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1"); };
+    var stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+    var l = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PAV collecte//Console//FR", "CALSCALE:GREGORIAN", "X-WR-CALNAME:PAV — actions"];
+    ev.forEach(function (x) {
+      l.push("BEGIN:VEVENT", "UID:" + (x.type + "-" + (x.id || (x.doc ? x.doc[1] : x.commune)) + "-" + x.date).replace(/[^A-Za-z0-9-]/g, "") + "@pav-console",
+        "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:" + x.date.replace(/-/g, ""), "DTEND;VALUE=DATE:" + gJourSuivant(x.date).replace(/-/g, ""),
+        "SUMMARY:" + esc(titreEv(x)), "DESCRIPTION:" + esc(detailEv(x)), "END:VEVENT");
+    });
+    l.push("END:VCALENDAR");
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([l.join("\r\n")], { type: "text/calendar" })); a.download = "pav-actions.ics";
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    alerteAgenda(ev.length + " échéance(s) exportée(s) dans pav-actions.ics : dans Google Agenda, Paramètres › Importer et exporter › Importer.");
+  }
+  function alerteAgenda(t) { var m = $("ga-info"); if (m) { m.textContent = t; m.hidden = false; } }
   function dessinerAgenda() {
     if (!$("ga-grille")) return;
     var ev = evenements(), auj = new Date().toISOString().slice(0, 10);
@@ -726,6 +764,7 @@
     $("ga-liste").innerHTML = '<b>' + gDateFR(d) + '</b>' + l.map(ligneEv).join("") + '<p><a href="#" id="ga-tout">Tout le mois</a></p>';
   });
   function ouvrirDepuisAgenda(e) {
+    if (e.target.closest("[data-gcal]")) return;   // lien Google Agenda : on le laisse s'ouvrir
     if (e.target.id === "ga-tout") { e.preventDefault(); dessinerAgenda(); return; }
     var l = e.target.closest("[data-ga-com]"); if (!l) return;
     if (l.dataset.gaDoc) {
@@ -904,4 +943,5 @@
       + '<iframe src="' + gEsc(s) + '/meteo/widget.html" title="Météo de la propreté des points de collecte" loading="lazy" style="width:100%;height:420px;border:1px solid var(--trait);border-radius:10px;margin-top:10px;background:#fff"></iframe></div>';
   }
 
+  $("ga-ics").addEventListener("click", exporterIcs);
 })();
