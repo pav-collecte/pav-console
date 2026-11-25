@@ -549,9 +549,20 @@
     }).catch(function (e) { GK_LISTE = null; throw new Error("Liste des communes indisponible (" + e.message + ") : vérifiez la connexion puis réessayez."); });
     return GK_LISTE;
   }
+  // Homonymes (Saint-Vallier 26 / 71…) : « Nom (26) » choisit le département ; sinon la plus proche des communes suivies.
+  function choisirCommune(l, nom) {
+    var m = String(nom || "").match(/^(.*?)\s*\((\w{2,3})\)\s*$/), dep = m ? m[2] : "", s = slugCommune(m ? m[1] : nom);
+    var cand = l.filter(function (c) { return (slugCommune(c.nom) === s || c.code === nom) && (!dep || c.codeDepartement === dep); });
+    if (cand.length < 2) return cand[0];
+    var refs = (G && G.Clients || []).map(function (k) { return l.filter(function (x) { return x.code === k.code_insee; })[0]; }).filter(Boolean);
+    if (!refs.length) refs = l.filter(function (x) { return slugCommune(x.nom) === slugCommune(gReglage("carte_centre") || "Albon"); }).slice(0, 1);
+    if (!refs.length) return cand.sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
+    var lat = refs.reduce(function (t, x) { return t + x.centre.coordinates[1]; }, 0) / refs.length, lon = refs.reduce(function (t, x) { return t + x.centre.coordinates[0]; }, 0) / refs.length;
+    return cand.sort(function (a, b) { return distKm([lat, lon], [a.centre.coordinates[1], a.centre.coordinates[0]]) - distKm([lat, lon], [b.centre.coordinates[1], b.centre.coordinates[0]]); })[0];
+  }
   function centreDepuisNom(nom) {
     return listeCommunes().then(function (l) {
-      var c0 = l.filter(function (c) { return slugCommune(c.nom) === slugCommune(nom); }).sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
+      var c0 = choisirCommune(l, nom);
       if (!c0) throw new Error("Commune de centre introuvable : « " + nom + " ».");
       return [c0.centre.coordinates[1], c0.centre.coordinates[0]];
     });
@@ -1116,7 +1127,7 @@
     var c = gCommunes().filter(function (x) { return x[0] === q || slugCommune(x[1]) === s || x[0] === s; })[0];
     if (c) return Promise.resolve(c[0]);
     return listeCommunes().then(function (l) {
-      var k = l.filter(function (x) { return slugCommune(x.nom) === s || x.code === q; }).sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
+      var k = choisirCommune(l, q);
       if (!k) throw new Error("commune introuvable : " + q);
       var st = suivie(k);
       if (!st.client && !st.connue) G.Clients.push({ commune: st.id, statut: "prospect", nom_officiel: "Mairie de " + k.nom, ville: k.nom, code_insee: k.code, population: String(k.population || ""), code_postal: (k.codesPostaux || [])[0] || "" });
