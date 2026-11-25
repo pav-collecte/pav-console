@@ -1038,6 +1038,16 @@
       .catch(function (e) { msg("msg-tarifs-base", e.message, "ko"); });
   });
   // Tranches : une ligne éditable par tranche (de, à, prix, unité), enregistrée dans l'onglet Tarifs (catégorie « tranche »).
+  /* Avis AV-MWWDZ8WG-11 : chiffre d'affaires équivalent de la tranche, à l'année et au mois. */
+  function caTranche(t) {
+    var de = gNum(t.de), a = gNum(t.a), p = gNum(t.prix_ht), u = t.unite || "point_an";
+    if (!de || !p) return "";
+    var parAn = /mois$/.test(u) ? 12 : 1, forfait = /^forfait/.test(u);
+    var bas = (forfait ? p : p * de) * parAn, haut = a ? (forfait ? p : p * a) * parAn : 0;
+    var an = forfait || (a && a === de) ? gEuros(bas) : a ? gEuros(bas) + " à " + gEuros(haut) : "dès " + gEuros(bas);
+    var mois = forfait || (a && a === de) ? gEuros(bas / 12) : a ? gEuros(bas / 12) + " à " + gEuros(haut / 12) : "dès " + gEuros(bas / 12);
+    return '<div class="petit" style="margin-top:8px;padding:6px 10px;background:#EEF5F0;border-radius:7px">Chiffre d\'affaires de la tranche : <b>' + an + ' HT / an</b> · soit <b>' + mois + ' HT / mois</b>' + (forfait ? '' : ' <span style="color:var(--doux)">(' + de + (a ? ' à ' + a + ' points' : ' points et plus') + ')</span>') + '</div>';
+  }
   function ligneTranche(t) {
     t = t || {};
     var champ = "width:72px;padding:8px;margin:0";
@@ -1046,6 +1056,7 @@
       + ' à <input type="number" min="1" placeholder="et +" value="' + gEsc(t.a || "") + '" data-k="a" aria-label="À (points, vide = et plus)" style="' + champ + '"> point(s)</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px"><input type="number" min="0" step="any" placeholder="Prix" value="' + gEsc(t.prix_ht || "") + '" data-k="prix" aria-label="Prix HT" style="width:100px;padding:8px;margin:0"> € HT'
       + '<select data-k="unite" aria-label="Unité" style="flex:1;min-width:150px;margin:0">' + G_UNITES_TRANCHE.map(function (u) { return '<option value="' + u[0] + '"' + (u[0] === (t.unite || "point_an") ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") + '</select></div>'
+      + caTranche(t)
       + '<div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="principal" data-gtr-ok="1" style="flex:2;margin-top:0;padding:8px">Enregistrer la tranche</button>'
       + '<button type="button" class="second" data-gtr-suppr="1" style="flex:1;color:var(--ko)">Supprimer</button></div></div>';
   }
