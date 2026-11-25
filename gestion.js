@@ -61,7 +61,11 @@
   }
   function gEnvoyer(donnees, idMsg, ok) {
     msg(idMsg, "Enregistrement…");
-    return api("gestion", donnees).then(function (j) { msg(idMsg, ok, "ok"); return chargerGestion(true).then(function () { return j; }); })
+    return api("gestion", donnees).then(function (j) {
+      msg(idMsg, ok, "ok");
+      if (/^(Echanges)$/.test(donnees.onglet || "") || /document/.test(donnees.op || "")) syncAgendaPlusTard();
+      return chargerGestion(true).then(function () { return j; });
+    })
       .catch(function (e) { msg(idMsg, e.message, "ko"); throw e; });
   }
 
@@ -88,7 +92,7 @@
     var pt = gPotentiel(com), el = $("g-potentiel");
     if (!el) { el = document.createElement("div"); el.id = "g-potentiel"; $("g-contrat").insertAdjacentElement("afterend", el); }
     el.innerHTML = '<div style="margin-top:8px;padding:8px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px;font-size:15px">Potentiel : <b>' + (pt.points || "?") + ' point(s)</b>' + (pt.estime ? ' <span class="petit">(estimé : ' + gEsc(pt.base) + ')</span>' : ' <span class="petit">(' + gEsc(pt.base) + ')</span>')
-      + (pt.tarif && pt.points ? ' · <b>' + gEuros(pt.points * pt.tarif) + ' HT/an</b> <span class="petit">à ' + gEuros(pt.tarif) + '/point</span>' : ' · <span class="petit">montant : renseignez le prix de l\'abonnement dans l\'onglet Tarifs</span>') + '</div>';
+      + (pt.montant && pt.points ? ' · <b>' + gEuros(pt.montant) + ' HT/an</b> <span class="petit">(' + gEsc(pt.source) + ')</span>' : ' · <span class="petit">montant : renseignez le prix de l\'abonnement dans l\'onglet Tarifs</span>') + '</div>';
   }
   var G_AUTO_FAIT = {};
   function dessinerFiche() {
@@ -479,11 +483,11 @@
     var c = Object.assign({}, gClient(com), (G_AUTO && $("g-commune").value === com) ? G_AUTO : {}), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     var connus = (Number(c.nb_points) || 0) + (Number(c.nb_points_a_verifier) || 0);
     var hpp = Number(String(gReglage("habitants_par_point")).replace(",", ".")) || 300;
-    var tp = gTarifPoint(c, ct), tarif = tp.an * (1 - Math.min(100, gNum(c.remise_pct)) / 100);
-    if (connus) return { points: connus, estime: false, base: "points du Referentiel", tarif: tarif };
+    var fin = function (r) { var ab = gAbonnement(r.points, c, ct); r.montant = ab.an; r.source = ab.source; r.tarif = r.points ? ab.an / r.points : 0; return r; };
+    if (connus) return fin({ points: connus, estime: false, base: "points du Referentiel" });
     var pop = Number(c.population) || 0;
-    if (pop) return { points: Math.max(1, Math.ceil(pop / hpp)), estime: true, base: pop.toLocaleString("fr-FR") + " hab. ÷ " + hpp, tarif: tarif };
-    return { points: 0, estime: true, base: "population inconnue : « Rechercher automatiquement »", tarif: tarif };
+    if (pop) return fin({ points: Math.max(1, Math.ceil(pop / hpp)), estime: true, base: pop.toLocaleString("fr-FR") + " hab. ÷ " + hpp });
+    return fin({ points: 0, estime: true, base: "population inconnue : « Rechercher automatiquement »" });
   }
 
   /* ——— Sections Carte et Agenda ——— */
@@ -494,7 +498,10 @@
     + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
     + '<div><label for="gk-centre"><b>Centre</b></label><input id="gk-centre" placeholder="Albon"></div>'
     + '<div><label for="gk-rayon"><b>Rayon</b></label><select id="gk-rayon">' + [5, 10, 15, 20, 30, 40, 50, 75].map(function (k) { return '<option value="' + k + '">' + k + ' km</option>'; }).join("") + '</select></div></div>'
-    + '<div style="display:flex;gap:8px;margin-top:10px"><button class="second" type="button" id="gk-moi">Ma position</button><button class="principal" type="button" id="gk-ok" style="margin-top:0;flex:1">Afficher</button></div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="second" type="button" id="gk-moi">Ma position</button><button class="second" type="button" id="gk-viser">Choisir le centre sur la carte</button><button class="principal" type="button" id="gk-ok" style="margin-top:0;flex:1">Afficher</button></div>'
+    + '<details id="gk-filtres" style="margin-top:10px"><summary class="petit" style="cursor:pointer"><b>Filtres</b></summary>'
+    + '<div class="petit" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">Points de collecte : de <input id="gk-min" type="number" min="0" placeholder="0" style="width:70px"> à <input id="gk-max" type="number" min="0" placeholder="∞" style="width:70px"></div>'
+    + '<div class="petit" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">' + [["libre", "Pas en relation"], ["cours", "En cours"], ["client", "Clients"], ["perdu", "Perdus / suspendus"]].map(function (g) { return '<label style="margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" data-gkg="' + g[0] + '" checked style="width:auto">' + g[1] + '</label>'; }).join("") + '</div></details>'
     + '<div style="position:relative"><div id="gk-carte" style="height:min(38vh,380px);min-height:230px;margin-top:12px;border-radius:10px;border:1px solid var(--trait)"></div>'
     + '<button type="button" id="gk-bouger" class="second" hidden style="position:absolute;right:8px;bottom:8px;z-index:500;padding:5px 10px;font-size:12px">Déplacer la carte</button></div>'
     + '<div id="gk-legende" class="petit" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:10px"></div>'
@@ -503,7 +510,9 @@
     + '<p class="petit" style="margin-top:8px">Un clic sur une commune affiche ses habitants et son potentiel ; « Ouvrir la fiche » la crée comme prospect si elle n\'est pas encore suivie (elle n\'est enregistrée qu\'avec « Enregistrer la fiche »).</p>'
     + '</div></section>'
     + '<section id="agenda"><div class="carte">'
-    + '<h2>Agenda des actions <button class="second" id="ga-ics" type="button" style="float:right;padding:4px 10px;font-size:13px">Exporter vers Google Agenda (.ics)</button></h2>'
+    + '<h2>Agenda des actions</h2>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="principal" id="ga-sync" type="button" style="margin-top:0;flex:2">Synchroniser avec Google Agenda</button><button class="second" id="ga-ics" type="button" style="flex:1">Exporter (.ics)</button></div>'
+    + '<p class="petit" style="margin-top:0">Les échéances vont dans l\'agenda Google « PAV — actions » (créé au premier envoi) ; elles se mettent aussi à jour toutes seules après chaque enregistrement d\'échange, de devis ou de facture. Une action faite disparaît de l\'agenda.</p>'
     + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
     + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
     + '<div id="ga-grille" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px"></div>'
@@ -580,72 +589,82 @@
         GK.carte = L.map("gk-carte", { scrollWheelZoom: false, dragging: !tactile, tap: !tactile });
         if (tactile) { $("gk-bouger").hidden = false; }
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(GK.carte);
+        // « Choisir le centre » : le prochain clic sur la carte devient le centre du cercle.
+        GK.carte.on("click", function (e) {
+          if (!GK.viser) return;
+          GK.viser = false; $("gk-viser").textContent = "Choisir le centre sur la carte"; $("gk-carte").style.cursor = "";
+          GK_CENTRE = [e.latlng.lat, e.latlng.lng]; $("gk-centre").value = "Point choisi sur la carte"; ouvrirCarteProspects(GK_CENTRE);
+        });
       }
       if (GK.couche) GK.couche.remove();
       GK.couche = L.layerGroup().addTo(GK.carte);
-      L.circle(centre, { radius: rayon * 1000, color: "#1F3A2E", weight: 1, fill: false, dashArray: "4 4" }).addTo(GK.couche);
-      var proches = GK.communes.map(function (c) { return { c: c, d: distKm(centre, [c.centre.coordinates[1], c.centre.coordinates[0]]) }; })
-        .filter(function (x) { return x.d <= rayon; });
+      L.circle(centre, { radius: rayon * 1000, color: "#1F3A2E", weight: 1, fill: false, dashArray: "4 4", interactive: false }).addTo(GK.couche);
+      L.circleMarker(centre, { radius: 4, color: "#1F3A2E", fillColor: "#1F3A2E", fillOpacity: 1, interactive: false }).addTo(GK.couche);
+      var f = filtresCarte(), hpp = Number(gReglage("habitants_par_point")) || 300;
+      var tous = GK.communes.map(function (c) { return { c: c, d: distKm(centre, [c.centre.coordinates[1], c.centre.coordinates[0]]) }; })
+        .filter(function (x) { return x.d <= rayon; }).map(function (x) { return infosCommune(x, hpp); });
+      var proches = tous.filter(function (x) { return x.pts >= f.min && x.pts <= f.max && f.groupes[groupeStatut(x.s.statut)]; });
       proches.forEach(function (x) {
-        var c = x.c, s = suivie(c), pos = [c.centre.coordinates[1], c.centre.coordinates[0]];
+        var c = x.c, s = x.s, pos = [c.centre.coordinates[1], c.centre.coordinates[0]];
         var r = Math.max(5, Math.min(16, 3 + Math.sqrt(c.population || 0) / 9));
         var m = L.circleMarker(pos, { radius: r, color: s.statut === "aucun" ? "#7d857e" : "#fff", weight: s.statut === "aucun" ? 1 : 2, fillColor: G_COULEURS[s.statut] || G_COULEURS.aucun, fillOpacity: s.statut === "aucun" ? 0.45 : 0.95 }).addTo(GK.couche);
-        m.on("mouseover", function () { this.openPopup(); });
-        var hpp = Number(gReglage("habitants_par_point")) || 300, tarif = gTarifPoint(s.client, null).an * (1 - Math.min(100, gNum(s.client && s.client.remise_pct)) / 100);
-        var pts = s.client && (Number(s.client.nb_points) || 0) ? Number(s.client.nb_points) : Math.max(1, Math.ceil((c.population || 0) / hpp));
+        m.on("mouseover", function () { if (!GK.viser) this.openPopup(); });
         m.bindPopup('<b>' + gEsc(c.nom) + '</b> (' + gEsc(c.codeDepartement) + ')<br>' + (c.population || 0).toLocaleString("fr-FR") + ' habitants · ' + x.d.toFixed(1) + ' km'
           + '<br>Statut : <b>' + gEsc(s.statut === "aucun" ? "pas en relation" : gLib(G_STATUTS, s.statut)) + '</b>'
-          + '<br>Potentiel : ' + pts + ' point(s)' + (tarif ? ' ≈ ' + gEuros(pts * tarif) + ' HT/an' : '')
+          + '<br>Potentiel : ' + x.pts + ' point(s)' + (x.estime ? ' (estimé)' : '') + (x.eur ? ' ≈ ' + gEuros(x.eur) + ' HT/an' : '')
           + '<br><button type="button" class="second" data-gk-ouvrir="' + gEsc(c.code) + '" style="margin-top:6px;padding:4px 10px;font-size:13px">Ouvrir la fiche</button>');
       });
-      GK.carte.setView(centre, rayon <= 10 ? 12 : rayon <= 20 ? 11 : rayon <= 40 ? 10 : 9);
+      if (!centreForce || !GK.dejaVu) GK.carte.setView(centre, rayon <= 10 ? 12 : rayon <= 20 ? 11 : rayon <= 40 ? 10 : 9);
+      GK.dejaVu = true;
       setTimeout(function () { GK.carte.invalidateSize(); }, 50);
-      msg("msg-carte", proches.length + " communes dans un rayon de " + rayon + " km, dont " + proches.filter(function (x) { return suivie(x.c).statut !== "aucun"; }).length + " suivies.", "info");
-      potentielCercle(proches, rayon);
+      msg("msg-carte", proches.length + " commune(s) affichée(s) sur " + tous.length + " dans un rayon de " + rayon + " km" + (proches.length < tous.length ? " (filtres actifs)" : "") + ", dont " + proches.filter(function (x) { return x.s.statut !== "aucun"; }).length + " suivie(s).", "info");
+      potentielCercle(proches, rayon, proches.length < tous.length);
     }).catch(function (e) { msg("msg-carte", e.message, "ko"); });
   }
+  function groupeStatut(st) { return st === "client" ? "client" : /^(prospect|demo|devis)$/.test(st) ? "cours" : st === "aucun" ? "libre" : "perdu"; }
+  function filtresCarte() {
+    var mi = gNum($("gk-min").value), ma = gNum($("gk-max").value), g = {};
+    Array.prototype.forEach.call(document.querySelectorAll("#gk-filtres input[data-gkg]"), function (i) { g[i.dataset.gkg] = i.checked; });
+    return { min: mi || 0, max: ma || Infinity, groupes: g };
+  }
+  // Points (connus ou estimés) et abonnement HT/an d'une commune de la carte.
+  function infosCommune(x, hpp) {
+    var c = x.c, s = suivie(c), cl = s.client || (s.connue ? { commune: s.id } : null);
+    var ct = cl ? (G.communes || []).filter(function (k) { return k.commune === s.id; })[0] || {} : null;
+    var known = cl ? (Number(cl.nb_points) || 0) + (Number(cl.nb_points_a_verifier) || 0) : 0;
+    var pts = known || Math.max(1, Math.ceil(((cl && Number(cl.population)) || c.population || 0) / hpp));
+    return { c: c, s: s, d: x.d, pts: pts, estime: !known, eur: gAbonnement(pts, cl, ct).an };
+  }
   // « Ouvrir la fiche » : commune suivie → sa fiche ; sinon prospect préparé (non enregistré).
-  /* ——— Potentiel du cercle : abonnement HT/an, calculé en tâche de fond (par paquets, sans bloquer la carte) ——— */
+  /* ——— Potentiel du cercle : abonnement HT/an (calculé après l'affichage de la carte, sans la bloquer) ——— */
   var GK_CALCUL = 0;
-  function potentielCercle(proches, rayon) {
+  function potentielCercle(proches, rayon, filtre) {
     var num = ++GK_CALCUL, box = $("gk-potentiel");
     box.innerHTML = '<i>Calcul du potentiel du cercle…</i>';
-    var hpp = Number(gReglage("habitants_par_point")) || 300, tDef = gTarifPoint(null, null).an;
-    var G4 = { client: [0, 0, 0], cours: [0, 0, 0], libre: [0, 0, 0], perdu: [0, 0, 0] }, top = [], i = 0;
-    var groupe = function (st) { return st === "client" ? "client" : /^(prospect|demo|devis)$/.test(st) ? "cours" : st === "aucun" ? "libre" : "perdu"; };
-    var lot = function () {
-      if (num !== GK_CALCUL) return;   // un nouveau cercle a été demandé : on abandonne ce calcul
-      var fin = Math.min(proches.length, i + 40);
-      for (; i < fin; i++) {
-        var c = proches[i].c, s = suivie(c), pts, eur;
-        if (s.client || s.connue) {
-          var cl = s.client || { commune: s.id };
-          var ct = (G.communes || []).filter(function (x) { return x.commune === s.id; })[0] || {};
-          var known = (Number(cl.nb_points) || 0) + (Number(cl.nb_points_a_verifier) || 0);
-          pts = known || Math.max(1, Math.ceil((Number(cl.population) || c.population || 0) / hpp));
-          eur = pts * gTarifPoint(cl, ct).an * (1 - Math.min(100, gNum(cl.remise_pct)) / 100);
-        } else { pts = Math.max(1, Math.ceil((c.population || 0) / hpp)); eur = pts * tDef; }
-        var g = G4[groupe(s.statut)]; g[0]++; g[1] += pts; g[2] += eur;
-        if (s.statut === "aucun" || /^(prospect|demo|devis)$/.test(s.statut)) top.push({ c: c, pts: pts, eur: eur, st: s.statut, d: proches[i].d });
-      }
-      if (i < proches.length) { (window.requestIdleCallback || setTimeout)(lot); return; }
-      var ligne = function (lib, g, coul) { return '<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + coul + ';margin-right:5px"></span>' + lib + '</td><td style="text-align:right">' + g[0] + '</td><td style="text-align:right">' + g[1] + '</td><td style="text-align:right"><b>' + (tDef || g[2] ? gEuros(g[2]) : '—') + '</b></td></tr>'; };
+    setTimeout(function () {
+      if (num !== GK_CALCUL) return;
+      var hpp = Number(gReglage("habitants_par_point")) || 300, chiffre = gAbonnement(1, null, null).brut > 0;
+      var G4 = { client: [0, 0, 0], cours: [0, 0, 0], libre: [0, 0, 0], perdu: [0, 0, 0] }, top = [];
+      proches.forEach(function (x) {
+        var g = G4[groupeStatut(x.s.statut)]; g[0]++; g[1] += x.pts; g[2] += x.eur;
+        if (x.s.statut === "aucun" || /^(prospect|demo|devis)$/.test(x.s.statut)) top.push(x);
+      });
+      var ligne = function (lib, g, coul) { return '<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + coul + ';margin-right:5px"></span>' + lib + '</td><td style="text-align:right">' + g[0] + '</td><td style="text-align:right">' + g[1] + '</td><td style="text-align:right"><b>' + (chiffre || g[2] ? gEuros(g[2]) : '—') + '</b></td></tr>'; };
       var tot = [G4.client[0] + G4.cours[0] + G4.libre[0], G4.client[1] + G4.cours[1] + G4.libre[1], G4.client[2] + G4.cours[2] + G4.libre[2]];
-      top.sort(function (a, b) { return b.pts - a.pts; });
+      top.sort(function (a, b) { return b.eur - a.eur || b.pts - a.pts; });
       box.innerHTML = '<div style="padding:10px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px">'
-        + '<b style="font-size:15px">Potentiel du cercle de ' + rayon + ' km — abonnement HT/an</b>'
+        + '<b style="font-size:15px">Potentiel du cercle de ' + rayon + ' km' + (filtre ? ' (communes filtrées)' : '') + ' — abonnement HT/an</b>'
         + '<table class="dns" style="margin-top:6px"><tr><th style="text-align:left"></th><th style="text-align:right">Communes</th><th style="text-align:right">Points</th><th style="text-align:right">€ HT/an</th></tr>'
         + ligne("Clients (acquis)", G4.client, G_COULEURS.client) + ligne("En cours (prospect, démo, devis)", G4.cours, G_COULEURS.devis) + ligne("Pas encore en relation", G4.libre, G_COULEURS.aucun)
-        + '<tr><td><b>Total du cercle</b></td><td style="text-align:right"><b>' + tot[0] + '</b></td><td style="text-align:right"><b>' + tot[1] + '</b></td><td style="text-align:right"><b>' + (tDef || tot[2] ? gEuros(tot[2]) : '—') + '</b></td></tr></table>'
+        + '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + tot[0] + '</b></td><td style="text-align:right"><b>' + tot[1] + '</b></td><td style="text-align:right"><b>' + (chiffre || tot[2] ? gEuros(tot[2]) : '—') + '</b></td></tr></table>'
         + (G4.perdu[0] ? '<div>Hors total : ' + G4.perdu[0] + ' commune(s) perdue(s) ou suspendue(s), ' + gEuros(G4.perdu[2]) + '/an.</div>' : '')
-        + (tDef ? '' : '<div style="color:var(--ko);margin-top:4px">Prix de l\'abonnement non renseigné : complétez l\'onglet Tarifs pour chiffrer.</div>')
-        + '<div style="margin-top:4px;color:var(--doux)">Points connus quand la commune est relevée, sinon estimés à 1 pour ' + hpp + ' habitants ; remises des fiches appliquées ; options (installation, formation…) non comprises.</div>'
+        + (chiffre ? '' : '<div style="color:var(--ko);margin-top:4px">Prix de l\'abonnement non renseigné : complétez l\'onglet Tarifs pour chiffrer.</div>')
+        + '<div style="margin-top:4px;color:var(--doux)">Points connus quand la commune est relevée, sinon estimés à 1 pour ' + hpp + ' habitants ; tarif ' + (gReglage("calcul_abonnement") === "tranches" ? "par tranches" : "par point") + ' ; remises des fiches appliquées ; options non comprises.</div>'
         + (top.length ? '<div style="margin-top:8px"><b>Plus gros potentiels à travailler</b>' + top.slice(0, 8).map(function (x) {
-            return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--trait)"><span style="width:9px;height:9px;border-radius:50%;background:' + (G_COULEURS[x.st] || G_COULEURS.aucun) + '"></span><span style="flex:1">' + gEsc(x.c.nom) + ' <span style="color:var(--doux)">' + x.d.toFixed(0) + ' km · ' + (x.c.population || 0).toLocaleString("fr-FR") + ' hab.</span></span><span>' + x.pts + ' pts' + (x.eur ? ' · ' + gEuros(x.eur) : '') + '</span><a href="#" data-gk-ouvrir="' + gEsc(x.c.code) + '">Fiche</a></div>';
+            return '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--trait)"><span style="width:9px;height:9px;border-radius:50%;background:' + (G_COULEURS[x.s.statut] || G_COULEURS.aucun) + '"></span><span style="flex:1">' + gEsc(x.c.nom) + ' <span style="color:var(--doux)">' + x.d.toFixed(0) + ' km · ' + (x.c.population || 0).toLocaleString("fr-FR") + ' hab.</span></span><span>' + x.pts + ' pts' + (x.eur ? ' · ' + gEuros(x.eur) : '') + '</span><a href="#" data-gk-ouvrir="' + gEsc(x.c.code) + '">Fiche</a></div>';
           }).join("") + '</div>' : '')
         + '</div>';
-    };
-    setTimeout(lot, 0);
+    }, 0);
   }
   $("gk-potentiel").addEventListener("click", function (e) {
     var a = e.target.closest("[data-gk-ouvrir]"); if (!a) return; e.preventDefault();
@@ -672,7 +691,15 @@
     if (actif) GK.carte.dragging.disable(); else GK.carte.dragging.enable();
     this.textContent = actif ? "Déplacer la carte" : "Fixer la carte";
   });
-  $("gk-ok").addEventListener("click", function () { GK_CENTRE = null; ouvrirCarteProspects(); });
+  $("gk-ok").addEventListener("click", function () { if (!/^Point choisi|^Ma position/.test($("gk-centre").value)) GK_CENTRE = null; ouvrirCarteProspects(); });
+  $("gk-viser").addEventListener("click", function () {
+    if (!GK.carte) { msg("msg-carte", "Affichez d'abord la carte.", "info"); return; }
+    GK.viser = !GK.viser; this.textContent = GK.viser ? "Touchez la carte… (annuler)" : "Choisir le centre sur la carte";
+    $("gk-carte").style.cursor = GK.viser ? "crosshair" : ""; if (GK.viser) GK.carte.closePopup();
+  });
+  $("gk-centre").addEventListener("input", function () { GK_CENTRE = null; });
+  var GK_FILTRE = null;
+  $("gk-filtres").addEventListener("input", function () { clearTimeout(GK_FILTRE); GK_FILTRE = setTimeout(function () { if (GK.carte) ouvrirCarteProspects(GK_CENTRE); }, 400); });
   $("gk-rayon").addEventListener("change", function () { ouvrirCarteProspects(); });
   $("gk-moi").addEventListener("click", function () {
     if (!navigator.geolocation) { msg("msg-carte", "Géolocalisation indisponible sur cet appareil.", "ko"); return; }
@@ -791,6 +818,25 @@
   function gPrix(code) { var t = (G.Tarifs || []).filter(function (x) { return x.code === code; })[0]; return t ? gNum(t.prix_ht) : 0; }
   function gModeDefaut() { return gReglage("mode_facturation_defaut") === "mensuel" ? "mensuel" : "annuel"; }
   // Prix annuel d'un point pour une commune : contrat (onglet Communes), sinon catalogue selon le mode de facturation.
+  var G_UNITES_TRANCHE = [["point_an", "par point et par an"], ["point_mois", "par point et par mois"], ["forfait_an", "forfait par an"], ["forfait_mois", "forfait par mois"]];
+  function gTranches() {
+    return (G && G.Tarifs || []).filter(function (t) { return t.categorie === "tranche" && t.actif !== "non"; }).sort(function (a, b) { return gNum(a.de) - gNum(b.de); });
+  }
+  // Abonnement HT/an pour un nombre de points : contrat de la commune, sinon tranches, sinon prix par point ; remise de la fiche appliquée.
+  function gAbonnement(points, c, ct) {
+    c = c || {}; ct = ct || {}; points = Number(points) || 0;
+    var brut = 0, source = "", mode = c.mode_facturation || gModeDefaut(), tr = gTranches();
+    if (gNum(ct.tarif_point)) { brut = points * gNum(ct.tarif_point); source = gEuros(ct.tarif_point) + "/point (contrat)"; }
+    else if (gReglage("calcul_abonnement") === "tranches" && tr.length) {
+      var t = tr.filter(function (x) { return points >= gNum(x.de) && (!gNum(x.a) || points <= gNum(x.a)); })[0] || tr[tr.length - 1];
+      var p = gNum(t.prix_ht), u = t.unite;
+      brut = u === "point_an" ? points * p : u === "point_mois" ? points * p * 12 : u === "forfait_mois" ? p * 12 : p;
+      source = "tranche " + gNum(t.de) + (gNum(t.a) ? "–" + gNum(t.a) : " et +") + " pts : " + gEuros(p) + " " + gLib(G_UNITES_TRANCHE, u);
+      mode = /mois/.test(u) ? "mensuel" : "annuel";
+    } else { var tp = gTarifPoint(c, ct); brut = points * tp.an; source = tp.source; mode = tp.mode; }
+    var remise = Math.min(100, Math.max(0, gNum(c.remise_pct)));
+    return { brut: brut, an: brut * (1 - remise / 100), source: source, mode: mode, remise: remise };
+  }
   function gTarifPoint(c, ct) {
     c = c || {}; ct = ct || {};
     var mode = c.mode_facturation || gModeDefaut();
@@ -807,9 +853,9 @@
   // Proposition chiffrée : abonnement + options, remise appliquée.
   function gProposition(com, c, opts) {
     var ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
-    var pt = gPotentiel(com), tp = gTarifPoint(c, ct), remise = Math.min(100, Math.max(0, gNum(c.remise_pct)));
+    var pt = gPotentiel(com), ab = gAbonnement(pt.points, c, ct), tp = ab, remise = Math.min(100, Math.max(0, gNum(c.remise_pct)));
     var l = [], rec = 0, une = 0;
-    if (pt.points && tp.an) { rec += pt.points * tp.an; l.push(["Abonnement : " + pt.points + " point(s) × " + tp.source, pt.points * tp.an, "an"]); }
+    if (pt.points && ab.brut) { rec += ab.brut; l.push(["Abonnement : " + pt.points + " point(s) — " + ab.source, ab.brut, "an"]); }
     gTarifs("option").forEach(function (t) {
       if (!opts[t.code]) return;
       var q = opts[t.code], m = G_RECURRENT[t.unite], mt = q * gNum(t.prix_ht);
@@ -879,8 +925,12 @@
   main.insertAdjacentHTML("beforeend",
     '<section id="tarifs"><div class="carte"><h2>Facturation de base</h2>'
     + '<label for="gt-mode"><b>Facturation de l\'abonnement par défaut</b></label><select id="gt-mode"><option value="annuel">À l\'année (prix par point et par an)</option><option value="mensuel">Au mois (prix par point et par mois)</option></select>'
+    + '<label for="gt-calcul"><b>Calcul de l\'abonnement</b></label><select id="gt-calcul"><option value="point">Prix unique par point (catalogue ci-dessous)</option><option value="tranches">Par tranches de nombre de points</option></select>'
     + '<p class="petit">Chaque commune peut avoir son propre mode et un taux de remise commerciale : dans sa fiche (onglet Clients), bloc « Conditions commerciales ».</p>'
     + '<button class="principal" id="gt-mode-ok" type="button">Enregistrer</button><div class="msg" id="msg-tarifs-base"></div></div>'
+    + '<div class="carte"><h2>Tarif par tranches <button class="second" id="gtr-ajout" type="button" style="float:right;padding:4px 10px;font-size:13px">Ajouter une tranche</button></h2>'
+    + '<p class="petit">Utilisé si « Calcul de l\'abonnement » est sur « Par tranches ». Exemple : de 1 à 3 points, 150 € par point et par an ; de 4 à 10, 120 € ; de 11 et plus (« à » vide), 100 €. Prix HT.</p>'
+    + '<div id="gtr-liste" class="petit">—</div><div class="msg" id="msg-tranches"></div></div>'
     + '<div class="carte"><h2>Catalogue <button class="second" id="gt-nouveau" type="button" style="float:right;padding:4px 10px;font-size:13px">Nouvelle option</button></h2>'
     + '<p class="petit">Abonnement par point (à l\'année ou au mois) et options proposées dans les devis : installation, formation, maintenance… Prix HT. Le tableau est aussi dans l\'onglet « Tarifs » du classeur commun.</p>'
     + '<div id="gt-liste" class="petit">—</div><div id="gt-form" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)" hidden></div><div class="msg" id="msg-tarifs"></div></div></section>');
@@ -888,6 +938,8 @@
   function dessinerTarifs() {
     if (!$("gt-liste") || !G) return;
     $("gt-mode").value = gModeDefaut();
+    $("gt-calcul").value = gReglage("calcul_abonnement") === "tranches" ? "tranches" : "point";
+    dessinerTranches();
     var tous = (G.Tarifs || []).slice().sort(function (a, b) { return gNum(a.ordre) - gNum(b.ordre); });
     var bloc = function (cat, titre) {
       var l = tous.filter(function (t) { return (t.categorie || "option") === cat; });
@@ -922,7 +974,39 @@
     }
   });
   $("gt-mode-ok").addEventListener("click", function () {
-    gEnvoyer({ op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "mode_facturation_defaut", valeur: $("gt-mode").value, description: "annuel ou mensuel : facturation par défaut de l'abonnement" } }, "msg-tarifs-base", "Mode de facturation par défaut enregistré.").catch(function () {});
+    msg("msg-tarifs-base", "Enregistrement…");
+    api("gestion", { op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "mode_facturation_defaut", valeur: $("gt-mode").value, description: "annuel ou mensuel : facturation par défaut de l'abonnement" } })
+      .then(function () { return gEnvoyer({ op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "calcul_abonnement", valeur: $("gt-calcul").value, description: "point : prix unique par point ; tranches : tarif par tranches de points" } }, "msg-tarifs-base", "Facturation de base enregistrée."); })
+      .catch(function (e) { msg("msg-tarifs-base", e.message, "ko"); });
+  });
+  // Tranches : une ligne éditable par tranche (de, à, prix, unité), enregistrée dans l'onglet Tarifs (catégorie « tranche »).
+  function ligneTranche(t) {
+    t = t || {};
+    return '<div data-gtr="' + gEsc(t.code || "") + '" style="display:grid;grid-template-columns:58px 58px 1fr 1.4fr auto auto;gap:6px;align-items:center;margin-top:6px">'
+      + '<input type="number" min="1" placeholder="de" value="' + gEsc(t.de || "") + '" data-k="de" aria-label="De (points)">'
+      + '<input type="number" min="1" placeholder="à" value="' + gEsc(t.a || "") + '" data-k="a" aria-label="À (points, vide = et plus)">'
+      + '<input type="number" min="0" step="any" placeholder="prix € HT" value="' + gEsc(t.prix_ht || "") + '" data-k="prix" aria-label="Prix HT">'
+      + '<select data-k="unite" aria-label="Unité">' + G_UNITES_TRANCHE.map(function (u) { return '<option value="' + u[0] + '"' + (u[0] === (t.unite || "point_an") ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") + '</select>'
+      + '<button type="button" class="second" data-gtr-ok="1" style="padding:6px 9px;font-size:13px">OK</button>'
+      + '<button type="button" class="second" data-gtr-suppr="1" style="padding:6px 9px;font-size:13px;color:var(--ko)" aria-label="Supprimer">✕</button></div>';
+  }
+  function dessinerTranches() {
+    var tr = (G.Tarifs || []).filter(function (t) { return t.categorie === "tranche"; }).sort(function (a, b) { return gNum(a.de) - gNum(b.de); });
+    $("gtr-liste").innerHTML = '<div style="display:grid;grid-template-columns:58px 58px 1fr 1.4fr auto auto;gap:6px;font-weight:700"><span>De</span><span>À</span><span>Prix HT</span><span>Unité</span><span></span><span></span></div>'
+      + (tr.map(ligneTranche).join("") || '<p>Aucune tranche : « Ajouter une tranche ».</p>');
+  }
+  $("gtr-ajout").addEventListener("click", function () { var p = $("gtr-liste").querySelector("p"); if (p) p.remove(); $("gtr-liste").insertAdjacentHTML("beforeend", ligneTranche(null)); });
+  $("gtr-liste").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    var row = b.closest("[data-gtr]"), code = row.dataset.gtr, val = function (k) { return row.querySelector('[data-k="' + k + '"]').value.trim(); };
+    if (b.dataset.gtrSuppr) {
+      if (!code) { row.remove(); return; }
+      if (!confirm("Supprimer cette tranche ?")) return;
+      gEnvoyer({ op: "supprimer", onglet: "Tarifs", cle: code }, "msg-tranches", "Tranche supprimée.").catch(function () {}); return;
+    }
+    var de = gNum(val("de")), a = gNum(val("a"));
+    if (!de || (a && a < de)) { msg("msg-tranches", "Indiquez « de » (et « à » supérieur ou égal, ou vide pour « et plus »).", "ko"); return; }
+    gEnvoyer({ op: "enregistrer", onglet: "Tarifs", valeurs: { code: code, libelle: "Abonnement de " + de + (a ? " à " + a : " point(s) et plus") + (a ? " points" : ""), categorie: "tranche", unite: val("unite"), prix_ht: val("prix").replace(",", "."), de: String(de), a: a ? String(a) : "", actif: "oui", ordre: String(100 + de) } }, "msg-tranches", "Tranche enregistrée.").catch(function () {});
   });
 
 
@@ -944,4 +1028,19 @@
   }
 
   $("ga-ics").addEventListener("click", exporterIcs);
+  /* Google Agenda : n8n envoie toutes les échéances dans l'agenda « PAV — actions » (même compte Google que le workflow Garantie SAV). */
+  var GA_SYNC = null;
+  function syncAgendaPlusTard() { clearTimeout(GA_SYNC); GA_SYNC = setTimeout(function () { syncAgenda(true); }, 3000); }
+  function syncAgenda(discret) {
+    var b = $("ga-sync"); if (!discret) { b.disabled = true; alerteAgenda("Envoi vers Google Agenda…"); }
+    return api("gestion", { op: "agenda" }).then(function (j) {
+      var a = j.agenda || {};
+      var suite = (a.cree && a.calendrier) ? api("gestion", { op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "agenda_google_id", valeur: a.calendrier, description: "Agenda Google « PAV — actions » (créé par la console)" } }) : Promise.resolve();
+      return suite.then(function () {
+        if (a.cree && G && G.Emetteur) G.Emetteur.push({ cle: "agenda_google_id", valeur: a.calendrier });
+        if (!discret || a.erreurs) alerteAgenda((a.cree ? "Agenda « PAV — actions » créé dans Google Agenda. " : "") + a.envoyes + " échéance(s) à jour dans Google Agenda" + (a.erreurs ? ", " + a.erreurs + " en erreur : " + a.erreur : "") + ".");
+      });
+    }).catch(function (e) { if (!discret) alerteAgenda("Google Agenda : " + e.message); }).then(function () { b.disabled = false; });
+  }
+  $("ga-sync").addEventListener("click", function () { syncAgenda(false); });
 })();
