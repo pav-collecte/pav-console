@@ -2394,7 +2394,7 @@
   }
   $("chat-ouvrir").addEventListener("click", function () {
     $("chat").hidden = false; $("chat-ouvrir").style.display = "none";
-    if (!$("chat-fil").children.length) bulle("Bonjour ! Je peux expliquer la console et préparer les actions : régler une nouvelle version du Bac-Score, simuler une note, préparer des points de collecte (depuis OpenStreetMap ou d'après vos adresses), remplir un formulaire d'agent ou de commune. J'agis sur l'écran ; c'est toujours vous qui cliquez pour enregistrer.", "lui");
+    if (!$("chat-fil").children.length) bulle("Bonjour ! Je peux expliquer la console et préparer les actions : chiffre d'affaires autour d'une commune, fiche et conditions commerciales d'un prospect, devis, échanges et agenda, préparation d'un déploiement, points de collecte, agents, Bac-Score. J'agis sur l'écran ; c'est toujours vous qui cliquez pour enregistrer.", "lui");
     $("chat-texte").focus();
   });
   $("chat-fermer").addEventListener("click", function () { $("chat").hidden = true; $("chat-ouvrir").style.display = ""; });
@@ -2582,7 +2582,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=16" defer></script>
+<script src="gestion.js?v=17" defer></script>
 <script>
 /* Smartphone : quand le clavier s'ouvre, l'assistant se cale sur la partie visible de l'écran (la saisie reste visible). */
 (function () {
