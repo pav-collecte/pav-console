@@ -911,7 +911,8 @@
             + '<label class="petit" style="margin:0;display:flex;gap:3px;align-items:center;white-space:nowrap" title="Offerte grâce au parrainage"><input type="checkbox" data-offert="' + gEsc(t.code) + '"' + (off[t.code] ? ' checked' : '') + ' style="width:auto">offerte</label></div>';
         }).join("") : '<p class="petit">Aucune option : ajoutez-en dans l\'onglet Tarifs.</p>')
       + '<div style="margin-top:10px">' + gChamp("gf-parrain", "Parrainage — commune qui a recommandé celle-ci", c.parrain || "", null, [["", "Aucun parrainage"]].concat(gCommunes().filter(function (x) { return x[0] !== c.commune; })), "cochez ensuite « offerte » sur la ou les options annulées") + '</div>'
-      + '<div id="gf-proposition" class="petit" style="margin-top:10px"></div></div>';
+      + '<div id="gf-proposition" class="petit" style="margin-top:10px"></div>'
+      + '<button class="second" type="button" id="gf-devis" style="margin-top:10px;width:100%">Générer le devis (brouillon) avec ces conditions</button></div>';
   }
   function lireConditions() {
     var box = $("gf-conditions"), o = [];
@@ -1066,4 +1067,176 @@
     }).catch(function (e) { if (!discret) alerteAgenda("Google Agenda : " + e.message); }).then(function () { b.disabled = false; });
   }
   $("ga-sync").addEventListener("click", function () { syncAgenda(false); });
+
+  /* ——— Devis depuis la fiche : abonnement 1re année + options cochées, parrainage et remise ——— */
+  function genererDevis() {
+    var com = $("g-commune").value; if (!com) throw new Error("aucune commune choisie");
+    var lu = lireConditions(), c = Object.assign({}, gClient(com), G_AUTO || {}, lu);
+    var opts = gLireOptions(lu.options), off = {}; String(lu.options_offertes || "").split(";").forEach(function (k) { if (k) off[k] = 1; });
+    var ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
+    var pt = gPotentiel(com), ab = gAbonnement(pt.points, c, ct), r2 = function (n) { return Math.round(n * 100) / 100; };
+    var lignes = [], payant = 0, nom = gNomCommune(com);
+    if (pt.points && ab.brut) {
+      var forfait = /forfait/.test(ab.source);
+      lignes.push({ designation: "Abonnement suivi des points de collecte — 1re année, " + pt.points + " point(s)" + (pt.estime ? " (estimation)" : "") + " — " + ab.source, site_code: "", quantite: forfait ? 1 : pt.points, prix_unitaire_ht: r2(forfait ? ab.brut : ab.brut / pt.points) });
+      payant += ab.brut;
+    }
+    gTarifs("option").forEach(function (t) {
+      if (!opts[t.code]) return;
+      var q = opts[t.code], m = G_RECURRENT[t.unite] || 1, pu = gNum(t.prix_ht) * m;
+      lignes.push({ designation: t.libelle + (m > 1 ? " (12 mois)" : "") + " — " + gLib(G_UNITES, t.unite), site_code: "", quantite: q, prix_unitaire_ht: r2(pu) });
+      if (off[t.code]) lignes.push({ designation: "Parrainage" + (c.parrain ? " de " + gNomCommune(c.parrain) : "") + " : " + t.libelle + " offerte", site_code: "", quantite: 1, prix_unitaire_ht: r2(-q * pu) });
+      else payant += q * pu;
+    });
+    var remise = Math.min(100, Math.max(0, gNum(lu.remise_pct)));
+    if (remise && payant) lignes.push({ designation: "Remise commerciale " + remise + " %", site_code: "", quantite: 1, prix_unitaire_ht: r2(-payant * remise / 100) });
+    if (!lignes.length) throw new Error("rien à chiffrer : renseignez les prix (onglet Tarifs) et cochez des options");
+    var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click();
+    ouvrirDoc("devis", "");
+    $("gd-commune").value = com;
+    $("gd-objet").value = "Suivi des points de collecte (PAV) — " + nom;
+    G_DOC.lignes = lignes; dessinerLignes();
+    msg("msg-doc", "Devis préparé depuis la fiche : vérifiez les lignes puis cliquez « Enregistrer ».", "info");
+    var ht = lignes.reduce(function (s, l) { return s + l.quantite * l.prix_unitaire_ht; }, 0);
+    return { lignes: lignes, ht: ht };
+  }
+  $("g-fiche").addEventListener("click", function (e) {
+    if (e.target.id !== "gf-devis") return;
+    try { genererDevis(); } catch (er) { msg("msg-fiche", er.message, "ko"); }
+  });
+
+  /* ——— Assistant : outils Clients, Carte, Agenda, Tarifs, Devis, Déploiement (il prépare, l'administrateur valide) ——— */
+  function attendre(test, ms) {
+    return new Promise(function (ok) { var t0 = Date.now(); (function boucle() { if (test() || Date.now() - t0 > ms) return ok(); setTimeout(boucle, 250); })(); });
+  }
+  function texte(id, max) { var e = $(id); return e ? e.innerText.replace(/\n{2,}/g, "\n").trim().slice(0, max || 2000) : ""; }
+  // Retrouve une commune suivie (identifiant ou nom), sinon la prépare comme prospect depuis la liste des communes.
+  function trouverCommune(q) {
+    var s = slugCommune(q);
+    var c = gCommunes().filter(function (x) { return x[0] === q || slugCommune(x[1]) === s || x[0] === s; })[0];
+    if (c) return Promise.resolve(c[0]);
+    return listeCommunes().then(function (l) {
+      var k = l.filter(function (x) { return slugCommune(x.nom) === s || x.code === q; }).sort(function (a, b) { return (b.population || 0) - (a.population || 0); })[0];
+      if (!k) throw new Error("commune introuvable : " + q);
+      var st = suivie(k);
+      if (!st.client && !st.connue) G.Clients.push({ commune: st.id, statut: "prospect", nom_officiel: "Mairie de " + k.nom, ville: k.nom, code_insee: k.code, population: String(k.population || ""), code_postal: (k.codesPostaux || [])[0] || "" });
+      return st.id;
+    });
+  }
+  function ouvrirFiche(q) {
+    var p = G_CHARGE ? Promise.resolve() : chargerGestion();
+    return p.then(function () { return trouverCommune(q); }).then(function (id) {
+      var nb = document.querySelector('nav button[data-onglet="clients"]'); if (nb && !nb.classList.contains("actif")) nb.click();
+      if ($("g-commune").value !== id) {
+        dessinerGestion(); $("g-commune").value = id; G_CONTACT = null; G_ECHANGE = null; G_AUTO = null; cacher("msg-fiche"); dessinerFiche();
+      }
+      return attendre(function () { return !/Recherche des infos/.test($("msg-fiche").textContent); }, 12000).then(function () { return id; });
+    });
+  }
+  function resumeFiche(id) {
+    var c = Object.assign({}, gClient(id), G_AUTO || {});
+    var ech = (G.Echanges || []).filter(function (e) { return e.commune === id && e.fait !== "oui" && (e.prochaine_action || e.echeance); }).map(function (e) { return (e.echeance || "sans date") + " : " + (e.prochaine_action || e.resume); });
+    return "Fiche " + gNomCommune(id) + " (statut " + (c.statut || "prospect") + (G_AUTO ? ", infos publiques trouvées mais pas encore enregistrées" : "") + ")\n"
+      + texte("g-potentiel", 300) + "\n" + texte("gf-infos", 700) + "\nChiffrage : " + texte("gf-proposition", 1200)
+      + "\nContacts : " + ((G.Contacts || []).filter(function (k) { return k.commune === id; }).map(function (k) { return k.nom + (k.fonction ? " (" + k.fonction + ")" : ""); }).join(", ") || "aucun")
+      + "\nÀ faire : " + (ech.join(" ; ") || "rien") + ($("gf-deployer") ? "\nCommune pas encore déployée." : "\nCommune déployée.");
+  }
+  function appliquerConditions(a) {
+    var box = $("gf-conditions"); if (!box) throw new Error("fiche non ouverte");
+    var fixe = function (id, v) { var e = $(id); if (e && v !== undefined && v !== null) { e.value = String(v); e.dispatchEvent(new Event("change", { bubbles: true })); } };
+    if (a.mode !== undefined) fixe("gf-mode", a.mode === "defaut" ? "" : a.mode);
+    if (a.remise_pct !== undefined) fixe("gf-remise", a.remise_pct);
+    if (a.parrain !== undefined) {
+      if (!a.parrain) fixe("gf-parrain", "");
+      else { var s = slugCommune(a.parrain), p = gCommunes().filter(function (x) { return x[0] === a.parrain || slugCommune(x[1]) === s; })[0]; if (!p) throw new Error("parrain inconnu (doit être une commune suivie) : " + a.parrain); fixe("gf-parrain", p[0]); }
+    }
+    if (Array.isArray(a.options)) {
+      var voulu = {}; a.options.forEach(function (o) { voulu[o.code] = o; });
+      Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) {
+        var o = voulu[i.dataset.opt]; i.checked = !!o;
+        var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); if (o && o.quantite && q) q.value = o.quantite;
+        var f = box.querySelector('input[data-offert="' + i.dataset.opt + '"]'); if (f) f.checked = !!(o && o.offerte);
+      });
+      var inconnus = a.options.filter(function (o) { return !box.querySelector('input[data-opt="' + o.code + '"]'); }).map(function (o) { return o.code; });
+      if (inconnus.length) throw new Error("options inconnues : " + inconnus.join(", ") + " (codes du catalogue : " + gTarifs("option").map(function (t) { return t.code; }).join(", ") + ")");
+    }
+    dessinerConditions();
+  }
+  PAV.outils = {
+    carte_afficher: function (a) {
+      var nb = document.querySelector('nav button[data-onglet="carte"]'); if (nb && !nb.classList.contains("actif")) nb.click();
+      if (a.centre) { $("gk-centre").value = a.centre; GK_CENTRE = null; }
+      if (a.rayon_km) { var r = [5, 10, 15, 20, 30, 40, 50, 75].reduce(function (b, k) { return Math.abs(k - a.rayon_km) < Math.abs(b - a.rayon_km) ? k : b; }, 20); $("gk-rayon").value = String(r); $("gk-rayon").dataset.init = "1"; }
+      $("gk-min").value = a.points_min || ""; $("gk-max").value = a.points_max || "";
+      var st = Array.isArray(a.statuts) && a.statuts.length ? a.statuts : ["libre", "cours", "client", "perdu"];
+      Array.prototype.forEach.call(document.querySelectorAll("#gk-filtres input[data-gkg]"), function (i) { i.checked = st.indexOf(i.dataset.gkg) >= 0; });
+      if (a.points_min || a.points_max || st.length < 4) $("gk-filtres").open = true;
+      $("gk-potentiel").innerHTML = "";
+      return (G_CHARGE ? Promise.resolve() : chargerGestion()).then(function () {
+        ouvrirCarteProspects(GK_CENTRE);
+        return attendre(function () { return /Total/.test($("gk-potentiel").innerText) || /ko/.test($("msg-carte").className); }, 30000);
+      }).then(function () {
+        if (/ko/.test($("msg-carte").className)) throw new Error($("msg-carte").textContent);
+        return texte("msg-carte", 300) + "\n" + texte("gk-potentiel", 2500);
+      });
+    },
+    fiche_ouvrir: function (a) { return ouvrirFiche(a.commune).then(resumeFiche); },
+    fiche_conditions: function (a) {
+      return ouvrirFiche(a.commune).then(function (id) { appliquerConditions(a); return "Conditions remplies (non enregistrées) pour " + gNomCommune(id) + ".\nChiffrage : " + texte("gf-proposition", 1500) + "\nL'administrateur doit cliquer « Enregistrer la fiche »."; });
+    },
+    echange_preparer: function (a) {
+      return ouvrirFiche(a.commune).then(function (id) {
+        formEchange({ date: a.date || "", type: a.type || "appel", contact: a.contact || "", resume: a.resume || "", prochaine_action: a.prochaine_action || "", echeance: a.echeance || "" });
+        $("g-echange-form").scrollIntoView({ behavior: "smooth", block: "center" });
+        return "Échange prérempli pour " + gNomCommune(id) + " : l'administrateur doit cliquer « Ajouter ».";
+      });
+    },
+    agenda_lister: function (a) {
+      var p = G_CHARGE ? Promise.resolve() : chargerGestion();
+      return p.then(function () {
+        var j = Number(a.jours) || 14, auj = new Date().toISOString().slice(0, 10), fin = new Date(Date.now() + j * 864e5).toISOString().slice(0, 10);
+        var ev = evenements().filter(function (x) { return !x.passe && (x.retard || (x.date >= auj && x.date <= fin)); });
+        return ev.length ? ev.map(function (x) { return (x.retard ? "EN RETARD " : "") + x.date + " · " + x.nomCommune + " — " + x.titre; }).join("\n") : "Rien de prévu dans les " + j + " prochains jours, aucun retard.";
+      });
+    },
+    devis_preparer: function (a) {
+      return ouvrirFiche(a.commune).then(function (id) {
+        if (a.mode !== undefined || a.remise_pct !== undefined || a.parrain !== undefined || Array.isArray(a.options)) appliquerConditions(a);
+        var d = genererDevis();
+        return "Devis brouillon préparé pour " + gNomCommune(id) + " (non enregistré) :\n" + d.lignes.map(function (l) { return "- " + l.designation + " : " + l.quantite + " × " + gEuros(l.prix_unitaire_ht); }).join("\n")
+          + "\nTotal HT " + gEuros(d.ht) + ". L'administrateur vérifie puis clique « Enregistrer » (onglet Factures). Les conditions modifiées de la fiche ne sont pas enregistrées tant qu'il ne clique pas « Enregistrer la fiche ».";
+      });
+    },
+    deploiement_preparer: function (a) {
+      return ouvrirFiche(a.commune).then(function (id) {
+        if (!$("gf-deployer")) return gNomCommune(id) + " est déjà déployée : rien à préparer.";
+        lancerDeploiement();
+        return attendre(function () { var i = document.getElementById("p-commune.nom"), r = i && i.parentNode.querySelector("div.petit"); return r && /✓|Aucune|Plusieurs|impossible/.test(r.textContent) && !/Recherche des infos/.test(r.textContent); }, 20000).then(function () {
+          var i = document.getElementById("p-commune.nom"), r = i && i.parentNode.querySelector("div.petit");
+          return "Onglet « commune » prérempli pour " + gNomCommune(id) + " : " + (r ? r.textContent : "recherche lancée") + "\nÉtape suivante possible : brouillon_enregistrer (îlots OpenStreetMap intégrés), puis agents_preparer. Rien n'est créé avant la validation de l'administrateur.";
+        });
+      });
+    },
+    tarifs_lister: function () {
+      var p = G_CHARGE ? Promise.resolve() : chargerGestion();
+      return p.then(function () {
+        var tr = gTranches();
+        return "Calcul de l'abonnement : " + (gReglage("calcul_abonnement") === "tranches" ? "par tranches" : "prix unique par point") + ", facturation par défaut " + gModeDefaut()
+          + "\nAbonnement : " + gTarifs("abonnement").map(function (t) { return t.code + " = " + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : "à définir") + " " + gLib(G_UNITES, t.unite); }).join(" ; ")
+          + "\nTranches : " + (tr.map(function (t) { return gNum(t.de) + (gNum(t.a) ? "–" + gNum(t.a) : " et +") + " pts : " + gEuros(t.prix_ht) + " " + gLib(G_UNITES_TRANCHE, t.unite); }).join(" ; ") || "aucune")
+          + "\nOptions (codes) : " + gTarifs("option").map(function (t) { return t.code + " — " + t.libelle + " — " + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : "à définir") + " " + gLib(G_UNITES, t.unite); }).join(" ; ");
+      });
+    }
+  };
+  // Ce que l'assistant voit en plus dans l'état de la console, selon l'onglet.
+  PAV.etatGestion = function (o) {
+    if (!G) return { gestion: "données Clients non chargées (elles le seront au premier outil)" };
+    var e = { communes_suivies: gCommunes().map(function (c) { return c[0] + " (" + (gClient(c[0]).statut || "client") + ")"; }).join(", "), options_catalogue: gTarifs("option").map(function (t) { return t.code; }).join(", ") };
+    if (o === "clients" && $("g-commune").value) e.fiche = resumeFiche($("g-commune").value).slice(0, 2500);
+    if (o === "carte") e.carte = texte("msg-carte", 300) + "\n" + texte("gk-potentiel", 2000);
+    if (o === "agenda") e.agenda = texte("ga-retard", 1000) + "\n" + texte("ga-liste", 1500);
+    if (o === "factu") e.documents = texte("g-devis-liste", 1000) + "\n" + texte("g-factures-liste", 1000) + (G_DOC ? "\nDocument ouvert : " + texte("g-doc", 1500) : "");
+    return { gestion: e };
+  };
+
 })();
