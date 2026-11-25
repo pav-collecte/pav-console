@@ -1017,18 +1017,18 @@
   // Tranches : une ligne éditable par tranche (de, à, prix, unité), enregistrée dans l'onglet Tarifs (catégorie « tranche »).
   function ligneTranche(t) {
     t = t || {};
-    return '<div data-gtr="' + gEsc(t.code || "") + '" style="display:grid;grid-template-columns:58px 58px 1fr 1.4fr auto auto;gap:6px;align-items:center;margin-top:6px">'
-      + '<input type="number" min="1" placeholder="de" value="' + gEsc(t.de || "") + '" data-k="de" aria-label="De (points)">'
-      + '<input type="number" min="1" placeholder="à" value="' + gEsc(t.a || "") + '" data-k="a" aria-label="À (points, vide = et plus)">'
-      + '<input type="number" min="0" step="any" placeholder="prix € HT" value="' + gEsc(t.prix_ht || "") + '" data-k="prix" aria-label="Prix HT">'
-      + '<select data-k="unite" aria-label="Unité">' + G_UNITES_TRANCHE.map(function (u) { return '<option value="' + u[0] + '"' + (u[0] === (t.unite || "point_an") ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") + '</select>'
-      + '<button type="button" class="second" data-gtr-ok="1" style="padding:6px 9px;font-size:13px">OK</button>'
-      + '<button type="button" class="second" data-gtr-suppr="1" style="padding:6px 9px;font-size:13px;color:var(--ko)" aria-label="Supprimer">✕</button></div>';
+    var champ = "width:72px;padding:8px;margin:0";
+    return '<div data-gtr="' + gEsc(t.code || "") + '" style="padding:10px;margin-top:8px;border:1px solid var(--trait);border-radius:9px;background:#fff">'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">De <input type="number" min="1" placeholder="1" value="' + gEsc(t.de || "") + '" data-k="de" aria-label="De (points)" style="' + champ + '">'
+      + ' à <input type="number" min="1" placeholder="et +" value="' + gEsc(t.a || "") + '" data-k="a" aria-label="À (points, vide = et plus)" style="' + champ + '"> point(s)</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px"><input type="number" min="0" step="any" placeholder="Prix" value="' + gEsc(t.prix_ht || "") + '" data-k="prix" aria-label="Prix HT" style="width:100px;padding:8px;margin:0"> € HT'
+      + '<select data-k="unite" aria-label="Unité" style="flex:1;min-width:150px;margin:0">' + G_UNITES_TRANCHE.map(function (u) { return '<option value="' + u[0] + '"' + (u[0] === (t.unite || "point_an") ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") + '</select></div>'
+      + '<div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="principal" data-gtr-ok="1" style="flex:2;margin-top:0;padding:8px">Enregistrer la tranche</button>'
+      + '<button type="button" class="second" data-gtr-suppr="1" style="flex:1;color:var(--ko)">Supprimer</button></div></div>';
   }
   function dessinerTranches() {
     var tr = (G.Tarifs || []).filter(function (t) { return t.categorie === "tranche"; }).sort(function (a, b) { return gNum(a.de) - gNum(b.de); });
-    $("gtr-liste").innerHTML = '<div style="display:grid;grid-template-columns:58px 58px 1fr 1.4fr auto auto;gap:6px;font-weight:700"><span>De</span><span>À</span><span>Prix HT</span><span>Unité</span><span></span><span></span></div>'
-      + (tr.map(ligneTranche).join("") || '<p>Aucune tranche : « Ajouter une tranche ».</p>');
+    $("gtr-liste").innerHTML = tr.map(ligneTranche).join("") || '<p>Aucune tranche : « Ajouter une tranche ».</p>';
   }
   $("gtr-ajout").addEventListener("click", function () { var p = $("gtr-liste").querySelector("p"); if (p) p.remove(); $("gtr-liste").insertAdjacentHTML("beforeend", ligneTranche(null)); });
   $("gtr-liste").addEventListener("click", function (e) {
