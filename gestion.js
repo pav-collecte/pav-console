@@ -48,6 +48,7 @@
     (G.Clients || []).forEach(function (c) { if (c.commune && !m[c.commune]) m[c.commune] = c.ville || String(c.nom_officiel || c.commune).replace(/^Mairie (de |d'|du |des )/i, ""); });
     return Object.keys(m).sort(function (a, b) { return m[a].localeCompare(m[b], "fr"); }).map(function (k) { return [k, m[k]]; });
   }
+  function gNomCommune(com) { return (gCommunes().filter(function (x) { return x[0] === com; })[0] || [com, com])[1]; }
   function gClient(com) { return (G.Clients || []).filter(function (c) { return c.commune === com; })[0] || { commune: com }; }
 
   function chargerGestion(garderMsg) {
@@ -851,34 +852,41 @@
   // Options cochées d'une fiche : « code:quantité;code:quantité ».
   function gLireOptions(t) { var o = {}; String(t || "").split(";").forEach(function (p) { var x = p.split(":"); if (x[0]) o[x[0].trim()] = gNum(x[1]) || 1; }); return o; }
   // Proposition chiffrée : abonnement + options, remise appliquée.
-  function gProposition(com, c, opts) {
+  function gProposition(com, c, opts, offertes) {
+    offertes = offertes || {};
     var ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     var pt = gPotentiel(com), ab = gAbonnement(pt.points, c, ct), tp = ab, remise = Math.min(100, Math.max(0, gNum(c.remise_pct)));
     var l = [], rec = 0, une = 0;
     if (pt.points && ab.brut) { rec += ab.brut; l.push(["Abonnement : " + pt.points + " point(s) — " + ab.source, ab.brut, "an"]); }
     gTarifs("option").forEach(function (t) {
       if (!opts[t.code]) return;
-      var q = opts[t.code], m = G_RECURRENT[t.unite], mt = q * gNum(t.prix_ht);
-      if (m) { rec += mt * m; l.push([t.libelle + " : " + q + " × " + gEuros(t.prix_ht) + " " + gLib(G_UNITES, t.unite), mt * m, "an"]); }
-      else { une += mt; l.push([t.libelle + " : " + q + " × " + gEuros(t.prix_ht) + " " + gLib(G_UNITES, t.unite), mt, "une"]); }
+      var q = opts[t.code], m = G_RECURRENT[t.unite], mt = q * gNum(t.prix_ht), lib = t.libelle + " : " + q + " × " + gEuros(t.prix_ht) + " " + gLib(G_UNITES, t.unite);
+      if (offertes[t.code]) { l.push([lib + " — offert (parrainage" + (c.parrain ? " de " + gNomCommune(c.parrain) : "") + ")", 0, m ? "an" : "une", m ? mt * m : mt]); return; }
+      if (m) { rec += mt * m; l.push([lib, mt * m, "an"]); }
+      else { une += mt; l.push([lib, mt, "une"]); }
     });
     var k = 1 - remise / 100;
-    return { lignes: l, recurrent: rec * k, uneFois: une * k, remise: remise, brut: rec + une, mode: tp.mode };
+    var offert = l.reduce(function (s, x) { return s + (x[3] || 0); }, 0);
+    return { lignes: l, recurrent: rec * k, uneFois: une * k, remise: remise, brut: rec + une, mode: tp.mode, offert: offert };
   }
   function dessinerConditions() {
     var com = $("g-commune").value, box = $("gf-conditions"); if (!box || !com) return;
     var opts = {}; Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) { if (i.checked) { var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); opts[i.dataset.opt] = gNum(q && q.value) || 1; } });
-    var c = Object.assign({}, gClient(com), { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise") });
-    var p = gProposition(com, c, opts);
+    var lu = lireConditions(), off = {}; lu.options_offertes.split(";").forEach(function (k) { if (k) off[k] = 1; });
+    Array.prototype.forEach.call(box.querySelectorAll("input[data-offert]"), function (i) { i.disabled = !lu.parrain || !box.querySelector('input[data-opt="' + i.dataset.offert + '"]').checked; });
+    var c = Object.assign({}, gClient(com), { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), parrain: lu.parrain });
+    var p = gProposition(com, c, opts, off);
     $("gf-proposition").innerHTML = p.lignes.length
-      ? p.lignes.map(function (x) { return '<div style="display:flex;gap:8px"><span style="flex:1">' + gEsc(x[0]) + '</span><b>' + gEuros(x[1]) + (x[2] === "an" ? "/an" : "") + '</b></div>'; }).join("")
+      ? p.lignes.map(function (x) { return '<div style="display:flex;gap:8px"><span style="flex:1">' + gEsc(x[0]) + '</span><b>' + (x[3] ? '<s style="color:var(--doux);font-weight:400">' + gEuros(x[3]) + '</s> 0 €' : gEuros(x[1]) + (x[2] === "an" ? "/an" : "")) + '</b></div>'; }).join("")
+        + (p.offert ? '<div style="color:var(--ok, #2E7D4F)">Parrainage : ' + gEuros(p.offert) + ' HT offerts.</div>' : '')
         + '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--trait)">' + (p.remise ? 'Remise commerciale ' + p.remise + ' % appliquée.<br>' : '')
         + 'Récurrent : <b>' + gEuros(p.recurrent) + ' HT/an</b>' + (p.mode === "mensuel" ? ' (soit ' + gEuros(p.recurrent / 12) + '/mois)' : '')
         + (p.uneFois ? ' · Une fois : <b>' + gEuros(p.uneFois) + ' HT</b>' : '') + ' · <b>1re année : ' + gEuros(p.recurrent + p.uneFois) + ' HT</b></div>'
       : 'Renseignez les prix dans l\'onglet Tarifs pour chiffrer la proposition.';
   }
   function htmlConditions(c) {
-    var opts = gLireOptions(c.options), pts = gPotentiel(c.commune).points || 1;
+    var opts = gLireOptions(c.options), pts = gPotentiel(c.commune).points || 1, off = {};
+    String(c.options_offertes || "").split(";").forEach(function (k) { if (k) off[k] = 1; });
     var options = gTarifs("option");
     return '<div id="gf-conditions" style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Conditions commerciales</b>'
       + '<div style="display:grid;grid-template-columns:1fr 110px;gap:8px">'
@@ -889,15 +897,20 @@
           var q = opts[t.code] || (/point/.test(t.unite) ? pts : 1);
           return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" data-opt="' + gEsc(t.code) + '" id="gfo-' + gEsc(t.code) + '"' + (opts[t.code] ? ' checked' : '') + ' style="width:auto">'
             + '<label for="gfo-' + gEsc(t.code) + '" style="flex:1;margin:0">' + gEsc(t.libelle) + ' <span class="petit">— ' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : 'prix à définir') + ' ' + gEsc(gLib(G_UNITES, t.unite)) + '</span></label>'
-            + '<input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '" style="width:70px" aria-label="Quantité"></div>';
+            + '<input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '" style="width:70px" aria-label="Quantité">'
+            + '<label class="petit" style="margin:0;display:flex;gap:3px;align-items:center;white-space:nowrap" title="Offerte grâce au parrainage"><input type="checkbox" data-offert="' + gEsc(t.code) + '"' + (off[t.code] ? ' checked' : '') + ' style="width:auto">offerte</label></div>';
         }).join("") : '<p class="petit">Aucune option : ajoutez-en dans l\'onglet Tarifs.</p>')
+      + '<div style="margin-top:10px">' + gChamp("gf-parrain", "Parrainage — commune qui a recommandé celle-ci", c.parrain || "", null, [["", "Aucun parrainage"]].concat(gCommunes().filter(function (x) { return x[0] !== c.commune; })), "cochez ensuite « offerte » sur la ou les options annulées") + '</div>'
       + '<div id="gf-proposition" class="petit" style="margin-top:10px"></div></div>';
   }
   function lireConditions() {
     var box = $("gf-conditions"), o = [];
     if (!box) return {};
     Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) { if (i.checked) { var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); o.push(i.dataset.opt + ":" + (gNum(q && q.value) || 1)); } });
-    return { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), options: o.join(";") };
+    var off = [];
+    Array.prototype.forEach.call(box.querySelectorAll("input[data-offert]"), function (i) { if (i.checked && box.querySelector('input[data-opt="' + i.dataset.offert + '"]').checked) off.push(i.dataset.offert); });
+    var parrain = gVal("gf-parrain");
+    return { mode_facturation: gVal("gf-mode"), remise_pct: gVal("gf-remise"), options: o.join(";"), parrain: parrain, options_offertes: parrain ? off.join(";") : "" };
   }
   $("g-fiche").addEventListener("input", function (e) { if (e.target.closest("#gf-conditions")) dessinerConditions(); });
   $("g-fiche").addEventListener("change", function (e) { if (e.target.closest("#gf-conditions")) dessinerConditions(); });
