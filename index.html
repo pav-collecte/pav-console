@@ -2372,7 +2372,7 @@
     return appels.reduce(function (p, a) {
       return p.then(function () {
         var f = OUTILS[a.name] || (window.PAV && PAV.outils && PAV.outils[a.name]);
-        return Promise.resolve().then(function () { if (!f) throw new Error("outil inconnu : " + a.name); return f(a.input || {}); }).catch(function (er) { return reessaiBrouillon(er, a, f); })
+        return Promise.resolve().then(function () { if (!f) throw new Error("outil inconnu : " + a.name + " — cette page de la console n'est pas à jour : rechargez-la (bandeau en haut ou tirez vers le bas)"); return f(a.input || {}); }).catch(function (er) { return reessaiBrouillon(er, a, f); })
           .then(function (r) { bulle("✓ " + r, "action"); res.push({ type: "tool_result", tool_use_id: a.id, content: String(r) }); },
             function (er) { bulle("✗ " + er.message, "erreur"); res.push({ type: "tool_result", tool_use_id: a.id, content: er.message, is_error: true }); });
       });
@@ -2582,7 +2582,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=19" defer></script>
+<script src="gestion.js?v=20" defer></script>
 <script>
 /* Smartphone : quand le clavier s'ouvre, l'assistant se cale sur la partie visible de l'écran (la saisie reste visible). */
 (function () {
@@ -2595,6 +2595,29 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   vv.addEventListener("resize", caler); vv.addEventListener("scroll", caler);
   new MutationObserver(caler).observe(chat, { attributes: true, attributeFilter: ["hidden"] });
   var t = document.getElementById("chat-texte"); if (t) t.addEventListener("focus", function () { setTimeout(caler, 300); });
+})();
+</script>
+<script>
+/* Mise à jour : si une nouvelle version de la console est publiée pendant que la page est ouverte, un bandeau propose de recharger. */
+(function () {
+  var s = document.querySelector('script[src*="gestion.js?v="]'); if (!s) return;
+  var actuelle = (s.getAttribute("src").match(/v=(\d+)/) || [])[1], affiche = false;
+  function verifier() {
+    if (affiche || document.hidden) return;
+    fetch("index.html?z=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.text(); }).then(function (t) {
+      var v = (t.match(/gestion\.js\?v=(\d+)/) || [])[1];
+      if (!v || v === actuelle) return;
+      affiche = true;
+      var b = document.createElement("div");
+      b.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:99;background:#C9752B;color:#fff;padding:10px 14px;font:600 14px system-ui;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap";
+      b.innerHTML = 'Une nouvelle version de la console est disponible.<button type="button" style="border:0;border-radius:8px;padding:6px 12px;font:700 14px system-ui;background:#fff;color:#1F3A2E;cursor:pointer">Recharger</button>';
+      b.querySelector("button").addEventListener("click", function () { location.reload(); });
+      document.body.appendChild(b);
+    }).catch(function () {});
+  }
+  setInterval(verifier, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", verifier);
+  window.addEventListener("focus", verifier);
 })();
 </script>
 </body>
