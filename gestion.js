@@ -114,8 +114,9 @@
       + '<div class="gf-pane" data-p="infos">' + ((G.communes || []).some(function (x) { return x.commune === com; }) ? htmlDeployee(com) : '<button class="second" type="button" id="gf-deployer" style="margin-top:12px;width:100%">Lancer le déploiement de la commune</button><p class="petit">Ouvre l\'onglet « Créer » pré-rempli avec cette commune (recherche INSEE et mairie lancée) : vous complétez puis validez.</p>')
       + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
       + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
-      + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div></div>';
-    gfAppliquerPane();
+      + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>'
+      + '<div id="gf-bareme" style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Bac-Score</b> <span class="petit">— chargement…</span></div></div>';
+    gfAppliquerPane(); dessinerBaremeFiche(com);
     dessinerInfos(c); dessinerConditions(); dessinerDocsFiche();
     dessinerContacts(); dessinerEchanges();
     // Fiche sans infos publiques : recherche lancée d'elle-même (une fois par commune et par session).
@@ -1574,5 +1575,28 @@
     document.head.appendChild(st);
     gfAppliquerPane();
   })();
+
+  /* Fiche client : barème Bac-Score suivi par la commune, et accès direct à l'onglet Bac-Score. */
+  function dessinerBaremeFiche(com) {
+    var box = $("gf-bareme"); if (!box) return;
+    var bouton = '<button type="button" class="second" data-gf-bareme="' + gEsc(com) + '" style="width:100%;margin-top:8px">Voir ou définir le barème de cette commune</button>';
+    api("bareme", { commune: com }).then(function (j) {
+      if ($("g-commune").value !== com || !$("gf-bareme")) return;
+      var auj = new Date().toISOString().slice(0, 10), C = (j.commune || []).slice().sort(function (a, b) { return String(a.depuis).localeCompare(String(b.depuis)); });
+      var enCours = C.filter(function (v) { return v.depuis <= auj; }).pop(), aVenir = C.filter(function (v) { return v.depuis > auj; })[0];
+      var nomV = function (v) { return gEsc(v.nom || v.version || "version"); };
+      var etat = (!enCours || enCours.bareme === "modele")
+        ? '<b>Modèle commun</b>' + (enCours ? ' <span class="petit">(retour au modèle depuis le ' + gDateFR(enCours.depuis) + ')</span>' : ' <span class="petit">(pas de barème propre)</span>')
+        : '<b>Barème propre : ' + nomV(enCours) + '</b> <span class="petit">depuis le ' + gDateFR(enCours.depuis) + '</span>';
+      var futur = aVenir ? '<div class="petit" style="margin-top:4px">À venir le ' + gDateFR(aVenir.depuis) + ' : ' + (aVenir.bareme === "modele" ? "retour au modèle commun" : nomV(aVenir)) + '</div>' : '';
+      box.innerHTML = '<div style="font-size:15px">Bac-Score : ' + etat + '</div>' + futur + bouton;
+    }).catch(function () { if ($("gf-bareme")) $("gf-bareme").innerHTML = '<b>Bac-Score</b> <span class="petit">— état non disponible</span>' + bouton; });
+  }
+  $("g-fiche").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-gf-bareme]"); if (!b) return;
+    var nb = document.querySelector('nav button[data-onglet="bac"]'); if (!nb) return;
+    nb.click();
+    setTimeout(function () { var s = $("bac-portee"); if (!s) return; s.value = b.dataset.gfBareme; s.dispatchEvent(new Event("change")); window.scrollTo({ top: 0, behavior: "smooth" }); }, 50);
+  });
 
 })();
