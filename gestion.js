@@ -1046,7 +1046,9 @@
     var bas = (forfait ? p : p * de) * parAn, haut = a ? (forfait ? p : p * a) * parAn : 0;
     var an = forfait || (a && a === de) ? gEuros(bas) : a ? gEuros(bas) + " à " + gEuros(haut) : "dès " + gEuros(bas);
     var mois = forfait || (a && a === de) ? gEuros(bas / 12) : a ? gEuros(bas / 12) + " à " + gEuros(haut / 12) : "dès " + gEuros(bas / 12);
-    return '<div class="petit" style="margin-top:8px;padding:6px 10px;background:#EEF5F0;border-radius:7px">Chiffre d\'affaires de la tranche : <b>' + an + ' HT / an</b> · soit <b>' + mois + ' HT / mois</b>' + (forfait ? '' : ' <span style="color:var(--doux)">(' + de + (a ? ' à ' + a + ' points' : ' points et plus') + ')</span>') + '</div>';
+    return '<div style="margin-top:10px;padding:10px 12px;background:#EEF5F0;border:1px solid #cfe3d6;border-radius:9px;font-size:18px;line-height:1.45;color:var(--encre)">'
+      + '<div style="font-size:15px;color:var(--doux)">Chiffre d\'affaires de la tranche' + (forfait ? '' : ' (' + de + (a ? ' à ' + a + ' points' : ' points et plus') + ')') + '</div>'
+      + '<div><b style="font-size:21px">' + an + '</b> HT par an</div><div><b style="font-size:21px">' + mois + '</b> HT par mois</div></div>';
   }
   function ligneTranche(t) {
     t = t || {};
