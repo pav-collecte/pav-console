@@ -101,7 +101,7 @@
     var c = gClient(com), ct = (G.communes || []).filter(function (x) { return x.commune === com; })[0] || {};
     $("g-contrat").innerHTML = "Contrat (onglet Communes) : tarif par point <b>" + (ct.tarif_point ? gEuros(ct.tarif_point) : "non renseigné") + "</b> · anniversaire <b>" + (gDateFR(ct.anniversaire) || "non renseigné") + "</b> · initialisation " + (ct.cloture_initialisation ? "clôturée le <b>" + gDateFR(ct.cloture_initialisation) + "</b>" : "<b>en cours</b>") + (ct.etat ? " · état : " + gEsc(ct.etat) : "");
     dessinerPotentiel(com);
-    $("g-fiche").innerHTML = gChamp("gf-statut", "Statut de la relation", c.statut || "prospect", null, G_STATUTS)
+    $("g-fiche").innerHTML = '<div class="gf-pane" data-p="fiche">' + gChamp("gf-statut", "Statut de la relation", c.statut || "prospect", null, G_STATUTS)
       + gChamp("gf-nom", "Nom officiel (facturation)", c.nom_officiel, "text", null, "ex. Mairie d'Andancette")
       + gChamp("gf-siret", "SIRET de la mairie", c.siret)
       + gChamp("gf-chorus", "Code service Chorus Pro", c.code_service_chorus, "text", null, "si la mairie en impose un")
@@ -109,12 +109,13 @@
       + '<div style="display:grid;grid-template-columns:120px 1fr;gap:8px">' + '<div>' + gChamp("gf-cp", "Code postal", c.code_postal) + '</div><div>' + gChamp("gf-ville", "Ville", c.ville) + '</div></div>'
       + gChamp("gf-email", "E-mail de facturation", c.email_facturation, "email")
       + gChamp("gf-date", "Date du contrat", c.date_contrat, "date")
-      + gChamp("gf-notes", "Notes", c.notes, "zone")
-      + htmlConditions(c)
-      + ((G.communes || []).some(function (x) { return x.commune === com; }) ? htmlDeployee(com) : '<button class="second" type="button" id="gf-deployer" style="margin-top:12px;width:100%">Lancer le déploiement de la commune</button><p class="petit">Ouvre l\'onglet « Créer » pré-rempli avec cette commune (recherche INSEE et mairie lancée) : vous complétez puis validez.</p>')
+      + gChamp("gf-notes", "Notes", c.notes, "zone") + '</div>'
+      + '<div class="gf-pane" data-p="offre">' + htmlConditions(c) + '</div>'
+      + '<div class="gf-pane" data-p="infos">' + ((G.communes || []).some(function (x) { return x.commune === com; }) ? htmlDeployee(com) : '<button class="second" type="button" id="gf-deployer" style="margin-top:12px;width:100%">Lancer le déploiement de la commune</button><p class="petit">Ouvre l\'onglet « Créer » pré-rempli avec cette commune (recherche INSEE et mairie lancée) : vous complétez puis validez.</p>')
       + '<div style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Infos publiques</b>'
       + ' <button class="second" type="button" id="gf-auto" style="float:right;padding:4px 10px;font-size:13px">Rechercher automatiquement</button>'
-      + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div>';
+      + '<div id="gf-infos" class="petit" style="margin-top:6px;clear:both"></div></div></div>';
+    gfAppliquerPane();
     dessinerInfos(c); dessinerConditions(); dessinerDocsFiche();
     dessinerContacts(); dessinerEchanges();
     // Fiche sans infos publiques : recherche lancée d'elle-même (une fois par commune et par session).
@@ -666,7 +667,7 @@
         var g = G4[groupeStatut(x.s.statut)]; g[0]++; g[1] += x.pts; g[2] += x.eur;
         if (x.s.statut === "aucun" || /^(prospect|demo|devis)$/.test(x.s.statut)) top.push(x);
       });
-      var ligne = function (lib, g, coul) { return '<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + coul + ';margin-right:5px"></span>' + lib + '</td><td style="text-align:right">' + g[0] + '</td><td style="text-align:right">' + g[1] + '</td><td style="text-align:right"><b>' + (chiffre || g[2] ? gEuros(g[2]) : '—') + '</b></td></tr>'; };
+      var ligne = function (lib, g, coul) { return '<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + coul + ';margin-right:5px"></span>' + lib + '</td><td style="text-align:right">' + g[0] + '</td><td style="text-align:right">' + g[1] + '</td><td style="text-align:right;font-size:18px"><b>' + (chiffre || g[2] ? gEuros(g[2]) : '—') + '</b></td></tr>'; };
       var tot = [G4.client[0] + G4.cours[0] + G4.libre[0], G4.client[1] + G4.cours[1] + G4.libre[1], G4.client[2] + G4.cours[2] + G4.libre[2]];
       top.sort(function (a, b) { return b.eur - a.eur || b.pts - a.pts; });
       box.innerHTML = '<div style="padding:10px 12px;background:#EEF5F0;border:1px solid var(--trait);border-radius:9px">'
@@ -675,7 +676,7 @@
         + [["", "Tarif de base"], ["point", "Par point"], ["tranches", "Par tranches"]].map(function (o) { return '<button type="button" data-gkc="' + o[0] + '" style="flex:1;padding:9px 6px;font-size:15px"' + (o[0] === GK_CALC ? ' class="on"' : '') + '>' + o[1] + '</button>'; }).join("") + '</div>'
         + '<table class="dns" style="margin-top:6px"><tr><th style="text-align:left"></th><th style="text-align:right">Communes</th><th style="text-align:right">Points</th><th style="text-align:right">€ HT/an</th></tr>'
         + ligne("Clients (acquis)", G4.client, G_COULEURS.client) + ligne("En cours (prospect, démo, devis)", G4.cours, G_COULEURS.devis) + ligne("Pas encore en relation", G4.libre, G_COULEURS.aucun)
-        + '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + tot[0] + '</b></td><td style="text-align:right"><b>' + tot[1] + '</b></td><td style="text-align:right"><b>' + (chiffre || tot[2] ? gEuros(tot[2]) : '—') + '</b></td></tr></table>'
+        + '<tr><td><b>Total</b></td><td style="text-align:right"><b>' + tot[0] + '</b></td><td style="text-align:right"><b>' + tot[1] + '</b></td><td style="text-align:right;font-size:22px;color:var(--vert)"><b>' + (chiffre || tot[2] ? gEuros(tot[2]) : '—') + '</b></td></tr></table>'
         + (G4.perdu[0] ? '<div>Hors total : ' + G4.perdu[0] + ' commune(s) perdue(s) ou suspendue(s), ' + gEuros(G4.perdu[2]) + '/an.</div>' : '')
         + (chiffre ? '' : '<div style="color:var(--ko);margin-top:4px">Prix de l\'abonnement non renseigné : complétez l\'onglet Tarifs pour chiffrer.</div>')
         + '<div style="margin-top:4px;color:var(--doux)">Points connus quand la commune est relevée, sinon estimés à 1 pour ' + hpp + ' habitants ; tarif ' + ((GK_CALC || (gReglage("calcul_abonnement") === "tranches" ? "tranches" : "point")) === "tranches" ? "par tranches" : "par point") + (GK_CALC ? "" : " (réglage de l\'onglet Tarifs)") + ' ; remises des fiches appliquées ; options non comprises.</div>'
@@ -1361,7 +1362,7 @@
   /* — Avis des utilisateurs (onglet Avis du classeur commun, alimenté par le workflow n8n « avis des utilisateurs ») —
      Priorité (haute / normale / basse), case « traité », note de suivi (colonne suite). */
   var GA_PRIO = [["haute", "Haute"], ["normale", "Normale"], ["basse", "Basse"]];
-  var GA_CRIT = { simplicite: "Simplicité", fiabilite: "Fiabilité", rapidite: "Rapidité", clarte: "Clarté", utilite: "Utilité", justesse: "Justesse", gain_temps: "Gain de temps" };
+  var GA_CRIT = { global: "Note globale", simplicite: "Simplicité", fiabilite: "Fiabilité", rapidite: "Rapidité", clarte: "Clarté", utilite: "Utilité", justesse: "Justesse", gain_temps: "Gain de temps" };
   function gavNotes(a) { var o = {}; String(a.notes_detail || "").split(";").forEach(function (x) { var p = x.split(":"); if (GA_CRIT[p[0]] && Number(p[1]) >= 1) o[p[0]] = Number(p[1]); }); return o; }
   var GA_ETATS = [["", "—"], ["a_faire", "À faire"], ["en_cours", "En cours"], ["realise", "Réalisé"], ["abandonne", "Abandonné"]];
   var GA_PAGES = { collecte: "Appli de tournée", meteo: "Météo", encart: "Encart du site", integrer: "Page « Intégrer »", console: "Console" };
@@ -1422,7 +1423,7 @@
         var som = {}, nb = {};
         tous.forEach(function (a) { var n = gavNotes(a); Object.keys(n).forEach(function (k) { som[k] = (som[k] || 0) + n[k]; nb[k] = (nb[k] || 0) + 1; }); });
         var k = Object.keys(GA_CRIT).filter(function (x) { return nb[x]; });
-        return k.length ? '<div class="gav-moy">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + (som[x] / nb[x]).toFixed(1).replace(".", ",") + ' ★</b> <i>(' + nb[x] + ')</i></span>'; }).join("") + '</div>' : '';
+        return k.length ? '<div class="gav-moy">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + (som[x] / nb[x]).toFixed(1).replace(".", ",") + (x === "global" ? ' ♥' : ' ★') + '</b> <i>(' + nb[x] + ')</i></span>'; }).join("") + '</div>' : '';
       })();
     // Filtres
     Array.prototype.forEach.call($("gav-vue").querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.v === GA_FILTRE.vue); });
@@ -1456,7 +1457,7 @@
         + (a.etat_traitement ? '<span class="gav-tag gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : (a.version ? '<span class="gav-tag">' + gEsc(a.version) + '</span>' : ''))
         + '<span class="d">' + gEsc(gavDate(a.date)) + '</span>'
         + (id ? '<button type="button" class="gav-crayon" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button>' : '') + '</div>'
-        + (function () { var n = gavNotes(a), k = Object.keys(n); return k.length ? '<div class="gav-crits">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + n[x] + '★</b></span>'; }).join("") + '</div>' : ''; })()
+        + (function () { var n = gavNotes(a), k = Object.keys(n); return k.length ? '<div class="gav-crits">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + n[x] + (x === "global" ? '♥' : '★') + '</b></span>'; }).join("") + '</div>' : ''; })()
         + '<div class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</div>'
         + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
         + (contact ? '<div>Contact : ' + contact + '</div>' : '')
@@ -1513,5 +1514,65 @@
     else if (e.target.matches("[data-gav-valide]")) gavEnregistrer(c.dataset.gav, { valide: e.target.checked ? "oui" : "non" });
     else if (e.target.matches("[data-gav-suite]")) gavEnregistrer(c.dataset.gav, { suite: e.target.value.trim() });
   });
+
+  /* — Onglet Clients réorganisé : recherche en tête, une seule fiche en sous-onglets — */
+  var GF_PANE = "fiche";
+  var GF_PANES = [["fiche", "Fiche"], ["offre", "Offre"], ["docs", "Devis & factures"], ["contacts", "Contacts"], ["echanges", "Échanges"], ["infos", "Infos & appli"]];
+  function gfAppliquerPane() {
+    Array.prototype.forEach.call(document.querySelectorAll("#clients .gf-pane"), function (p) { p.classList.toggle("on", p.dataset.p === GF_PANE); });
+    Array.prototype.forEach.call(document.querySelectorAll("#gf-onglets button"), function (b) { b.classList.toggle("on", b.dataset.p === GF_PANE); });
+    var ok = $("g-fiche-ok"); if (ok) ok.hidden = !(GF_PANE === "fiche" || GF_PANE === "offre");
+    var t = $("gf-titre"); if (t && G) { var com = $("g-commune").value, cl = gClient(com); t.innerHTML = com ? gEsc(gNomCommune(com)) + ' <span class="gf-statut">' + gEsc(gLib(G_STATUTS, cl.statut || "prospect")) + '</span>' : "Choisissez une commune"; }
+  }
+  (function reorganiserClients() {
+    var sec = $("clients"); if (!sec || !$("g-fiche-docs")) return;
+    var carte = function (id) { return $(id).closest(".carte"); };
+    var cSuivi = carte("g-pipeline"), cFiche = carte("g-fiche"), cDocs = carte("g-fiche-docs"), cCont = carte("g-contacts"), cEch = carte("g-echanges");
+    // Recherche
+    cSuivi.querySelector("h2").insertAdjacentHTML("afterend", '<input id="g-cherche" type="search" autocomplete="off" placeholder="🔍 Rechercher : commune, contact, maire, SIRET, notes…" style="font-size:17px;padding:12px 14px;margin:2px 0 10px">');
+    // Fiche : titre + sous-onglets ; les cartes Devis, Contacts, Échanges deviennent des sous-onglets
+    cFiche.querySelector("h2").outerHTML = '<h2 id="gf-titre" style="font-size:22px">Fiche client</h2>';
+    $("g-commune").insertAdjacentHTML("beforebegin", '<label for="g-commune" class="petit" style="margin-top:0">Changer de commune</label>');
+    var lab = cFiche.querySelector('label[for="g-commune"] b'); if (lab) lab.parentNode.remove();
+    $("g-fiche").insertAdjacentHTML("beforebegin", '<div id="gf-onglets" class="gf-onglets" role="tablist">' + GF_PANES.map(function (p) { return '<button type="button" role="tab" data-p="' + p[0] + '">' + p[1] + '</button>'; }).join("") + '</div>');
+    var ok = $("g-fiche-ok"), msgF = $("msg-fiche");
+    [["docs", cDocs], ["contacts", cCont], ["echanges", cEch]].forEach(function (x) {
+      var d = document.createElement("div"); d.className = "gf-pane"; d.dataset.p = x[0];
+      var h = x[1].querySelector("h2"); if (h) { h.style.fontSize = "17px"; }
+      while (x[1].firstChild) d.appendChild(x[1].firstChild);
+      cFiche.insertBefore(d, ok); x[1].remove();
+    });
+    if (msgF) cFiche.appendChild(msgF);
+    $("gf-onglets").addEventListener("click", function (e) { var b = e.target.closest("button[data-p]"); if (!b) return; GF_PANE = b.dataset.p; gfAppliquerPane(); });
+    // Recherche : filtre la liste, Entrée ouvre la première commune trouvée
+    var norm = function (t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); };
+    function correspond(com, q) {
+      var cl = gClient(com), txt = [com, gNomCommune(com), cl.nom_officiel, cl.siret, cl.maire, cl.ville, cl.notes, cl.email_facturation];
+      (G.Contacts || []).forEach(function (k) { if (k.commune === com) txt.push(k.nom, k.email, k.telephone, k.fonction); });
+      return norm(txt.join(" ")).indexOf(q) >= 0;
+    }
+    function filtrer() {
+      var q = norm($("g-cherche").value.trim()), n = 0, premier = null;
+      Array.prototype.forEach.call($("g-pipeline").querySelectorAll("tr"), function (tr) {
+        var a = tr.querySelector("[data-gcom]"); if (!a) return;
+        var vis = !q || correspond(a.dataset.gcom, q); tr.hidden = !vis; if (vis) { n++; if (!premier) premier = a; }
+      });
+      var m = $("g-cherche-n"); if (!m) { $("g-cherche").insertAdjacentHTML("afterend", '<div id="g-cherche-n" class="petit" style="margin:-4px 0 8px"></div>'); m = $("g-cherche-n"); }
+      m.textContent = q ? n + " commune(s) trouvée(s)" + (n ? " — Entrée pour ouvrir la première" : "") : "";
+      return premier;
+    }
+    $("g-cherche").addEventListener("input", filtrer);
+    $("g-cherche").addEventListener("keydown", function (e) { if (e.key === "Enter") { var a = filtrer(); if (a) a.click(); } });
+    $("g-pipeline").addEventListener("click", function (e) { if (e.target.closest("[data-gcom]")) setTimeout(function () { gfAppliquerPane(); cFiche.scrollIntoView({ behavior: "smooth", block: "start" }); }, 0); });
+    var st = document.createElement("style");
+    st.textContent = "#clients .gf-pane{display:none}#clients .gf-pane.on{display:block}"
+      + ".gf-onglets{display:flex;gap:6px;overflow-x:auto;margin:12px 0 6px;padding-bottom:4px;border-bottom:2px solid var(--trait)}"
+      + ".gf-onglets button{flex:none;border:1px solid var(--trait);background:#fff;border-radius:9px 9px 0 0;padding:9px 12px;font:600 15px system-ui;color:var(--vert);cursor:pointer}"
+      + ".gf-onglets button.on{background:var(--vert);color:#fff;border-color:var(--vert)}"
+      + ".gf-statut{font-size:13px;font-weight:600;background:#EEF5F0;color:var(--vert);border:1px solid var(--trait);border-radius:999px;padding:3px 10px;vertical-align:middle}"
+      + "#g-pipeline tr[hidden]{display:none}";
+    document.head.appendChild(st);
+    gfAppliquerPane();
+  })();
 
 })();
