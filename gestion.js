@@ -1284,7 +1284,7 @@
     emise: "#E08A00", deposee_chorus: "#7B4FA3", payee: "#2E7D4F", annulee: "#5E6B63" };
   (function () {
     var carteFiche = $("g-fiche").closest(".carte"); if (!carteFiche) return;
-    carteFiche.insertAdjacentHTML("afterend", '<div class="carte"><h2>Devis et factures <button class="second" id="gfd-nouveau" type="button" style="float:right;padding:4px 10px;font-size:13px">Nouveau devis</button></h2><div id="g-fiche-docs" class="petit">—</div></div>');
+    carteFiche.insertAdjacentHTML("afterend", '<div class="carte"><h2>Devis et factures <button class="second" id="gfd-nouveau" type="button" style="float:right;padding:4px 10px;font-size:13px">Nouveau devis</button></h2><div id="g-fiche-docs" class="petit">—</div><div class="msg" id="msg-fiche-docs"></div></div>');
   })();
   function badge(st, liste) { return '<span style="display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;background:' + (G_COUL_ST[st] || "#9AA39B") + '">' + gEsc(gLib(liste, st)) + '</span>'; }
   function dessinerDocsFiche() {
@@ -1297,13 +1297,13 @@
     var h = '<b>Devis (' + dv.length + ')</b>' + (dv.length ? '<table class="dns" style="margin-top:4px"><tr><th style="text-align:left">N°</th><th style="text-align:left">Date</th><th style="text-align:left">Objet</th><th style="text-align:left">Statut</th><th style="text-align:right">HT</th></tr>'
       + dv.map(function (d) {
           var info = d.statut === "accepte" && d.accepte_le ? " le " + gDateFR(d.accepte_le) : (d.statut === "envoye" && d.validite ? (d.validite < auj ? " — validité dépassée le " : " — valable jusqu'au ") + gDateFR(d.validite) : "");
-          return '<tr><td><a href="#" data-gdoc="devis" data-num="' + gEsc(d.numero) + '">' + gEsc(num(d.numero)) + '</a></td><td>' + gDateFR(d.date) + '</td><td>' + gEsc(d.objet || "") + '</td><td>' + badge(d.statut, G_ST_DEVIS) + '<span style="color:var(--doux)">' + gEsc(info) + '</span></td><td style="text-align:right">' + gEuros(d.total_ht) + '</td></tr>';
+          return '<tr><td><a href="#" data-gdoc="devis" data-num="' + gEsc(d.numero) + '">' + gEsc(num(d.numero)) + '</a></td><td>' + gDateFR(d.date) + '</td><td>' + gEsc(d.objet || "") + '</td><td>' + badge(d.statut, G_ST_DEVIS) + '<span style="color:var(--doux)">' + gEsc(info) + '</span>' + (String(d.numero || "").indexOf("BROUILLON") === 0 || d.statut === "brouillon" ? ' <a href="#" data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '" style="color:var(--ko);white-space:nowrap" title="Supprimer ce brouillon">✕ supprimer</a>' : '') + '</td><td style="text-align:right">' + gEuros(d.total_ht) + '</td></tr>';
         }).join("") + '</table>' : '<p>Aucun devis.</p>');
     h += '<div style="height:10px"></div><b>Factures (' + fa.length + ')</b>' + (fa.length ? '<table class="dns" style="margin-top:4px"><tr><th style="text-align:left">N°</th><th style="text-align:left">Date</th><th style="text-align:left">Type</th><th style="text-align:left">Statut</th><th style="text-align:right">TTC</th></tr>'
       + fa.map(function (f) {
           var retard = (f.statut === "emise" || f.statut === "deposee_chorus") && f.echeance && f.echeance < auj;
           var info = f.statut === "payee" && f.payee_le ? " le " + gDateFR(f.payee_le) : (f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus") ? (retard ? " — échue le " : " — échéance ") + gDateFR(f.echeance) : "");
-          return '<tr><td><a href="#" data-gdoc="facture" data-num="' + gEsc(f.numero) + '">' + gEsc(num(f.numero)) + '</a></td><td>' + gDateFR(f.date) + '</td><td>' + gEsc(gLib(G_TYPES_FACT, f.type)) + '</td><td>' + badge(f.statut, G_ST_FACT) + '<span style="color:' + (retard ? "var(--ko)" : "var(--doux)") + '">' + gEsc(info) + '</span></td><td style="text-align:right">' + gEuros(f.total_ttc) + '</td></tr>';
+          return '<tr><td><a href="#" data-gdoc="facture" data-num="' + gEsc(f.numero) + '">' + gEsc(num(f.numero)) + '</a></td><td>' + gDateFR(f.date) + '</td><td>' + gEsc(gLib(G_TYPES_FACT, f.type)) + '</td><td>' + badge(f.statut, G_ST_FACT) + '<span style="color:' + (retard ? "var(--ko)" : "var(--doux)") + '">' + gEsc(info) + '</span>' + (String(f.numero || "").indexOf("BROUILLON") === 0 || f.statut === "brouillon" ? ' <a href="#" data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '" style="color:var(--ko);white-space:nowrap" title="Supprimer ce brouillon">✕ supprimer</a>' : '') + '</td><td style="text-align:right">' + gEuros(f.total_ttc) + '</td></tr>';
         }).join("") + '</table>' : '<p>Aucune facture.</p>');
     var paye = fa.filter(function (f) { return f.statut === "payee"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
     var du = fa.filter(function (f) { return f.statut === "emise" || f.statut === "deposee_chorus"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
@@ -1311,6 +1311,14 @@
     box.innerHTML = h;
   }
   $("g-fiche-docs").addEventListener("click", function (e) {
+    var sp = e.target.closest("[data-gsuppr-doc]");
+    if (sp) {
+      e.preventDefault();
+      if (!confirm("Supprimer ce " + (sp.dataset.gsupprDoc === "devis" ? "devis" : "brouillon de facture") + " (brouillon, avec ses lignes) ?")) return;
+      if (G_DOC && G_DOC.d && G_DOC.d.numero === sp.dataset.num) { $("g-doc").hidden = true; G_DOC = null; }
+      gEnvoyer({ op: "supprimer-document", type: sp.dataset.gsupprDoc, numero: sp.dataset.num }, "msg-fiche-docs", "Brouillon supprimé.").catch(function () {});
+      return;
+    }
     var a = e.target.closest("[data-gdoc]"); if (!a) return; e.preventDefault();
     var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click();
     ouvrirDoc(a.dataset.gdoc, a.dataset.num);
