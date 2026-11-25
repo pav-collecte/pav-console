@@ -593,7 +593,7 @@
         // « Choisir le centre » : le prochain clic sur la carte devient le centre du cercle.
         GK.carte.on("click", function (e) {
           if (!GK.viser) return;
-          GK.viser = false; $("gk-viser").textContent = "Choisir le centre sur la carte"; $("gk-carte").style.cursor = "";
+          finViser();
           GK_CENTRE = [e.latlng.lat, e.latlng.lng]; $("gk-centre").value = "Point choisi sur la carte"; ouvrirCarteProspects(GK_CENTRE);
         });
       }
@@ -693,10 +693,20 @@
     this.textContent = actif ? "Déplacer la carte" : "Fixer la carte";
   });
   $("gk-ok").addEventListener("click", function () { if (!/^Point choisi|^Ma position/.test($("gk-centre").value)) GK_CENTRE = null; ouvrirCarteProspects(); });
+  // Mode « choisir le centre » : la carte se déplace et se zoome librement, puis un toucher fixe le centre.
+  function finViser() {
+    GK.viser = false; $("gk-viser").textContent = "Choisir le centre sur la carte"; $("gk-carte").style.cursor = "";
+    if (GK.carte && GK.bougeait === false) GK.carte.dragging.disable();
+    $("gk-bouger").textContent = GK.carte && GK.carte.dragging.enabled() ? "Fixer la carte" : "Déplacer la carte";
+  }
   $("gk-viser").addEventListener("click", function () {
     if (!GK.carte) { msg("msg-carte", "Affichez d'abord la carte.", "info"); return; }
-    GK.viser = !GK.viser; this.textContent = GK.viser ? "Touchez la carte… (annuler)" : "Choisir le centre sur la carte";
-    $("gk-carte").style.cursor = GK.viser ? "crosshair" : ""; if (GK.viser) GK.carte.closePopup();
+    if (GK.viser) { finViser(); msg("msg-carte", "Choix du centre annulé.", "info"); return; }
+    GK.viser = true; GK.bougeait = GK.carte.dragging.enabled();
+    GK.carte.dragging.enable(); GK.carte.closePopup();
+    this.textContent = "Annuler le choix du centre"; $("gk-carte").style.cursor = "crosshair";
+    msg("msg-carte", "Faites glisser et zoomez la carte jusqu'à l'endroit voulu, puis touchez-le (sans glisser) : il devient le centre du cercle.", "info");
+    $("gk-carte").scrollIntoView({ behavior: "smooth", block: "center" });
   });
   $("gk-centre").addEventListener("input", function () { GK_CENTRE = null; });
   var GK_FILTRE = null;
