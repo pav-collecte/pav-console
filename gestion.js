@@ -1340,46 +1340,55 @@
     carteFiche.insertAdjacentHTML("afterend", '<div class="carte"><h2>Devis et factures <button class="second" id="gfd-nouveau" type="button" style="float:right;padding:4px 10px;font-size:13px">Nouveau devis</button></h2><div id="g-fiche-docs" class="petit">—</div><div class="msg" id="msg-fiche-docs"></div></div>');
   })();
   function badge(st, liste) { return '<span style="display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;background:' + (G_COUL_ST[st] || "#9AA39B") + '">' + gEsc(gLib(liste, st)) + '</span>'; }
-  function dessinerDocsFiche() {
-    var com = $("g-commune").value, box = $("g-fiche-docs"); if (!box) return;
-    if (!com) { box.textContent = "—"; return; }
-    var auj = new Date().toISOString().slice(0, 10), tri = function (a, b) { return (b.date || "").localeCompare(a.date || ""); };
-    var dv = (G.Devis || []).filter(function (d) { return d.commune === com; }).sort(tri);
-    var fa = (G.Factures || []).filter(function (f) { return f.commune === com; }).sort(tri);
-    var brouillon = function (x) { return String(x.numero || "").indexOf("BROUILLON") === 0 || x.statut === "brouillon"; };
-    var num = function (x) { return String(x.numero || "").indexOf("BROUILLON") === 0 ? "Brouillon" : x.numero; };
+  // Cartes de devis / facture (fiche client et page Factures). avecCommune : affiche la commune (page Factures).
+  function gdfNum(x) { return String(x.numero || "").indexOf("BROUILLON") === 0 ? "Brouillon" : x.numero; }
+  function gdfBrouillon(x) { return String(x.numero || "").indexOf("BROUILLON") === 0 || x.statut === "brouillon"; }
+  function gdfAct(lib, attrs, cls) { return '<button type="button" class="' + (cls || "second") + '" ' + attrs + '>' + lib + '</button>'; }
+  function gdfCarteDevis(d, avecCommune) {
+    var auj = new Date().toISOString().slice(0, 10), fac = gdFactureDuDevis(d.numero);
+    var info = d.statut === "accepte" ? "Accepté" + (d.accepte_le ? " le " + gDateFR(d.accepte_le) : "") + (d.accepte_par ? " par " + d.accepte_par : "")
+      : d.statut === "envoye" && d.validite ? (d.validite < auj ? "Validité dépassée le " : "Valable jusqu'au ") + gDateFR(d.validite) : "";
+    return '<div class="gdf-c" data-gdf-cle="' + gEsc([d.numero, gNomCommune(d.commune), d.commune, gClient(d.commune).nom_officiel, d.objet].join(" ").toLowerCase()) + '"><div class="gdf-h"><b>' + gEsc(gdfNum(d)) + '</b>' + badge(d.statut, G_ST_DEVIS) + '</div>'
+      + (avecCommune ? '<div class="gdf-com">' + gEsc(gNomCommune(d.commune)) + '</div>' : '')
+      + (d.objet ? '<div class="gdf-o">' + gEsc(d.objet) + '</div>' : '')
+      + '<div class="gdf-m"><span>' + gDateFR(d.date) + (info ? '<br><small' + (d.statut === "envoye" && d.validite < auj ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(d.total_ht) + ' <small>HT</small></b></div>'
+      + (fac ? '<div class="gdf-lien">🧾 Facturé : <button type="button" class="gdf-lnk" data-gdoc="facture" data-num="' + gEsc(fac.numero) + '">' + gEsc(gdfNum(fac)) + '</button> ' + badge(fac.statut, G_ST_FACT) + '</div>' : '')
+      + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="devis" data-num="' + gEsc(d.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="devis" data-num="' + gEsc(d.numero) + '"', "second gd-pdfb")
+      + (d.statut === "accepte" && !fac ? gdfAct("🧾 Créer la facture", 'data-gfacturer="' + gEsc(d.numero) + '"', "principal") : '')
+      + (gdfBrouillon(d) ? gdfAct("Supprimer", 'data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '"', "second gdf-sup") : '') + '</div></div>';
+  }
+  function gdfCarteFacture(f, avecCommune) {
+    var auj = new Date().toISOString().slice(0, 10);
+    var retard = (f.statut === "emise" || f.statut === "deposee_chorus") && f.echeance && f.echeance < auj;
+    var info = f.statut === "payee" ? "Payée" + (f.payee_le ? " le " + gDateFR(f.payee_le) : "")
+      : f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus") ? (retard ? "Échue depuis le " : "Échéance le ") + gDateFR(f.echeance) : f.statut === "brouillon" ? "À vérifier puis émettre" : "";
+    var details = [gLib(G_TYPES_FACT, f.type), f.periode_debut ? "du " + gDateFR(f.periode_debut) + " au " + gDateFR(f.periode_fin) : ""].filter(Boolean).join(" · ");
+    return '<div class="gdf-c' + (retard ? ' retard' : '') + '" data-gdf-cle="' + gEsc([f.numero, gNomCommune(f.commune), f.commune, gClient(f.commune).nom_officiel, f.ref_devis, f.ref_chorus].join(" ").toLowerCase()) + '"><div class="gdf-h"><b>' + gEsc(gdfNum(f)) + '</b>' + badge(f.statut, G_ST_FACT) + '</div>'
+      + (avecCommune ? '<div class="gdf-com">' + gEsc(gNomCommune(f.commune)) + '</div>' : '')
+      + '<div class="gdf-o">' + gEsc(details) + (f.ref_devis ? '<br><small>Devis d\'origine : ' + gEsc(f.ref_devis) + '</small>' : '') + (f.ref_chorus ? '<br><small>Chorus : ' + gEsc(f.ref_chorus) + '</small>' : '') + '</div>'
+      + '<div class="gdf-m"><span>' + gDateFR(f.date) + (info ? '<br><small' + (retard ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(f.total_ttc) + ' <small>TTC</small></b></div>'
+      + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="facture" data-num="' + gEsc(f.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="facture" data-num="' + gEsc(f.numero) + '"', "second gd-pdfb")
+      + (f.statut !== "annulee" ? gdfAct(f.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus", 'data-gch="' + gEsc(f.numero) + '"', f.statut === "emise" ? "principal" : "second") : '')
+      + (gdfBrouillon(f) ? gdfAct("Supprimer", 'data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '"', "second gdf-sup") : '') + '</div></div>';
+  }
+  function gdfResume(dv, fa) {
     var paye = fa.filter(function (f) { return f.statut === "payee"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
     var du = fa.filter(function (f) { return f.statut === "emise" || f.statut === "deposee_chorus"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
     var attente = dv.filter(function (d) { return d.statut === "envoye"; }).length;
     var aFacturer = dv.filter(function (d) { return d.statut === "accepte" && !gdFactureDuDevis(d.numero); });
-    var h = '<div class="gdf-resume"><div><span>Encaissé</span><b>' + gEuros(paye) + '</b></div><div' + (du ? ' class="du"' : '') + '><span>À encaisser</span><b>' + gEuros(du) + '</b></div><div><span>Devis en attente</span><b>' + attente + '</b></div></div>'
-      + '<ol class="gdf-etapes"><li>Devis</li><li>Accepté</li><li>Facture</li><li>Chorus</li><li>Payée</li></ol>';
-    if (aFacturer.length) h += '<div class="gdf-alerte">🧾 ' + aFacturer.length + ' devis accepté' + (aFacturer.length > 1 ? 's' : '') + ' à facturer.</div>';
-    var act = function (lib, attrs, cls) { return '<button type="button" class="' + (cls || "second") + '" ' + attrs + '>' + lib + '</button>'; };
-    h += '<h3 class="gdf-t">Devis <span>' + dv.length + '</span></h3>' + (dv.length ? dv.map(function (d) {
-      var fac = gdFactureDuDevis(d.numero);
-      var info = d.statut === "accepte" ? "Accepté" + (d.accepte_le ? " le " + gDateFR(d.accepte_le) : "") + (d.accepte_par ? " par " + d.accepte_par : "")
-        : d.statut === "envoye" && d.validite ? (d.validite < auj ? "Validité dépassée le " : "Valable jusqu'au ") + gDateFR(d.validite) : "";
-      return '<div class="gdf-c"><div class="gdf-h"><b>' + gEsc(num(d)) + '</b>' + badge(d.statut, G_ST_DEVIS) + '</div>'
-        + (d.objet ? '<div class="gdf-o">' + gEsc(d.objet) + '</div>' : '')
-        + '<div class="gdf-m"><span>' + gDateFR(d.date) + (info ? '<br><small' + (d.statut === "envoye" && d.validite < auj ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(d.total_ht) + ' <small>HT</small></b></div>'
-        + (fac ? '<div class="gdf-lien">🧾 Facturé : <button type="button" class="gdf-lnk" data-gdoc="facture" data-num="' + gEsc(fac.numero) + '">' + gEsc(num(fac)) + '</button> ' + badge(fac.statut, G_ST_FACT) + '</div>' : '')
-        + '<div class="gdf-a">' + act("Ouvrir", 'data-gdoc="devis" data-num="' + gEsc(d.numero) + '"') + act("📄 PDF", 'data-gpdf="devis" data-num="' + gEsc(d.numero) + '"', "second gd-pdfb")
-        + (d.statut === "accepte" && !fac ? act("🧾 Créer la facture", 'data-gfacturer="' + gEsc(d.numero) + '"', "principal") : '')
-        + (brouillon(d) ? act("Supprimer", 'data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '"', "second gdf-sup") : '') + '</div></div>';
-    }).join("") : '<p class="gdf-vide">Aucun devis. « Nouveau devis » le prépare depuis l\'offre de la fiche.</p>');
-    h += '<h3 class="gdf-t">Factures <span>' + fa.length + '</span></h3>' + (fa.length ? fa.map(function (f) {
-      var retard = (f.statut === "emise" || f.statut === "deposee_chorus") && f.echeance && f.echeance < auj;
-      var info = f.statut === "payee" ? "Payée" + (f.payee_le ? " le " + gDateFR(f.payee_le) : "")
-        : f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus") ? (retard ? "Échue depuis le " : "Échéance le ") + gDateFR(f.echeance) : f.statut === "brouillon" ? "À vérifier puis émettre" : "";
-      var details = [gLib(G_TYPES_FACT, f.type), f.periode_debut ? "du " + gDateFR(f.periode_debut) + " au " + gDateFR(f.periode_fin) : ""].filter(Boolean).join(" · ");
-      return '<div class="gdf-c' + (retard ? ' retard' : '') + '"><div class="gdf-h"><b>' + gEsc(num(f)) + '</b>' + badge(f.statut, G_ST_FACT) + '</div>'
-        + '<div class="gdf-o">' + gEsc(details) + (f.ref_devis ? '<br><small>Devis d\'origine : ' + gEsc(f.ref_devis) + '</small>' : '') + (f.ref_chorus ? '<br><small>Chorus : ' + gEsc(f.ref_chorus) + '</small>' : '') + '</div>'
-        + '<div class="gdf-m"><span>' + gDateFR(f.date) + (info ? '<br><small' + (retard ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(f.total_ttc) + ' <small>TTC</small></b></div>'
-        + '<div class="gdf-a">' + act("Ouvrir", 'data-gdoc="facture" data-num="' + gEsc(f.numero) + '"') + act("📄 PDF", 'data-gpdf="facture" data-num="' + gEsc(f.numero) + '"', "second gd-pdfb")
-        + (f.statut !== "annulee" ? act(f.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus", 'data-gch="' + gEsc(f.numero) + '"', f.statut === "emise" ? "principal" : "second") : '')
-        + (brouillon(f) ? act("Supprimer", 'data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '"', "second gdf-sup") : '') + '</div></div>';
-    }).join("") : '<p class="gdf-vide">Aucune facture. Elle se crée depuis un devis accepté (bouton « Créer la facture »).</p>');
+    return '<div class="gdf-resume"><div><span>Encaissé</span><b>' + gEuros(paye) + '</b></div><div' + (du ? ' class="du"' : '') + '><span>À encaisser</span><b>' + gEuros(du) + '</b></div><div><span>Devis en attente</span><b>' + attente + '</b></div></div>'
+      + '<ol class="gdf-etapes"><li>Devis</li><li>Accepté</li><li>Facture</li><li>Chorus</li><li>Payée</li></ol>'
+      + (aFacturer.length ? '<div class="gdf-alerte">🧾 ' + aFacturer.length + ' devis accepté' + (aFacturer.length > 1 ? 's' : '') + ' à facturer.</div>' : '');
+  }
+  function dessinerDocsFiche() {
+    var com = $("g-commune").value, box = $("g-fiche-docs"); if (!box) return;
+    if (!com) { box.textContent = "—"; return; }
+    var tri = function (a, b) { return (b.date || "").localeCompare(a.date || ""); };
+    var dv = (G.Devis || []).filter(function (d) { return d.commune === com; }).sort(tri);
+    var fa = (G.Factures || []).filter(function (f) { return f.commune === com; }).sort(tri);
+    var h = gdfResume(dv, fa)
+      + '<h3 class="gdf-t">Devis <span>' + dv.length + '</span></h3>' + (dv.length ? dv.map(function (d) { return gdfCarteDevis(d, false); }).join("") : '<p class="gdf-vide">Aucun devis. « Nouveau devis » le prépare depuis l\'offre de la fiche.</p>')
+      + '<h3 class="gdf-t">Factures <span>' + fa.length + '</span></h3>' + (fa.length ? fa.map(function (f) { return gdfCarteFacture(f, false); }).join("") : '<p class="gdf-vide">Aucune facture. Elle se crée depuis un devis accepté (bouton « Créer la facture »).</p>');
     box.innerHTML = h;
   }
   $("g-fiche-docs").addEventListener("click", function (e) {
@@ -2223,5 +2232,89 @@
     });
   })();
   (function () { var st = document.createElement("style"); st.textContent = "@media(max-width:480px){#gfd-nouveau,#gfd-facture{float:none!important;display:inline-block;margin:6px 6px 0 0!important}}"; document.head.appendChild(st); })();
+
+
+  /* ——— Page Factures : émetteur repliable avec son état, recherche, devis et factures en cartes ——— */
+  var GM_OBLIG = [["raison_sociale", "raison sociale"], ["siret", "SIRET"], ["adresse", "adresse"], ["code_postal", "code postal"], ["ville", "ville"], ["iban", "IBAN"]];
+  (function () {
+    var carte = $("g-emetteur").closest(".carte"), h2 = carte.querySelector("h2");
+    var det = document.createElement("details"); det.id = "gm-det"; det.className = "gm-det";
+    det.innerHTML = '<summary><span class="gm-tit">Émetteur des devis et factures</span><span id="gm-etat" class="gm-etat">…</span></summary>';
+    var corps = document.createElement("div"); corps.className = "gm-corps";
+    Array.prototype.slice.call(carte.children).forEach(function (el) { if (el !== h2) corps.appendChild(el); });
+    det.appendChild(corps); h2.remove(); carte.appendChild(det);
+    // Recherche + résumé, juste sous l'émetteur.
+    carte.insertAdjacentHTML("afterend", '<div class="carte" id="gx-carte"><div class="gx-rech"><input id="gx-q" type="search" autocomplete="off" placeholder="🔍 N° de facture ou de devis, commune, client…" aria-label="Rechercher une facture ou un devis">'
+      + '<div class="gx-filtres" role="group" aria-label="Type de document"><button type="button" data-gx="tout" class="on">Tout</button><button type="button" data-gx="factures">Factures</button><button type="button" data-gx="devis">Devis</button><button type="button" data-gx="du">À encaisser</button></div></div>'
+      + '<div id="gx-res" class="gx-res"></div><div id="gx-resume"></div><div class="msg" id="msg-gx"></div></div>');
+  })();
+  function gmEtat() {
+    var manque = GM_OBLIG.filter(function (k) { return !emet(k[0]); });
+    var e = $("gm-etat"); if (!e) return;
+    e.className = "gm-etat " + (manque.length ? "ko" : "ok");
+    e.textContent = manque.length ? "⚠️ " + manque.length + " à remplir : " + manque.map(function (k) { return k[1]; }).join(", ") : "✅ Complet";
+  }
+  (function () { var o = dessinerEmetteur; dessinerEmetteur = function () { var r = o.apply(this, arguments); gmEtat(); return r; }; })();
+  var GX_FILTRE = "tout";
+  function gxFiltrer() {
+    var q = String(gVal("gx-q") || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim(), mots = q ? q.split(/\s+/) : [];
+    var n = { devis: 0, factures: 0 };
+    [["g-devis-liste", "devis"], ["g-factures-liste", "factures"]].forEach(function (x) {
+      var carte = $(x[0]).closest(".carte"), visibleType = GX_FILTRE === "tout" || GX_FILTRE === x[1] || (GX_FILTRE === "du" && x[1] === "factures");
+      carte.hidden = !visibleType;
+      Array.prototype.forEach.call($(x[0]).querySelectorAll(".gdf-c"), function (c) {
+        var cle = (c.dataset.gdfCle || "").normalize("NFD").replace(/[̀-ͯ]/g, "");
+        var ok = mots.every(function (m) { return cle.indexOf(m) >= 0; }) && (GX_FILTRE !== "du" || c.dataset.du === "1");
+        c.hidden = !ok; if (ok && visibleType) n[x[1]]++;
+      });
+      var cpt = carte.querySelector(".gx-n"); if (cpt) cpt.textContent = $(x[0]).querySelectorAll(".gdf-c:not([hidden])").length;
+    });
+    $("gx-res").textContent = (q || GX_FILTRE !== "tout") ? (n.factures + n.devis ? n.factures + " facture(s), " + n.devis + " devis trouvés" : "Aucun résultat.") : "";
+  }
+  (function () { var o = dessinerDocs; dessinerDocs = function () {
+    var tri = function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b.numero || "").localeCompare(a.numero || ""); };
+    var dv = (G.Devis || []).slice().sort(tri), fa = (G.Factures || []).slice().sort(tri);
+    $("g-devis-liste").innerHTML = dv.length ? dv.map(function (d) { return gdfCarteDevis(d, true); }).join("") : '<p class="gdf-vide">Aucun devis.</p>';
+    $("g-factures-liste").innerHTML = fa.length ? fa.map(function (f) { return gdfCarteFacture(f, true).replace('<div class="gdf-c', '<div data-du="' + (f.statut === "emise" || f.statut === "deposee_chorus" ? 1 : 0) + '" class="gdf-c'); }).join("") : '<p class="gdf-vide">Aucune facture.</p>';
+    $("gx-resume").innerHTML = gdfResume(dv, fa);
+    [["g-devis-liste", "Devis"], ["g-factures-liste", "Factures"]].forEach(function (x) {
+      var h2 = $(x[0]).closest(".carte").querySelector("h2"); if (h2 && !h2.querySelector(".gx-n")) h2.firstChild.textContent = x[1] + " "; if (h2 && !h2.querySelector(".gx-n")) h2.firstChild.after(Object.assign(document.createElement("span"), { className: "gx-n" }));
+    });
+    gxFiltrer();
+  }; })();
+  $("gx-q").addEventListener("input", gxFiltrer);
+  $("gx-carte").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-gx]"); if (!b) return;
+    GX_FILTRE = b.dataset.gx; Array.prototype.forEach.call(document.querySelectorAll("[data-gx]"), function (x) { x.classList.toggle("on", x === b); }); gxFiltrer();
+  });
+  // Actions des cartes dans les listes de la page Factures.
+  ["g-devis-liste", "g-factures-liste"].forEach(function (id) {
+    $(id).addEventListener("click", function (e) {
+      var f = e.target.closest("[data-gfacturer]");
+      if (f) { e.preventDefault(); e.stopImmediatePropagation(); factureDepuisDevis(f.dataset.gfacturer, "msg-gx"); return; }
+      var sp = e.target.closest("[data-gsuppr-doc]"); if (!sp) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (!confirm("Supprimer ce brouillon (" + (sp.dataset.gsupprDoc === "devis" ? "devis" : "facture") + ", avec ses lignes) ?")) return;
+      if (G_DOC && G_DOC.d && G_DOC.d.numero === sp.dataset.num) { $("g-doc").hidden = true; G_DOC = null; }
+      gEnvoyer({ op: "supprimer-document", type: sp.dataset.gsupprDoc, numero: sp.dataset.num }, "msg-gx", "Brouillon supprimé.").catch(function () {});
+    }, true);
+  });
+  // « Nouvelle facture » (page Factures) : propose d'abord les devis acceptés pas encore facturés.
+  $("g-facture-nouvelle").addEventListener("click", function (e) {
+    var acc = (G.Devis || []).filter(function (d) { return d.statut === "accepte" && !gdFactureDuDevis(d.numero); }); if (!acc.length) return;
+    e.stopImmediatePropagation();
+    var ch = prompt("Facturer un devis accepté ? Numéro :\n" + acc.map(function (d, i) { return (i + 1) + ". " + d.numero + " — " + gNomCommune(d.commune) + " (" + gEuros(d.total_ht) + " HT)"; }).join("\n") + "\n\n(0 = facture vierge)", "1");
+    if (ch === null) return;
+    var d = acc[Number(ch) - 1]; if (d) factureDepuisDevis(d.numero, "msg-gx"); else ouvrirDoc("facture", "");
+  }, true);
+  (function () { var st = document.createElement("style"); st.textContent =
+    ".gm-det summary{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;font-size:18px;font-weight:700;padding:2px 0}.gm-det summary::-webkit-details-marker{display:none}"
+    + ".gm-det summary:after{content:'▾';font-size:16px;color:var(--doux);margin-left:auto}.gm-det[open] summary:after{content:'▴'}.gm-corps{margin-top:10px}"
+    + ".gm-etat{font-size:13px;font-weight:600;border-radius:999px;padding:4px 10px}.gm-etat.ok{background:#E3F1E7;color:var(--vert)}.gm-etat.ko{background:#FDECEA;color:#8a1c14}"
+    + ".gx-rech input{font-size:17px;padding:12px 14px;margin:0 0 8px}.gx-filtres{display:flex;gap:6px;flex-wrap:wrap}.gx-filtres button{flex:1 1 auto;min-height:40px;border:1px solid var(--trait);background:#fff;border-radius:999px;padding:6px 12px;font:600 14px system-ui;color:var(--vert);cursor:pointer}"
+    + ".gx-filtres button.on{background:var(--vert);border-color:var(--vert);color:#fff}.gx-res{font-size:14px;color:var(--doux);margin:8px 0 4px}#gx-resume{margin-top:8px}"
+    + ".gx-n{display:inline-block;background:#EEF5F0;border-radius:999px;padding:1px 9px;font-size:13px;vertical-align:middle;margin-right:6px}.gdf-com{font-weight:700;color:var(--vert);margin-top:2px}"
+    + "#g-devis-liste,#g-factures-liste{font-size:15px}@media(max-width:480px){#g-devis-nouveau,#g-facture-nouvelle{float:none!important;display:block;width:100%;margin-top:8px}}";
+    document.head.appendChild(st); })();
 
 })();
