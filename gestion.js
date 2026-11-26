@@ -1346,21 +1346,40 @@
     var auj = new Date().toISOString().slice(0, 10), tri = function (a, b) { return (b.date || "").localeCompare(a.date || ""); };
     var dv = (G.Devis || []).filter(function (d) { return d.commune === com; }).sort(tri);
     var fa = (G.Factures || []).filter(function (f) { return f.commune === com; }).sort(tri);
-    var num = function (n) { return String(n || "").indexOf("BROUILLON") === 0 ? "brouillon" : n; };
-    var h = '<b>Devis (' + dv.length + ')</b>' + (dv.length ? '<table class="dns" style="margin-top:4px"><tr><th style="text-align:left">N°</th><th style="text-align:left">Date</th><th style="text-align:left">Objet</th><th style="text-align:left">Statut</th><th style="text-align:right">HT</th></tr>'
-      + dv.map(function (d) {
-          var info = d.statut === "accepte" && d.accepte_le ? " le " + gDateFR(d.accepte_le) : (d.statut === "envoye" && d.validite ? (d.validite < auj ? " — validité dépassée le " : " — valable jusqu'au ") + gDateFR(d.validite) : "");
-          return '<tr><td><a href="#" data-gdoc="devis" data-num="' + gEsc(d.numero) + '">' + gEsc(num(d.numero)) + '</a></td><td>' + gDateFR(d.date) + '</td><td>' + gEsc(d.objet || "") + '</td><td>' + badge(d.statut, G_ST_DEVIS) + '<span style="color:var(--doux)">' + gEsc(info) + '</span>' + (String(d.numero || "").indexOf("BROUILLON") === 0 || d.statut === "brouillon" ? ' <a href="#" data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '" style="color:var(--ko);white-space:nowrap" title="Supprimer ce brouillon">✕ supprimer</a>' : '') + '</td><td style="text-align:right">' + gEuros(d.total_ht) + '</td></tr>';
-        }).join("") + '</table>' : '<p>Aucun devis.</p>');
-    h += '<div style="height:10px"></div><b>Factures (' + fa.length + ')</b>' + (fa.length ? '<table class="dns" style="margin-top:4px"><tr><th style="text-align:left">N°</th><th style="text-align:left">Date</th><th style="text-align:left">Type</th><th style="text-align:left">Statut</th><th style="text-align:right">TTC</th></tr>'
-      + fa.map(function (f) {
-          var retard = (f.statut === "emise" || f.statut === "deposee_chorus") && f.echeance && f.echeance < auj;
-          var info = f.statut === "payee" && f.payee_le ? " le " + gDateFR(f.payee_le) : (f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus") ? (retard ? " — échue le " : " — échéance ") + gDateFR(f.echeance) : "");
-          return '<tr><td><a href="#" data-gdoc="facture" data-num="' + gEsc(f.numero) + '">' + gEsc(num(f.numero)) + '</a></td><td>' + gDateFR(f.date) + '</td><td>' + gEsc(gLib(G_TYPES_FACT, f.type)) + '</td><td>' + badge(f.statut, G_ST_FACT) + '<span style="color:' + (retard ? "var(--ko)" : "var(--doux)") + '">' + gEsc(info) + '</span>' + (String(f.numero || "").indexOf("BROUILLON") === 0 || f.statut === "brouillon" ? ' <a href="#" data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '" style="color:var(--ko);white-space:nowrap" title="Supprimer ce brouillon">✕ supprimer</a>' : '') + '</td><td style="text-align:right">' + gEuros(f.total_ttc) + '</td></tr>';
-        }).join("") + '</table>' : '<p>Aucune facture.</p>');
+    var brouillon = function (x) { return String(x.numero || "").indexOf("BROUILLON") === 0 || x.statut === "brouillon"; };
+    var num = function (x) { return String(x.numero || "").indexOf("BROUILLON") === 0 ? "Brouillon" : x.numero; };
     var paye = fa.filter(function (f) { return f.statut === "payee"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
     var du = fa.filter(function (f) { return f.statut === "emise" || f.statut === "deposee_chorus"; }).reduce(function (s, f) { return s + gNum(f.total_ttc); }, 0);
-    if (fa.length) h += '<p style="margin-top:6px">Encaissé : <b>' + gEuros(paye) + '</b> TTC · Reste à encaisser : <b' + (du ? ' style="color:var(--ko)"' : '') + '>' + gEuros(du) + '</b> TTC</p>';
+    var attente = dv.filter(function (d) { return d.statut === "envoye"; }).length;
+    var aFacturer = dv.filter(function (d) { return d.statut === "accepte" && !gdFactureDuDevis(d.numero); });
+    var h = '<div class="gdf-resume"><div><span>Encaissé</span><b>' + gEuros(paye) + '</b></div><div' + (du ? ' class="du"' : '') + '><span>À encaisser</span><b>' + gEuros(du) + '</b></div><div><span>Devis en attente</span><b>' + attente + '</b></div></div>'
+      + '<ol class="gdf-etapes"><li>Devis</li><li>Accepté</li><li>Facture</li><li>Chorus</li><li>Payée</li></ol>';
+    if (aFacturer.length) h += '<div class="gdf-alerte">🧾 ' + aFacturer.length + ' devis accepté' + (aFacturer.length > 1 ? 's' : '') + ' à facturer.</div>';
+    var act = function (lib, attrs, cls) { return '<button type="button" class="' + (cls || "second") + '" ' + attrs + '>' + lib + '</button>'; };
+    h += '<h3 class="gdf-t">Devis <span>' + dv.length + '</span></h3>' + (dv.length ? dv.map(function (d) {
+      var fac = gdFactureDuDevis(d.numero);
+      var info = d.statut === "accepte" ? "Accepté" + (d.accepte_le ? " le " + gDateFR(d.accepte_le) : "") + (d.accepte_par ? " par " + d.accepte_par : "")
+        : d.statut === "envoye" && d.validite ? (d.validite < auj ? "Validité dépassée le " : "Valable jusqu'au ") + gDateFR(d.validite) : "";
+      return '<div class="gdf-c"><div class="gdf-h"><b>' + gEsc(num(d)) + '</b>' + badge(d.statut, G_ST_DEVIS) + '</div>'
+        + (d.objet ? '<div class="gdf-o">' + gEsc(d.objet) + '</div>' : '')
+        + '<div class="gdf-m"><span>' + gDateFR(d.date) + (info ? '<br><small' + (d.statut === "envoye" && d.validite < auj ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(d.total_ht) + ' <small>HT</small></b></div>'
+        + (fac ? '<div class="gdf-lien">🧾 Facturé : <button type="button" class="gdf-lnk" data-gdoc="facture" data-num="' + gEsc(fac.numero) + '">' + gEsc(num(fac)) + '</button> ' + badge(fac.statut, G_ST_FACT) + '</div>' : '')
+        + '<div class="gdf-a">' + act("Ouvrir", 'data-gdoc="devis" data-num="' + gEsc(d.numero) + '"') + act("📄 PDF", 'data-gpdf="devis" data-num="' + gEsc(d.numero) + '"', "second gd-pdfb")
+        + (d.statut === "accepte" && !fac ? act("🧾 Créer la facture", 'data-gfacturer="' + gEsc(d.numero) + '"', "principal") : '')
+        + (brouillon(d) ? act("Supprimer", 'data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '"', "second gdf-sup") : '') + '</div></div>';
+    }).join("") : '<p class="gdf-vide">Aucun devis. « Nouveau devis » le prépare depuis l\'offre de la fiche.</p>');
+    h += '<h3 class="gdf-t">Factures <span>' + fa.length + '</span></h3>' + (fa.length ? fa.map(function (f) {
+      var retard = (f.statut === "emise" || f.statut === "deposee_chorus") && f.echeance && f.echeance < auj;
+      var info = f.statut === "payee" ? "Payée" + (f.payee_le ? " le " + gDateFR(f.payee_le) : "")
+        : f.echeance && (f.statut === "emise" || f.statut === "deposee_chorus") ? (retard ? "Échue depuis le " : "Échéance le ") + gDateFR(f.echeance) : f.statut === "brouillon" ? "À vérifier puis émettre" : "";
+      var details = [gLib(G_TYPES_FACT, f.type), f.periode_debut ? "du " + gDateFR(f.periode_debut) + " au " + gDateFR(f.periode_fin) : ""].filter(Boolean).join(" · ");
+      return '<div class="gdf-c' + (retard ? ' retard' : '') + '"><div class="gdf-h"><b>' + gEsc(num(f)) + '</b>' + badge(f.statut, G_ST_FACT) + '</div>'
+        + '<div class="gdf-o">' + gEsc(details) + (f.ref_devis ? '<br><small>Devis d\'origine : ' + gEsc(f.ref_devis) + '</small>' : '') + (f.ref_chorus ? '<br><small>Chorus : ' + gEsc(f.ref_chorus) + '</small>' : '') + '</div>'
+        + '<div class="gdf-m"><span>' + gDateFR(f.date) + (info ? '<br><small' + (retard ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(f.total_ttc) + ' <small>TTC</small></b></div>'
+        + '<div class="gdf-a">' + act("Ouvrir", 'data-gdoc="facture" data-num="' + gEsc(f.numero) + '"') + act("📄 PDF", 'data-gpdf="facture" data-num="' + gEsc(f.numero) + '"', "second gd-pdfb")
+        + (f.statut !== "annulee" ? act(f.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus", 'data-gch="' + gEsc(f.numero) + '"', f.statut === "emise" ? "principal" : "second") : '')
+        + (brouillon(f) ? act("Supprimer", 'data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '"', "second gdf-sup") : '') + '</div></div>';
+    }).join("") : '<p class="gdf-vide">Aucune facture. Elle se crée depuis un devis accepté (bouton « Créer la facture »).</p>');
     box.innerHTML = h;
   }
   $("g-fiche-docs").addEventListener("click", function (e) {
@@ -1949,7 +1968,7 @@
 
   /* Devis / facture ouvert depuis la fiche client : « Fermer » ramène à la fiche (sous-onglet Devis & factures). */
   var GD_ORIGINE = null;
-  $("g-fiche-docs").addEventListener("click", function (e) { if (e.target.closest("a[data-gdoc]")) GD_ORIGINE = $("g-commune").value; }, true);
+  $("g-fiche-docs").addEventListener("click", function (e) { if (e.target.closest("[data-gdoc],[data-gfacturer]")) GD_ORIGINE = $("g-commune").value; }, true);
   if ($("gfd-nouveau")) $("gfd-nouveau").addEventListener("click", function () { GD_ORIGINE = $("g-commune").value; }, true);
   $("g-doc-fermer").addEventListener("click", function () {
     if (!GD_ORIGINE) return;
@@ -2105,6 +2124,81 @@
     + ".gch-c b{display:block;font-size:16px;word-break:break-all;font-variant-numeric:tabular-nums}.gch-c i{color:var(--doux);font-weight:400}.gch-c small{display:block;font-size:12px;color:var(--doux)}.gch-c button{padding:6px 12px;font-size:13px;white-space:nowrap;margin:0}.gch-c button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}"
     + ".gch-lien{display:block;text-align:center;padding:13px;border-radius:12px;background:#1F3A2E;color:#fff;font-weight:700;text-decoration:none;font-size:16px}"
     + "#gch .principal{width:100%;margin-top:8px}#gch-ref{font-size:16px}.gch-b{color:#5B3A87}";
+    document.head.appendChild(st); })();
+
+
+  /* — Du devis à la facture : une facture se crée depuis son devis accepté (lignes, TVA et lien repris). — */
+  function gdFactureDuDevis(n) { return (G && G.Factures || []).filter(function (f) { return f.ref_devis === n && f.statut !== "annulee"; })[0] || null; }
+  function gdLignesDevis(n) {
+    return (G.Lignes || []).filter(function (l) { return l.document === n; }).sort(function (a, b) { return Number(a.num) - Number(b.num); })
+      .map(function (l) { return { designation: l.designation, site_code: l.site_code, quantite: l.quantite, prix_unitaire_ht: l.prix_unitaire_ht, periode_debut: l.periode_debut, periode_fin: l.periode_fin }; });
+  }
+  function factureDepuisDevis(n, idMsg) {
+    var d = (G.Devis || []).filter(function (x) { return x.numero === n; })[0]; if (!d) return;
+    var deja = gdFactureDuDevis(n);
+    if (deja && !confirm("Ce devis a déjà la facture " + deja.numero + ". En créer une autre ?")) return;
+    if (d.statut !== "accepte" && !confirm("Ce devis n'est pas marqué « Accepté ». Créer quand même la facture ?")) return;
+    var lignes = gdLignesDevis(n); if (!lignes.length) { msg(idMsg, "Le devis " + n + " n'a aucune ligne.", "ko"); return; }
+    var auj = new Date().toISOString().slice(0, 10), fin = new Date(auj + "T12:00:00"); fin.setFullYear(fin.getFullYear() + 1); fin.setDate(fin.getDate() - 1);
+    var e = { numero: "", commune: d.commune, date: auj, type: "forfait", periode_debut: auj, periode_fin: fin.toISOString().slice(0, 10), ref_devis: n, statut: "brouillon", taux_tva: d.taux_tva || "", notes: d.objet ? "Objet : " + d.objet : "" };
+    gEnvoyer({ op: "document", type: "facture", entete: e, lignes: lignes }, idMsg, "Facture préparée depuis le devis " + n + ".").then(function (j) {
+      var num = j.document && j.document.numero; if (!num) return;
+      var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click();
+      ouvrirDoc("facture", num);
+      msg("msg-doc", "Facture préparée depuis le devis " + n + " (lignes et TVA reprises). Vérifiez la période, puis passez le statut à « Émise » et enregistrez.", "info");
+    }).catch(function () {});
+  }
+  $("g-fiche-docs").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-gfacturer]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation();
+    GD_ORIGINE = $("g-commune").value; factureDepuisDevis(b.dataset.gfacturer, "msg-fiche-docs");
+  }, true);
+  // Dans l'éditeur de devis : bouton « Créer la facture » quand le devis enregistré est accepté.
+  $("g-doc-pdf").insertAdjacentHTML("afterend", '<button class="principal" id="g-doc-facturer" type="button" style="flex:1;margin-top:0" hidden>🧾 Créer la facture</button>');
+  $("g-doc-facturer").addEventListener("click", function () { if (G_DOC && G_DOC.d.numero) factureDepuisDevis(G_DOC.d.numero, "msg-doc"); });
+  // Dans l'éditeur de facture : choisir le devis d'origine reprend ses lignes et sa TVA.
+  function gdBrancherDevis() {
+    var s = $("gd-devis"); if (!s || !G_DOC || G_DOC.type !== "facture" || G_DOC.verrou) return;
+    var remplir = function () {
+      var com = gVal("gd-commune"), cur = s.value;
+      s.innerHTML = '<option value="">— aucun —</option>' + (G.Devis || []).filter(function (x) { return x.commune === com && String(x.numero).indexOf("BROUILLON") !== 0; })
+        .map(function (x) { return '<option value="' + gEsc(x.numero) + '"' + (x.numero === cur ? " selected" : "") + '>' + gEsc(x.numero + " — " + gLib(G_ST_DEVIS, x.statut) + " — " + gEuros(x.total_ht) + " HT") + '</option>'; }).join("");
+    };
+    remplir();
+    if ($("gd-commune")) $("gd-commune").addEventListener("change", remplir);
+    s.addEventListener("change", function () {
+      var n = s.value; if (!n) return;
+      var lignes = gdLignesDevis(n); if (!lignes.length) return;
+      lireLignesSaisies();
+      var utiles = G_DOC.lignes.filter(function (l) { return String(l.designation || "").trim() || Number(l.prix_unitaire_ht); });
+      if (utiles.length && !confirm("Remplacer les " + utiles.length + " ligne(s) de la facture par celles du devis " + n + " ?")) return;
+      G_DOC.lignes = lignes;
+      var d = (G.Devis || []).filter(function (x) { return x.numero === n; })[0];
+      if (d && d.taux_tva && $("gd-tva")) $("gd-tva").value = d.taux_tva;
+      dessinerLignes(); msg("msg-doc", "Lignes reprises du devis " + n + ". Enregistrez pour les garder.", "info");
+    });
+  }
+  (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments);
+    var d = G_DOC && G_DOC.d;
+    $("g-doc-facturer").hidden = !(G_DOC && G_DOC.type === "devis" && d.numero && d.statut === "accepte");
+    if (!$("g-doc-facturer").hidden && gdFactureDuDevis(d.numero)) $("g-doc-facturer").textContent = "🧾 Facture " + gdFactureDuDevis(d.numero).numero;
+    else $("g-doc-facturer").textContent = "🧾 Créer la facture";
+    gdBrancherDevis(); return r; }; })();
+  $("g-doc-facturer").addEventListener("click", function (e) {
+    var f = G_DOC && gdFactureDuDevis(G_DOC.d.numero); if (!f) return; e.stopImmediatePropagation(); ouvrirDoc("facture", f.numero);
+  }, true);
+  (function () { var st = document.createElement("style"); st.textContent =
+    "#g-fiche-docs{font-size:15px}.gdf-resume{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.gdf-resume div{background:#F4F1EA;border-radius:12px;padding:8px 10px}"
+    + ".gdf-resume span{display:block;font-size:12px;color:var(--doux)}.gdf-resume b{font-size:17px;font-variant-numeric:tabular-nums}.gdf-resume .du b{color:var(--ko)}"
+    + ".gdf-etapes{display:flex;list-style:none;margin:0 0 10px;padding:0;gap:4px;font-size:12px;color:var(--doux);counter-reset:e}.gdf-etapes li{flex:1;text-align:center;padding:5px 2px;border-radius:8px;background:#EEF5F0;counter-increment:e}.gdf-etapes li:before{content:counter(e) '. ';font-weight:700}"
+    + ".gdf-alerte{background:#FFF4DF;color:#8a5a00;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-weight:600}"
+    + ".gdf-t{display:flex;align-items:center;gap:8px;margin:14px 0 8px;font-size:16px}.gdf-t span{background:#EEF5F0;border-radius:999px;padding:1px 9px;font-size:13px}"
+    + ".gdf-c{border:1px solid var(--trait);border-radius:14px;padding:12px 14px;margin-bottom:10px;background:#fff}.gdf-c.retard{border-color:#f2b8b5;background:#FFF8F7}"
+    + ".gdf-h{display:flex;justify-content:space-between;align-items:center;gap:8px}.gdf-h b{font-size:16px}.gdf-o{margin-top:4px;color:#333}.gdf-o small,.gdf-m small{color:var(--doux);font-size:13px}.gdf-m small.ko{color:var(--ko);font-weight:600}"
+    + ".gdf-m{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-top:6px}.gdf-m>b{font-size:19px;white-space:nowrap;font-variant-numeric:tabular-nums}.gdf-m>b small{font-size:12px;color:var(--doux);font-weight:400}"
+    + ".gdf-lien{margin-top:8px;padding:6px 10px;border-radius:8px;background:#EEF5F0}"
+    + ".gdf-a{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.gdf-a button{flex:1 1 auto;min-height:42px;margin:0;padding:8px 12px;font-size:14px;border-radius:10px}.gdf-a .gd-pdfb{font:inherit;font-size:14px;margin:0}.gdf-a .gdf-sup{color:var(--ko);flex:0 1 auto}"
+    + ".gdf-vide{color:var(--doux);font-style:italic}.gdf-lnk{border:0;background:none;padding:0;margin:0 4px 0 0;font:inherit;font-weight:700;color:var(--vert);text-decoration:underline;cursor:pointer}"
+    + "@media(max-width:480px){.gdf-resume b{font-size:15px}.gdf-a button{flex:1 1 40%}.gdf-a .principal{flex:1 1 100%}}";
     document.head.appendChild(st); })();
 
 })();
