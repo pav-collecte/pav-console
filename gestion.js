@@ -1818,17 +1818,50 @@
       + '<div class="pied">' + gEsc([emet("raison_sociale"), emet("forme_juridique"), emet("siret") ? "SIRET " + emet("siret") : "", emet("tva_intracom") ? "TVA " + emet("tva_intracom") : ""].filter(Boolean).join(" · ")) + '</div>'
       + '</div></body></html>';
   }
-  function apercuDoc() {
-    if (!G_DOC) return;
-    var w = window.open("", "_blank");
-    if (!w) { msg("msg-doc", "Autorisez les fenêtres surgissantes pour voir l'aperçu.", "ko"); return; }
-    w.document.open(); w.document.write(htmlDocument(lireDocCourant())); w.document.close();
+  /* Aperçu dans la console (plein écran, sans nouvelle fenêtre : fiable aussi sur téléphone). */
+  function montrerApercu(x) {
+    var vieux = $("gd-apercu"); if (vieux) vieux.remove();
+    var titre = (x.t === "devis" ? "Devis " : "Facture ") + (x.d.numero && x.d.numero.indexOf("BROUILLON") !== 0 ? x.d.numero : "(brouillon)");
+    var f = document.createElement("div"); f.id = "gd-apercu";
+    f.innerHTML = '<div class="gda-barre"><b>' + gEsc(titre) + ' — ' + gEsc(gNomCommune(x.d.commune)) + '</b><span><button type="button" id="gda-pdf">Imprimer / Enregistrer en PDF</button><button type="button" id="gda-x" aria-label="Fermer">✕</button></span></div><iframe id="gda-if" title="Aperçu du document"></iframe>';
+    document.body.appendChild(f); document.body.style.overflow = "hidden";
+    $("gda-if").srcdoc = htmlDocument(x).replace('<div class="barre">', '<div class="barre" style="display:none">');
+    var fermer = function () { f.remove(); document.body.style.overflow = ""; };
+    $("gda-x").onclick = fermer;
+    $("gda-pdf").onclick = function () { try { var w = $("gda-if").contentWindow; w.focus(); w.print(); } catch (e) { msg("msg-doc", "Impression impossible : " + e.message, "ko"); } };
   }
+  function apercuDoc() { if (G_DOC) montrerApercu(lireDocCourant()); }
+  function apercuDepuisListe(type, numero) {
+    var o = type === "devis" ? "Devis" : "Factures", d = (G[o] || []).filter(function (x) { return x.numero === numero; })[0]; if (!d) return;
+    var lignes = (G.Lignes || []).filter(function (l) { return l.document === numero; }).sort(function (a, b) { return Number(a.num) - Number(b.num); });
+    montrerApercu({ t: type, d: Object.assign({}, d), lignes: lignes });
+  }
+  // Bouton 📄 PDF à côté de chaque devis / facture des listes.
+  function boutonsPdf() {
+    ["g-devis-liste", "g-factures-liste", "g-fiche-docs"].forEach(function (id) {
+      var box = $(id); if (!box) return;
+      Array.prototype.forEach.call(box.querySelectorAll("a[data-gdoc]"), function (a) {
+        if (a.nextElementSibling && a.nextElementSibling.classList.contains("gd-pdfb")) return;
+        a.insertAdjacentHTML("afterend", ' <button type="button" class="gd-pdfb" data-gpdf="' + gEsc(a.dataset.gdoc) + '" data-num="' + gEsc(a.dataset.num) + '" title="Voir le PDF">📄 PDF</button>');
+      });
+    });
+  }
+  ["g-devis-liste", "g-factures-liste", "g-fiche-docs"].forEach(function (id) {
+    var box = $(id); if (!box) return;
+    box.addEventListener("click", function (e) { var b = e.target.closest("[data-gpdf]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); apercuDepuisListe(b.dataset.gpdf, b.dataset.num); }, true);
+    new MutationObserver(boutonsPdf).observe(box, { childList: true });
+  });
+  boutonsPdf();
   $("g-doc-pdf").addEventListener("click", apercuDoc);
   (function () { var st = document.createElement("style"); st.textContent =
     ".gd-ent,.gd-cols{display:grid;grid-template-columns:1fr 64px 1fr 96px 34px;gap:6px;align-items:center}.gd-ent{font-size:12px;color:var(--doux);margin:8px 0 -2px;padding:0 2px}"
     + ".gd-cols{margin-top:6px}.gd-cols input{margin:0}.gd-tl{text-align:right;font-variant-numeric:tabular-nums}"
-    + "@media(max-width:480px){.gd-ent,.gd-cols{grid-template-columns:1fr 54px 1fr 80px 30px}}";
+    + "@media(max-width:480px){.gd-ent,.gd-cols{grid-template-columns:1fr 54px 1fr 80px 30px}}"
+    + "#gd-apercu{position:fixed;inset:0;z-index:120;background:#3b423e;display:flex;flex-direction:column}"
+    + ".gda-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#1F3A2E;color:#fff;font-size:15px}.gda-barre span{display:flex;gap:8px}"
+    + ".gda-barre button{border:0;border-radius:9px;padding:10px 14px;font:700 15px system-ui;cursor:pointer;background:#fff;color:#1F3A2E}#gda-x{background:transparent;color:#fff;font-size:20px;padding:6px 12px}"
+    + "#gda-if{flex:1;border:0;background:#fff;width:100%;max-width:900px;margin:0 auto}"
+    + ".gd-pdfb{border:1px solid var(--trait);background:#fff;border-radius:7px;padding:2px 8px;font:600 12px system-ui;cursor:pointer;margin-left:4px;vertical-align:middle}.gd-pdfb:hover{background:#EEF5F0}";
     document.head.appendChild(st); })();
 
   /* Éditeur de document : lignes du catalogue, remise commerciale, option offerte (parrainage). */
