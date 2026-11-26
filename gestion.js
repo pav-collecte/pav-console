@@ -11,7 +11,7 @@
   [["clients", "Clients"], ["carte", "Carte"], ["agenda", "Agenda"], ["tarifs", "Tarifs"], ["factu", "Factures"], ["avis", "Avis"]].forEach(function (o) {
     var b = document.createElement("button"); b.dataset.onglet = o[0]; b.textContent = o[1]; nav.appendChild(b);
   });
-  main.insertAdjacentHTML("beforeend", "  <section id=\"clients\">\n    <div class=\"carte\">\n      <h2>Suivi des communes <button class=\"second\" id=\"g-recharger\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Actualiser</button></h2>\n      <p class=\"petit\">Une ligne par commune : o\u00f9 en est la relation, et la prochaine action pr\u00e9vue.</p>\n      <div id=\"g-pipeline\" class=\"petit\">\u2014</div>\n      <div class=\"msg\" id=\"msg-gestion\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Fiche client</h2>\n      <label for=\"g-commune\"><b>Commune</b></label>\n      <select id=\"g-commune\"></select>\n      <div id=\"g-contrat\" class=\"petit\" style=\"margin-top:8px\"></div>\n      <div id=\"g-fiche\"></div>\n      <button class=\"principal\" id=\"g-fiche-ok\" type=\"button\">Enregistrer la fiche</button>\n      <div class=\"msg\" id=\"msg-fiche\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Contacts</h2>\n      <div id=\"g-contacts\" class=\"petit\"></div>\n      <div id=\"g-contact-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-contact\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>\u00c9changes</h2>\n      <p class=\"petit\">Appels, r\u00e9unions, d\u00e9monstrations, relances\u2026 et la prochaine action \u00e0 faire.</p>\n      <div id=\"g-echanges\" class=\"petit\"></div>\n      <div id=\"g-echange-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-echange\"></div>\n    </div>\n  </section>\n\n  <section id=\"factu\">\n    <div class=\"carte\">\n      <h2>\u00c9metteur des devis et factures</h2>\n      <p class=\"petit\">Ces informations figureront sur chaque document. Tant que des champs sont \u00ab \u00c0 REMPLIR \u00bb, les documents restent des brouillons sans valeur.</p>\n      <div id=\"g-emetteur\"></div>\n      <button class=\"principal\" id=\"g-emetteur-ok\" type=\"button\">Enregistrer l'\u00e9metteur</button>\n      <div class=\"msg\" id=\"msg-emetteur\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Devis <button class=\"second\" id=\"g-devis-nouveau\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouveau devis</button></h2>\n      <div id=\"g-devis-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\">\n      <h2>Factures <button class=\"second\" id=\"g-facture-nouvelle\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouvelle facture</button></h2>\n      <div id=\"g-factures-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\" id=\"g-doc\" hidden>\n      <h2 id=\"g-doc-titre\">Document</h2>\n      <div id=\"g-doc-entete\"></div>\n      <h2 style=\"margin-top:14px\">Lignes</h2>\n      <div id=\"g-doc-lignes\"></div>\n      <button class=\"second\" id=\"g-doc-ligne\" type=\"button\" style=\"margin-top:8px\">+ Ajouter une ligne</button>\n      <div id=\"g-doc-totaux\" class=\"petit\" style=\"margin-top:10px;text-align:right;font-size:15px\"></div>\n      <div class=\"msg\" id=\"msg-doc\"></div>\n      <div style=\"display:flex;gap:8px;margin-top:12px;flex-wrap:wrap\">\n        <button class=\"second\" id=\"g-doc-fermer\" type=\"button\" style=\"flex:1\">Fermer</button>\n        <button class=\"second\" id=\"g-doc-supprimer\" type=\"button\" style=\"flex:1;color:var(--ko)\">Supprimer le brouillon</button>\n        <button class=\"principal\" id=\"g-doc-ok\" type=\"button\" style=\"flex:2;margin-top:0\">Enregistrer</button>\n      </div>\n    </div>\n  </section>\n");
+  main.insertAdjacentHTML("beforeend", "  <section id=\"clients\">\n    <div class=\"carte\">\n      <h2>Suivi des communes <button class=\"second\" id=\"g-recharger\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Actualiser</button></h2>\n      <p class=\"petit\">Une ligne par commune : o\u00f9 en est la relation, et la prochaine action pr\u00e9vue.</p>\n      <div id=\"g-pipeline\" class=\"petit\">\u2014</div>\n      <div class=\"msg\" id=\"msg-gestion\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Fiche client</h2>\n      <label for=\"g-commune\"><b>Commune</b></label>\n      <select id=\"g-commune\"></select>\n      <div id=\"g-contrat\" class=\"petit\" style=\"margin-top:8px\"></div>\n      <div id=\"g-fiche\"></div>\n      <button class=\"principal\" id=\"g-fiche-ok\" type=\"button\">Enregistrer la fiche</button>\n      <div class=\"msg\" id=\"msg-fiche\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Contacts</h2>\n      <div id=\"g-contacts\" class=\"petit\"></div>\n      <div id=\"g-contact-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-contact\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>\u00c9changes</h2>\n      <p class=\"petit\">Appels, r\u00e9unions, d\u00e9monstrations, relances\u2026 et la prochaine action \u00e0 faire.</p>\n      <div id=\"g-echanges\" class=\"petit\"></div>\n      <div id=\"g-echange-form\" style=\"margin-top:10px;padding-top:10px;border-top:1px solid var(--trait)\"></div>\n      <div class=\"msg\" id=\"msg-echange\"></div>\n    </div>\n  </section>\n\n  <section id=\"factu\">\n    <div class=\"carte\">\n      <h2>\u00c9metteur des devis et factures</h2>\n      <p class=\"petit\">Ces informations figureront sur chaque document. Tant que des champs sont \u00ab \u00c0 REMPLIR \u00bb, les documents restent des brouillons sans valeur.</p>\n      <div id=\"g-emetteur\"></div>\n      <button class=\"principal\" id=\"g-emetteur-ok\" type=\"button\">Enregistrer l'\u00e9metteur</button>\n      <div class=\"msg\" id=\"msg-emetteur\"></div>\n    </div>\n    <div class=\"carte\">\n      <h2>Devis <button class=\"second\" id=\"g-devis-nouveau\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouveau devis</button></h2>\n      <div id=\"g-devis-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\">\n      <h2>Factures <button class=\"second\" id=\"g-facture-nouvelle\" type=\"button\" style=\"float:right;padding:4px 10px;font-size:13px\">Nouvelle facture</button></h2>\n      <div id=\"g-factures-liste\" class=\"petit\">\u2014</div>\n    </div>\n    <div class=\"carte\" id=\"g-doc\" hidden>\n      <h2 id=\"g-doc-titre\">Document</h2>\n      <div id=\"g-doc-entete\"></div>\n      <h2 style=\"margin-top:14px\">Lignes</h2>\n      <div id=\"g-doc-lignes\"></div>\n      <button class=\"second\" id=\"g-doc-ligne\" type=\"button\" style=\"margin-top:8px\">+ Ajouter une ligne</button>\n      <div id=\"g-doc-totaux\" class=\"petit\" style=\"margin-top:10px;text-align:right;font-size:15px\"></div>\n      <div class=\"msg\" id=\"msg-doc\"></div>\n      <div style=\"display:flex;gap:8px;margin-top:12px;flex-wrap:wrap\">\n        <button class=\"second\" id=\"g-doc-fermer\" type=\"button\" style=\"flex:1\">Fermer</button>\n        <button class=\"second\" id=\"g-doc-pdf\" type=\"button\" style=\"flex:1\">Aperçu / PDF</button>\n        <button class=\"second\" id=\"g-doc-supprimer\" type=\"button\" style=\"flex:1;color:var(--ko)\">Supprimer le brouillon</button>\n        <button class=\"principal\" id=\"g-doc-ok\" type=\"button\" style=\"flex:2;margin-top:0\">Enregistrer</button>\n      </div>\n    </div>\n  </section>\n");
   // Bascule d'onglet pour les deux nouveaux boutons (les autres sont gérés par la console).
   Array.prototype.forEach.call(nav.querySelectorAll("button"), function (b) {
     b.addEventListener("click", function () {
@@ -344,13 +344,14 @@
   }
   function dessinerLignes() {
     var v = G_DOC.verrou;
-    $("g-doc-lignes").innerHTML = G_DOC.lignes.map(function (l, i) {
+    $("g-doc-lignes").innerHTML = (G_DOC.lignes.length ? '<div class="gd-ent"><span>Point</span><span>Qté</span><span>Prix unit. HT</span><span style="text-align:right">Total HT</span><span></span></div>' : '') + G_DOC.lignes.map(function (l, i) {
       return '<div class="g-ligne" data-i="' + i + '" style="padding:8px 0;border-bottom:1px solid var(--trait)">'
         + '<input data-k="designation" placeholder="Désignation (ex. Point de collecte AND-06 — 2027)" value="' + gEsc(l.designation) + '"' + (v ? " disabled" : "") + '>'
-        + '<div style="display:grid;grid-template-columns:1fr 70px 1fr 34px;gap:6px;margin-top:6px;align-items:center">'
-        + '<input data-k="site_code" placeholder="Point" value="' + gEsc(l.site_code) + '"' + (v ? " disabled" : "") + '>'
-        + '<input data-k="quantite" type="number" step="any" placeholder="Qté" value="' + gEsc(l.quantite) + '"' + (v ? " disabled" : "") + '>'
-        + '<input data-k="prix_unitaire_ht" type="number" step="0.01" placeholder="PU HT €" value="' + gEsc(l.prix_unitaire_ht) + '"' + (v ? " disabled" : "") + '>'
+        + '<div class="gd-cols">'
+        + '<input data-k="site_code" placeholder="—" value="' + gEsc(l.site_code) + '"' + (v ? " disabled" : "") + ' aria-label="Point concerné">'
+        + '<input data-k="quantite" type="number" step="any" placeholder="1" value="' + gEsc(l.quantite) + '"' + (v ? " disabled" : "") + ' aria-label="Quantité">'
+        + '<input data-k="prix_unitaire_ht" type="number" step="0.01" placeholder="0,00" value="' + gEsc(l.prix_unitaire_ht) + '"' + (v ? " disabled" : "") + ' aria-label="Prix unitaire HT">'
+        + '<b class="gd-tl">' + gEuros((Number(String(l.quantite).replace(",", ".")) || 0) * (Number(String(l.prix_unitaire_ht).replace(",", ".")) || 0)) + '</b>'
         + (v ? '<span></span>' : '<button type="button" class="second" data-gsuppr-ligne="' + i + '" style="padding:6px;color:var(--ko)" aria-label="Retirer la ligne">×</button>') + '</div></div>';
     }).join("") || '<p class="petit">Aucune ligne.</p>';
     totauxDoc();
@@ -1755,5 +1756,127 @@
     + ".gav-sw{display:flex;gap:8px}.gav-ok span{border:1px solid var(--trait);border-radius:999px;padding:6px 12px;font-size:14px}.gav-ok input{position:absolute;opacity:0;width:1px;height:1px}"
     + ".gav-ok input:checked+span{background:var(--ok);border-color:var(--ok);color:#fff}.gav-ok input:focus-visible+span{outline:2px solid var(--accent)}";
     document.head.appendChild(st); })();
+
+  /* — Document imprimable (devis / facture) : modèle classique et professionnel, A4, enregistrable en PDF — */
+  function emet(k) { var v = ((G.Emetteur || []).filter(function (p) { return p.cle === k; })[0] || {}).valeur || ""; return v === "À REMPLIR" ? "" : v; }
+  function lireDocCourant() {
+    var t = G_DOC.type, d = Object.assign({}, G_DOC.d);
+    var map = { commune: "gd-commune", date: "gd-date", objet: "gd-objet", statut: "gd-statut", ref_points: "gd-points", taux_tva: "gd-tva", notes: "gd-notes", type: "gd-type", periode_debut: "gd-pdeb", periode_fin: "gd-pfin", ref_devis: "gd-devis", ref_chorus: "gd-chorus" };
+    Object.keys(map).forEach(function (k) { if ($(map[k])) d[k] = gVal(map[k]); });
+    var lignes = (G_DOC.lignes || []).filter(function (l) { return String(l.designation || "").trim() || Number(l.prix_unitaire_ht); });
+    return { t: t, d: d, lignes: lignes };
+  }
+  function htmlDocument(x) {
+    var t = x.t, d = x.d, cl = gClient(d.commune), tva = Number(String(d.taux_tva || emet("taux_tva") || 20).replace(",", ".")) || 0;
+    var num = d.numero && d.numero.indexOf("BROUILLON") !== 0 ? d.numero : "Brouillon";
+    var ht = 0, lignes = x.lignes.map(function (l) {
+      var q = Number(String(l.quantite).replace(",", ".")) || 0, pu = Number(String(l.prix_unitaire_ht).replace(",", ".")) || 0, tl = q * pu; ht += tl;
+      return '<tr><td>' + gEsc(l.designation || "") + (l.site_code ? '<div class="sub">Point ' + gEsc(l.site_code) + '</div>' : '') + (l.periode_debut ? '<div class="sub">Du ' + gDateFR(l.periode_debut) + ' au ' + gDateFR(l.periode_fin) + '</div>' : '') + '</td>'
+        + '<td class="n">' + String(q).replace(".", ",") + '</td><td class="n">' + gEuros(pu) + '</td><td class="n">' + gEuros(tl) + '</td></tr>';
+    }).join("");
+    var mt = ht * tva / 100, ttc = ht + mt;
+    var validite = d.validite || (function () { var n = Number(emet("validite_devis_jours")) || 30, z = new Date((d.date || new Date().toISOString().slice(0, 10)) + "T12:00:00"); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); })();
+    var echeance = d.echeance || (function () { var n = Number(emet("delai_paiement_jours")) || 30, z = new Date((d.date || new Date().toISOString().slice(0, 10)) + "T12:00:00"); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); })();
+    var adrE = [emet("adresse"), (emet("code_postal") + " " + emet("ville")).trim()].filter(Boolean).map(gEsc).join("<br>");
+    var adrC = [cl.adresse_facturation, ((cl.code_postal || "") + " " + (cl.ville || "")).trim()].filter(Boolean).map(gEsc).join("<br>");
+    var titre = t === "devis" ? "Devis" : "Facture";
+    var manque = ["raison_sociale", "siret", "adresse", "iban"].filter(function (k) { return !emet(k); });
+    return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + titre + ' ' + gEsc(num) + ' — ' + gEsc(gNomCommune(d.commune)) + '</title><style>'
+      + '@page{size:A4;margin:16mm 15mm 18mm}*{box-sizing:border-box}body{font:10.5pt/1.45 "Helvetica Neue",Arial,sans-serif;color:#1d2420;margin:0}'
+      + '.barre{position:sticky;top:0;background:#1F3A2E;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center;font:600 14px system-ui}.barre button{border:0;border-radius:8px;padding:9px 16px;font:700 14px system-ui;cursor:pointer;background:#fff;color:#1F3A2E}'
+      + '.page{max-width:180mm;margin:0 auto;padding:12mm 0}.alerte{background:#FDECEA;color:#8a1c14;border:1px solid #f2b8b5;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:9.5pt}'
+      + '.haut{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.em b{font-size:13pt}.em,.cl{font-size:9.5pt;color:#333}'
+      + '.titre{text-align:right}.titre h1{margin:0;font-size:24pt;letter-spacing:.04em;color:#1F3A2E;text-transform:uppercase}.titre .num{font-size:11pt;font-weight:700}.titre .dt{font-size:9.5pt;color:#555}'
+      + '.blocs{display:flex;justify-content:space-between;gap:20px;margin:14mm 0 8mm}.cl{border:1px solid #cfd4cd;border-radius:6px;padding:10px 12px;min-width:85mm}.cl .lab,.lab{font-size:8pt;text-transform:uppercase;letter-spacing:.08em;color:#777;margin-bottom:3px}'
+      + '.objet{margin:0 0 6mm;font-size:11pt}table{width:100%;border-collapse:collapse}th{background:#1F3A2E;color:#fff;font-size:8.5pt;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:7px 8px}'
+      + 'td{padding:8px;border-bottom:1px solid #e4e1d8;vertical-align:top}.n{text-align:right;white-space:nowrap}.sub{font-size:8.5pt;color:#666}'
+      + '.tot{margin-left:auto;width:75mm;margin-top:5mm}.tot div{display:flex;justify-content:space-between;padding:4px 8px}.tot .ttc{background:#1F3A2E;color:#fff;font-weight:700;font-size:12pt;border-radius:4px;margin-top:3px}'
+      + '.mentions{margin-top:9mm;font-size:8.5pt;color:#444}.mentions p{margin:3px 0}.sign{display:flex;gap:20px;margin-top:10mm}.sign div{flex:1;border:1px solid #cfd4cd;border-radius:6px;height:32mm;padding:8px;font-size:9pt;color:#555}'
+      + '.pied{margin-top:12mm;padding-top:6px;border-top:1px solid #cfd4cd;font-size:7.5pt;color:#777;text-align:center}'
+      + '@media print{.barre{display:none}.page{padding:0;max-width:none}.alerte{display:none}}'
+      + '</style></head><body><div class="barre">' + titre + ' ' + gEsc(num) + ' — <button type="button" onclick="window.print()">Imprimer / Enregistrer en PDF</button></div><div class="page">'
+      + (manque.length ? '<div class="alerte">Émetteur incomplet (onglet Factures › Émetteur) : ' + manque.join(", ") + '. Le document n\'a pas de valeur tant que ces champs sont vides.</div>' : '')
+      + (num === "Brouillon" ? '<div class="alerte">Brouillon : enregistrez le document pour obtenir son numéro.</div>' : '')
+      + '<div class="haut"><div class="em"><b>' + gEsc(emet("raison_sociale") || "Raison sociale") + '</b>' + (emet("forme_juridique") ? ' <span>(' + gEsc(emet("forme_juridique")) + ')</span>' : '') + '<br>' + adrE
+      + (emet("telephone") ? '<br>Tél. ' + gEsc(emet("telephone")) : '') + (emet("email") ? '<br>' + gEsc(emet("email")) : '') + (emet("siret") ? '<br>SIRET ' + gEsc(emet("siret")) : '') + (emet("tva_intracom") ? '<br>TVA ' + gEsc(emet("tva_intracom")) : '') + '</div>'
+      + '<div class="titre"><h1>' + titre + '</h1><div class="num">N° ' + gEsc(num) + '</div><div class="dt">Date : ' + gDateFR(d.date) + (t === "devis" ? '<br>Valable jusqu\'au ' + gDateFR(validite) : '<br>Échéance : ' + gDateFR(echeance)) + '</div></div></div>'
+      + '<div class="blocs"><div></div><div class="cl"><div class="lab">' + (t === "devis" ? "Destinataire" : "Facturé à") + '</div><b>' + gEsc(cl.nom_officiel || ("Mairie de " + gNomCommune(d.commune))) + '</b><br>' + adrC
+      + (cl.siret ? '<br>SIRET ' + gEsc(cl.siret) : '') + (cl.code_service_chorus ? '<br>Code service Chorus : ' + gEsc(cl.code_service_chorus) : '') + '</div></div>'
+      + (t === "devis" && d.objet ? '<p class="objet"><b>Objet :</b> ' + gEsc(d.objet) + '</p>' : '')
+      + (t === "facture" ? '<p class="objet">' + (d.periode_debut ? '<b>Période :</b> du ' + gDateFR(d.periode_debut) + ' au ' + gDateFR(d.periode_fin) : '') + (d.ref_devis ? (d.periode_debut ? ' · ' : '') + '<b>Devis :</b> ' + gEsc(d.ref_devis) : '') + '</p>' : '')
+      + '<table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unit. HT</th><th class="n">Total HT</th></tr></thead><tbody>' + (lignes || '<tr><td colspan="4">Aucune ligne.</td></tr>') + '</tbody></table>'
+      + '<div class="tot"><div><span>Total HT</span><b>' + gEuros(ht) + '</b></div>' + (tva ? '<div><span>TVA ' + String(tva).replace(".", ",") + ' %</span><b>' + gEuros(mt) + '</b></div>' : '') + '<div class="ttc"><span>Total TTC</span><span>' + gEuros(ttc) + '</span></div></div>'
+      + '<div class="mentions">' + (!tva && emet("mention_tva") ? '<p>' + gEsc(emet("mention_tva")) + '</p>' : '')
+      + (t === "devis"
+        ? '<p>Devis valable jusqu\'au ' + gDateFR(validite) + '. Pour accepter, retourner ce devis daté et signé avec la mention « Bon pour accord ».</p>'
+        : '<p>Paiement à ' + (Number(emet("delai_paiement_jours")) || 30) + ' jours, soit au plus tard le ' + gDateFR(echeance) + ', par virement (mandat administratif).</p>'
+          + (emet("iban") ? '<p><b>IBAN</b> ' + gEsc(emet("iban")) + (emet("bic") ? ' · <b>BIC</b> ' + gEsc(emet("bic")) : '') + '</p>' : '')
+          + '<p>En cas de retard de paiement : intérêts moratoires au taux légal applicable aux pouvoirs adjudicateurs et indemnité forfaitaire pour frais de recouvrement de 40 €.</p>'
+          + (cl.code_service_chorus || cl.siret ? '<p>Facture déposée sur Chorus Pro' + (cl.siret ? ' (SIRET destinataire ' + gEsc(cl.siret) + (cl.code_service_chorus ? ', service ' + gEsc(cl.code_service_chorus) : '') + ')' : '') + '.</p>' : ''))
+      + (emet("conditions") ? '<p>' + gEsc(emet("conditions")) + '</p>' : '') + (d.notes ? '<p>' + gEsc(d.notes) + '</p>' : '') + '</div>'
+      + (t === "devis" ? '<div class="sign"><div>Pour ' + gEsc(emet("raison_sociale") || "l'émetteur") + '</div><div>Bon pour accord — date, nom, qualité et signature<br>Pour la commune de ' + gEsc(gNomCommune(d.commune)) + '</div></div>' : '')
+      + '<div class="pied">' + gEsc([emet("raison_sociale"), emet("forme_juridique"), emet("siret") ? "SIRET " + emet("siret") : "", emet("tva_intracom") ? "TVA " + emet("tva_intracom") : ""].filter(Boolean).join(" · ")) + '</div>'
+      + '</div></body></html>';
+  }
+  function apercuDoc() {
+    if (!G_DOC) return;
+    var w = window.open("", "_blank");
+    if (!w) { msg("msg-doc", "Autorisez les fenêtres surgissantes pour voir l'aperçu.", "ko"); return; }
+    w.document.open(); w.document.write(htmlDocument(lireDocCourant())); w.document.close();
+  }
+  $("g-doc-pdf").addEventListener("click", apercuDoc);
+  (function () { var st = document.createElement("style"); st.textContent =
+    ".gd-ent,.gd-cols{display:grid;grid-template-columns:1fr 64px 1fr 96px 34px;gap:6px;align-items:center}.gd-ent{font-size:12px;color:var(--doux);margin:8px 0 -2px;padding:0 2px}"
+    + ".gd-cols{margin-top:6px}.gd-cols input{margin:0}.gd-tl{text-align:right;font-variant-numeric:tabular-nums}"
+    + "@media(max-width:480px){.gd-ent,.gd-cols{grid-template-columns:1fr 54px 1fr 80px 30px}}";
+    document.head.appendChild(st); })();
+
+  /* Éditeur de document : lignes du catalogue, remise commerciale, option offerte (parrainage). */
+  $("g-doc-ligne").insertAdjacentHTML("afterend", '<div class="gd-outils" id="gd-outils">'
+    + '<select id="gd-cat" aria-label="Ajouter une ligne du catalogue"><option value="">+ Ligne du catalogue…</option></select>'
+    + '<button type="button" class="second" id="gd-remise">+ Remise %</button>'
+    + '<button type="button" class="second" id="gd-offert">+ Option offerte (parrainage)</button></div>');
+  function catalogue() { return (G.Tarifs || []).filter(function (t) { return t.categorie !== "tranche" && t.actif !== "non"; }).sort(function (a, b) { return (Number(a.ordre) || 0) - (Number(b.ordre) || 0); }); }
+  function libUnite(u) { return ({ point_an: "par point et par an", point_mois: "par point et par mois", forfait_an: "forfait annuel", forfait_mois: "forfait mensuel", forfait: "forfait", unite: "l'unité" })[u] || (u || ""); }
+  function remplirCatalogue() {
+    var s = $("gd-cat"); if (!s) return;
+    s.innerHTML = '<option value="">+ Ligne du catalogue…</option>' + catalogue().map(function (t) { return '<option value="' + gEsc(t.code) + '">' + gEsc(t.libelle) + ' — ' + gEuros(t.prix_ht) + ' HT ' + gEsc(libUnite(t.unite)) + '</option>'; }).join("");
+    $("gd-outils").hidden = !!(G_DOC && G_DOC.verrou);
+  }
+  function lireLignesSaisies() {
+    Array.prototype.forEach.call($("g-doc-lignes").querySelectorAll(".g-ligne"), function (r) {
+      var l = G_DOC.lignes[Number(r.dataset.i)]; if (!l) return;
+      Array.prototype.forEach.call(r.querySelectorAll("[data-k]"), function (e) { l[e.dataset.k] = e.value; });
+    });
+  }
+  function totalLignesHT() { return G_DOC.lignes.reduce(function (s, l) { return s + (Number(String(l.quantite).replace(",", ".")) || 0) * (Number(String(l.prix_unitaire_ht).replace(",", ".")) || 0); }, 0); }
+  $("gd-cat").addEventListener("change", function () {
+    var t = catalogue().filter(function (x) { return x.code === $("gd-cat").value; })[0]; $("gd-cat").value = ""; if (!t || !G_DOC) return;
+    lireLignesSaisies();
+    G_DOC.lignes = G_DOC.lignes.filter(function (l) { return String(l.designation || "").trim() || Number(l.prix_unitaire_ht); });
+    var q = /^point/.test(t.unite) ? (Number(gPotentiel(gVal("gd-commune")).points) || 1) : 1;
+    G_DOC.lignes.push({ designation: t.libelle + (t.unite ? " (" + libUnite(t.unite) + ")" : ""), site_code: "", quantite: q, prix_unitaire_ht: t.prix_ht });
+    dessinerLignes();
+  });
+  $("gd-remise").addEventListener("click", function () {
+    if (!G_DOC) return; lireLignesSaisies();
+    var base = G_DOC.lignes.filter(function (l) { return Number(String(l.prix_unitaire_ht).replace(",", ".")) > 0; }).reduce(function (s, l) { return s + (Number(String(l.quantite).replace(",", ".")) || 0) * Number(String(l.prix_unitaire_ht).replace(",", ".")); }, 0);
+    var p = prompt("Remise commerciale en % (sur " + gEuros(base) + " HT) :", "10"); if (p === null) return;
+    p = Number(String(p).replace(",", ".")); if (!(p > 0 && p <= 100)) { msg("msg-doc", "Remise invalide.", "ko"); return; }
+    G_DOC.lignes.push({ designation: "Remise commerciale " + String(p).replace(".", ",") + " %", site_code: "", quantite: 1, prix_unitaire_ht: -Math.round(base * p) / 100 });
+    dessinerLignes();
+  });
+  $("gd-offert").addEventListener("click", function () {
+    if (!G_DOC) return; lireLignesSaisies();
+    var opts = catalogue().filter(function (t) { return t.categorie === "option"; });
+    if (!opts.length) { msg("msg-doc", "Aucune option dans le catalogue (onglet Tarifs).", "ko"); return; }
+    var choix = prompt("Option offerte au titre du parrainage — numéro :\n" + opts.map(function (t, i) { return (i + 1) + ". " + t.libelle + " (" + gEuros(t.prix_ht) + " HT)"; }).join("\n"), "1");
+    var t = opts[Number(choix) - 1]; if (!t) return;
+    G_DOC.lignes.push({ designation: t.libelle + (t.unite ? " (" + libUnite(t.unite) + ")" : ""), site_code: "", quantite: 1, prix_unitaire_ht: t.prix_ht });
+    G_DOC.lignes.push({ designation: "Offert au titre du parrainage : " + t.libelle, site_code: "", quantite: 1, prix_unitaire_ht: -Number(t.prix_ht) || 0 });
+    dessinerLignes();
+  });
+  (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments); remplirCatalogue(); return r; }; })();
+  (function () { var st = document.createElement("style"); st.textContent = ".gd-outils{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.gd-outils select{flex:2;min-width:200px;margin:0}.gd-outils button{flex:1;min-width:120px}"; document.head.appendChild(st); })();
 
 })();
