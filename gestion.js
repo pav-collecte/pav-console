@@ -780,7 +780,10 @@
       + '<button type="button" class="ga-del" data-gr-suppr="' + gEsc(x.rdv) + '" title="Supprimer l\'événement" aria-label="Supprimer l\'événement">🗑</button></div>';
     return '<div class="ga-l" data-ga-com="' + gEsc(x.commune) + '"' + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + (x.retard ? ' style="color:var(--ko)"' : '') + '>' + cols
       + '<span class="ga-tx">' + gEsc(x.titre) + (x.nomCommune ? ' <i>· ' + gEsc(x.nomCommune) + '</i>' : '')
-      + (x.passe ? '' : ' <a href="' + gEsc(lienGoogle(x)) + '" target="_blank" rel="noopener" data-gcal="1" style="white-space:nowrap;font-size:12px">+ Google Agenda</a>') + '</span></div>';
+      + (x.passe ? '' : ' <a href="' + gEsc(lienGoogle(x)) + '" target="_blank" rel="noopener" data-gcal="1" style="white-space:nowrap;font-size:12px">+ Google Agenda</a>') + '</span>'
+      + (x.type === "action" && x.id ? '<button type="button" class="ga-del" data-ga-fait="' + gEsc(x.id) + '" title="Retirer de l\'agenda (action faite)" aria-label="Retirer de l\'agenda">🗑</button>'
+        : /^(devis|facture|anniversaire|rappel)$/.test(x.type) ? '<span class="ga-auto" title="Échéance automatique : elle disparaît quand le devis ou la facture change de statut (onglet Factures), ou se règle dans le contrat de la commune.">🔒</span>' : '<span></span>')
+      + '</div>';
   }
   /* Google Agenda : lien « ajouter » par événement (journée entière), et export .ics de toutes les échéances à venir. */
   function gJourSuivant(d) { var x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); }
@@ -1667,7 +1670,7 @@
     + ".ga-l{display:grid;grid-template-columns:12px 46px 46px 1fr auto;gap:0 6px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--trait);cursor:pointer;font-size:15px}"
     + ".ga-l:hover{background:#FAF8F3}.ga-pt{width:9px;height:9px;border-radius:50%;align-self:center}.ga-dt{font-variant-numeric:tabular-nums}.ga-hr{color:var(--vert);font-weight:700;font-variant-numeric:tabular-nums}"
     + ".ga-tx i{font-style:normal;color:var(--doux)}.ga-tx small{display:block;color:var(--doux);font-size:13px;white-space:pre-wrap;margin-top:2px}"
-    + ".ga-del{border:0;background:transparent;font-size:18px;width:40px;height:36px;border-radius:8px;cursor:pointer;opacity:.6;align-self:center}.ga-del:hover{background:#FDECEA;opacity:1}";
+    + ".ga-del{border:0;background:transparent;font-size:18px;width:40px;height:36px;border-radius:8px;cursor:pointer;opacity:.6;align-self:center}.ga-del:hover{background:#FDECEA;opacity:1}.ga-auto{width:40px;text-align:center;font-size:14px;opacity:.45;align-self:center;cursor:help}";
     document.head.appendChild(st); })();
   $("gr-form").addEventListener("change", function (e) {
     if (e.target.id === "gr-commune") { GR = Object.assign({}, GR, lireRdv(), { contact: "" }); formRdv(GR); }
@@ -1695,6 +1698,15 @@
   // Clic sur un événement libre : on l'ouvre en modification (avant le clic « fiche de la commune »).
   ["ga-liste", "ga-retard"].forEach(function (id) {
     $(id).addEventListener("click", function (e) {
+      var fa = e.target.closest("[data-ga-fait]");
+      if (fa) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        if (!confirm("Retirer cette action de l'agenda ? Elle sera notée comme faite dans les échanges de la commune.")) return;
+        gEnvoyer({ op: "enregistrer", onglet: "Echanges", valeurs: { id: fa.dataset.gaFait, fait: "oui" } }, "msg-rdv", "Action retirée de l'agenda (notée faite).").catch(function () {});
+        return;
+      }
+      var au = e.target.closest(".ga-auto");
+      if (au) { e.stopImmediatePropagation(); e.preventDefault(); msg("msg-rdv", au.title, "ok"); return; }
       var del = e.target.closest("[data-gr-suppr]");
       if (del) {
         e.stopImmediatePropagation(); e.preventDefault();
