@@ -1465,10 +1465,10 @@
       var notes = kn.map(function (x) { var g = x === "global", v = n[x]; return '<span class="gav-n"><i>' + GA_CRIT[x] + '</i><b class="' + (g ? 'c' : 'e') + '">' + (g ? '♥' : '★').repeat(v) + '<s>' + (g ? '♥' : '★').repeat(5 - v) + '</s></b></span>'; }).join("");
       var meta = [gEsc(a.commune || "commune ?"), gEsc(GA_PAGES[a.page] || a.page || "page ?"), a.appareil ? gEsc(gavAppareil(a.appareil)) : ""].filter(Boolean).join(" · ");
       return '<article class="gav-a p-' + gEsc(p) + (gavFait(a) ? ' fait' : '') + '" data-gav="' + gEsc(id) + '">'
-        + '<header class="gav-top"><span class="gav-num">n° ' + (GA_NUM[id] || "?") + '</span><span class="gav-quand">' + gEsc(gavDate(a.date)) + '</span>'
+        + '<div class="gav-top"><span class="gav-num">n° ' + (GA_NUM[id] || "?") + '</span><span class="gav-quand">' + gEsc(gavDate(a.date)) + '</span>'
         + '<span class="gav-badges">' + (a.valide === "oui" ? '<span class="gav-pill gav-v">✓ Validé</span>' : '')
         + (a.etat_traitement ? '<span class="gav-pill gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : '') + '</span>'
-        + (id ? '<span class="gav-outils"><button type="button" class="gav-ic" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button><button type="button" class="gav-ic" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button></span>' : '') + '</header>'
+        + (id ? '<span class="gav-outils"><button type="button" class="gav-ic" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button><button type="button" class="gav-ic" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button></span>' : '') + '</div>'
         + '<blockquote class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</blockquote>'
         + (notes ? '<div class="gav-notes">' + notes + '</div>' : '')
         + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
@@ -1480,9 +1480,9 @@
           + '<div><label>Version de réalisation</label><input id="gav-e-version" maxlength="40" placeholder="ex. V1.5.0" value="' + gEsc(a.version || "") + '"></div></div>'
           + '<label>Note de suivi</label><textarea id="gav-e-suite" rows="2" maxlength="2000" placeholder="Réponse faite, correctif prévu, version…">' + gEsc(a.suite || "") + '</textarea>'
           + '<div class="gav-eb"><button type="button" class="second" data-gav-annuler>Annuler</button><button type="button" class="principal" data-gav-ok>Enregistrer</button></div></div>' : '')
-        + (id ? '<footer class="gav-b"><div class="gav-seg" role="group" aria-label="Priorité">' + GA_PRIO.map(function (x) { return '<button type="button" data-p="' + x[0] + '"' + (x[0] === p ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join("") + '</div>'
+        + (id ? '<div class="gav-b"><div class="gav-seg" role="group" aria-label="Priorité">' + GA_PRIO.map(function (x) { return '<button type="button" data-p="' + x[0] + '"' + (x[0] === p ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join("") + '</div>'
           + '<span class="gav-sw"><label class="gav-ok"><input type="checkbox" data-gav-valide' + (a.valide === "oui" ? ' checked' : '') + '><span>Validé</span></label>'
-          + '<label class="gav-ok"><input type="checkbox" data-gav-fait' + (gavFait(a) ? ' checked' : '') + '><span>Traité</span></label></span></footer>'
+          + '<label class="gav-ok"><input type="checkbox" data-gav-fait' + (gavFait(a) ? ' checked' : '') + '><span>Traité</span></label></span></div>'
           : '<div class="gav-meta" style="color:var(--ko)">Avis sans identifiant : actualisez pour le numéroter.</div>')
         + '</article>';
     }).join("");
