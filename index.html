@@ -935,10 +935,20 @@
   function ajouterRechercheCommune(inp) {
     if (!inp.parentNode || inp.dataset.recherche) return; inp.dataset.recherche = "1";
     var pf = inp.id.slice(0, inp.id.indexOf("commune.nom"));
-    var bt = document.createElement("button"); bt.type = "button"; bt.className = "second"; bt.textContent = "Rechercher la commune (code postal, INSEE, mairie)";
-    bt.style.cssText = "margin:6px 0 4px;padding:7px 12px;font-size:13px";
+    var bt = document.createElement("button"); bt.type = "button"; bt.className = "second"; bt.textContent = "🌐 Rechercher les infos de la commune";
+    bt.title = "Sources officielles : code postal et INSEE (geo.api.gouv.fr), téléphone, e-mail et site de la mairie (service-public.fr), maire (répertoire des élus)";
+    bt.style.cssText = "margin:6px 6px 4px 0;padding:7px 12px;font-size:13px";
+    /* Recherche web libre, dans un nouvel onglet : pour compléter à la main ce que les sources officielles ne donnent pas. */
+    var web = document.createElement("button"); web.type = "button"; web.className = "second"; web.textContent = "🔎 Chercher sur le web ↗";
+    web.title = "Ouvre une recherche web sur la mairie dans un nouvel onglet";
+    web.style.cssText = "margin:6px 0 4px;padding:7px 12px;font-size:13px";
+    web.addEventListener("click", function () {
+      var nom = inp.value.trim(), dep = ((champ("commune.departement") || {}).value || "").trim();
+      if (!nom) { res.textContent = "Indiquez d’abord le nom de la commune."; inp.focus(); return; }
+      window.open("https://www.google.com/search?q=" + encodeURIComponent("mairie " + nom + (dep ? " " + dep : "") + " site officiel horaires maire"), "_blank", "noopener");
+    });
     var res = document.createElement("div"); res.className = "petit"; res.style.margin = "4px 0 10px";
-    inp.parentNode.insertBefore(res, inp.nextSibling); inp.parentNode.insertBefore(bt, res);
+    inp.parentNode.insertBefore(res, inp.nextSibling); inp.parentNode.insertBefore(bt, res); inp.parentNode.insertBefore(web, res);
     function champ(k) { return document.getElementById(pf + k); }
     function poser(c) {
       var set = function (k, v) { var e = champ(k); if (e && v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); } };
