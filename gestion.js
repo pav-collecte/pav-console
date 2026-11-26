@@ -1354,6 +1354,7 @@
       + '<div class="gdf-m"><span>' + gDateFR(d.date) + (info ? '<br><small' + (d.statut === "envoye" && d.validite < auj ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(d.total_ht) + ' <small>HT</small></b></div>'
       + (fac ? '<div class="gdf-lien">🧾 Facturé : <button type="button" class="gdf-lnk" data-gdoc="facture" data-num="' + gEsc(fac.numero) + '">' + gEsc(gdfNum(fac)) + '</button> ' + badge(fac.statut, G_ST_FACT) + '</div>' : '')
       + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="devis" data-num="' + gEsc(d.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="devis" data-num="' + gEsc(d.numero) + '"', "second gd-pdfb")
+      + (d.pdf_drive ? '<a class="second gdf-drive" href="' + gEsc(d.pdf_drive) + '" target="_blank" rel="noopener">☁️ Drive</a>' : '')
       + (d.statut === "brouillon" || d.statut === "envoye" ? gdfAct(d.statut === "envoye" ? "📨 Renvoyer" : "📨 Soumettre", 'data-gsoum="' + gEsc(d.numero) + '"', d.statut === "brouillon" ? "principal" : "second") : '')
       + (d.statut === "accepte" && !fac ? gdfAct("🧾 Créer la facture", 'data-gfacturer="' + gEsc(d.numero) + '"', "principal") : '')
       + (gdfBrouillon(d) ? gdfAct("Supprimer", 'data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '"', "second gdf-sup") : '') + '</div></div>';
@@ -1369,6 +1370,7 @@
       + '<div class="gdf-o">' + gEsc(details) + (f.ref_devis ? '<br><small>Devis d\'origine : ' + gEsc(f.ref_devis) + '</small>' : '') + (f.ref_chorus ? '<br><small>Chorus : ' + gEsc(f.ref_chorus) + '</small>' : '') + '</div>'
       + '<div class="gdf-m"><span>' + gDateFR(f.date) + (info ? '<br><small' + (retard ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(f.total_ttc) + ' <small>TTC</small></b></div>'
       + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="facture" data-num="' + gEsc(f.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="facture" data-num="' + gEsc(f.numero) + '"', "second gd-pdfb")
+      + (f.pdf_drive ? '<a class="second gdf-drive" href="' + gEsc(f.pdf_drive) + '" target="_blank" rel="noopener">☁️ Drive</a>' : '')
       + (f.statut !== "annulee" ? gdfAct(f.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus", 'data-gch="' + gEsc(f.numero) + '"', f.statut === "emise" ? "principal" : "second") : '')
       + (gdfBrouillon(f) ? gdfAct("Supprimer", 'data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '"', "second gdf-sup") : '') + '</div></div>';
   }
@@ -2055,7 +2057,7 @@
       + etape(1, "Vérifications", '<ul class="gch-ctrl">' + ctrl.map(function (c) { return '<li class="' + c[0] + '"><span>' + icone[c[0]] + '</span><div><b>' + gEsc(c[1]) + '</b><br>' + gEsc(c[2]) + '</div></li>'; }).join("") + '</ul>'
         + (bloquant ? '<div class="gch-stop">Corrigez les points ❌ avant de déposer : une facture incomplète est rejetée par Chorus.' + (!siretC || !gchSiretOk(siretC) ? ' <button type="button" class="second" id="gch-fiche">Ouvrir la fiche de ' + gEsc(nomC) + '</button>' : '') + '</div>' : ''))
       + etape(2, "Enregistrer le PDF", '<p>Ouvrez l\'aperçu puis « Imprimer / Enregistrer en PDF » (destination : <b>Enregistrer au format PDF</b>). Un seul fichier par facture, sans mot de passe.</p>'
-        + copie("Nom de fichier conseillé", fichier) + '<button type="button" class="principal" id="gch-pdf">📄 Ouvrir le PDF de la facture</button>')
+        + (f.pdf_drive ? '<a class="gch-lien" href="' + gEsc(f.pdf_drive) + '" target="_blank" rel="noopener" style="margin-bottom:8px">☁️ PDF archivé sur Drive (à télécharger puis déposer)</a>' : '') + copie("Nom de fichier conseillé", fichier) + '<button type="button" class="' + (f.pdf_drive ? 'second' : 'principal') + '" id="gch-pdf">📄 ' + (f.pdf_drive ? "Ou recréer le PDF depuis la console" : "Ouvrir le PDF de la facture") + '</button>')
       + etape(3, "Ouvrir Chorus Pro", '<p>Connectez-vous, puis <b>Facturation › Factures émises › Déposer facture</b>. Choisissez le dépôt d\'un fichier <b>PDF</b> et importez le fichier enregistré.</p>'
         + '<a class="gch-lien" href="' + GCH_PORTAIL + '" target="_blank" rel="noopener">🏛 Ouvrir le portail Chorus Pro ↗</a>')
       + etape(4, "Compléter les blocs", '<p>Chorus lit le PDF et pré-remplit une partie des champs. Vérifiez chaque bloc avec les valeurs ci-dessous.</p>'
@@ -2342,7 +2344,8 @@
     var dejaEnvoye = d.statut === "envoye";
     var h = '<div class="gch-barre"><b>' + (dejaEnvoye ? "Renvoyer" : "Soumettre") + ' le devis ' + gEsc(d.numero) + ' · ' + gEsc(nomC) + '</b><button type="button" id="gso-x" aria-label="Fermer">✕</button></div><div class="gch-corps">'
       + (dejaEnvoye ? '<div class="gdf-alerte">Ce devis est déjà au statut « Soumis ». Vous pouvez le renvoyer et reprogrammer la relance.</div>' : '')
-      + '<div class="gch-e"><h3><span>1</span>Le PDF à joindre</h3><p>Ouvrez le devis puis « Imprimer / Enregistrer en PDF ». Nom conseillé : <b>' + gEsc(fichier) + '</b></p><button type="button" class="second" id="gso-pdf">📄 Ouvrir le PDF du devis</button></div>'
+      + '<div class="gch-e"><h3><span>1</span>Le PDF à joindre</h3><div id="gso-drive" class="gso-drive">' + (d.pdf_drive ? '<a class="gch-lien" href="' + gEsc(d.pdf_drive) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail, joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>' : '<p class="petit">☁️ Archivage du PDF sur Drive…</p>') + '</div>'
+      + '<p class="petit">Ou créez-le ici : « Imprimer / Enregistrer en PDF », nom conseillé <b>' + gEsc(fichier) + '</b>.</p><button type="button" class="second" id="gso-pdf">📄 Ouvrir le PDF du devis</button></div>'
       + '<div class="gch-e"><h3><span>2</span>Le message</h3>'
       + '<label for="gso-a"><b>À</b>' + (mails.length ? '' : ' <span class="petit" style="color:var(--ko)">— aucune adresse dans la fiche ni dans les contacts</span>') + '</label><input id="gso-a" type="email" list="gso-l" value="' + gEsc(mails[0] || "") + '" placeholder="mairie@exemple.fr" autocomplete="off"><datalist id="gso-l">' + mails.map(function (m) { return '<option value="' + gEsc(m) + '">'; }).join("") + '</datalist>'
       + '<label for="gso-o"><b>Objet</b></label><input id="gso-o" value="' + gEsc(objet) + '">'
@@ -2358,6 +2361,9 @@
     document.body.appendChild(o); document.body.style.overflow = "hidden";
     var fermer = function () { o.remove(); document.body.style.overflow = ""; };
     $("gso-x").onclick = fermer;
+    if (!d.pdf_drive) garArchiver("devis", d.numero).then(function (lien) {
+      if ($("gso-drive")) $("gso-drive").innerHTML = '<a class="gch-lien" href="' + gEsc(lien) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail, joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>';
+    }).catch(function (e) { if ($("gso-drive")) $("gso-drive").innerHTML = '<p class="petit" style="color:var(--ko)">Archivage Drive impossible : ' + gEsc(e.message) + '</p>'; });
     var url = function (gmail) {
       var a = gVal("gso-a"), su = encodeURIComponent($("gso-o").value), bo = encodeURIComponent($("gso-m").value);
       return gmail ? "https://mail.google.com/mail/?view=cm&fs=1&to=" + encodeURIComponent(a) + "&su=" + su + "&body=" + bo : "mailto:" + encodeURIComponent(a).replace(/%40/g, "@") + "?subject=" + su + "&body=" + bo;
@@ -2414,5 +2420,123 @@
     + "#gso textarea{font:15px/1.45 system-ui;width:100%;box-sizing:border-box}#gso .principal,#gso .second{min-height:44px}#gso-ok{width:100%;margin-top:10px}"
     + ".gso-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.gso-b button{flex:1 1 auto;margin:0}";
     document.head.appendChild(st); })();
+
+
+  /* ——— Archivage des PDF sur Google Drive (via n8n) ———
+     Le PDF est fabriqué ici avec pdfmake (texte réel, lisible par Chorus Pro), envoyé à n8n qui le range
+     dans le dossier Drive « Devis et factures (PAV) », puis le lien est noté sur le document (colonne pdf_drive). */
+  var GAR_PDFMAKE = null;
+  function garCharger() {
+    if (window.pdfMake && window.pdfMake.vfs) return Promise.resolve(window.pdfMake);
+    if (GAR_PDFMAKE) return GAR_PDFMAKE;
+    var src = function (u) { return new Promise(function (ok, ko) { var sc = document.createElement("script"); sc.src = u; sc.onload = ok; sc.onerror = function () { ko(new Error("Chargement impossible : " + u)); }; document.head.appendChild(sc); }); };
+    var base = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/";
+    GAR_PDFMAKE = src(base + "pdfmake.min.js").then(function () { return src(base + "vfs_fonts.js"); }).then(function () { return window.pdfMake; })
+      .catch(function (e) { GAR_PDFMAKE = null; throw e; });
+    return GAR_PDFMAKE;
+  }
+  function garDoc(type, numero) {
+    var o = type === "devis" ? "Devis" : "Factures";
+    var d = (G[o] || []).filter(function (x) { return x.numero === numero; })[0]; if (!d) throw new Error("Document " + numero + " introuvable.");
+    var lignes = (G.Lignes || []).filter(function (l) { return l.document === numero; }).sort(function (a, b) { return Number(a.num) - Number(b.num); });
+    return { t: type, d: d, lignes: lignes };
+  }
+  function garFichier(x) { return ((x.t === "devis" ? "Devis-" : "Facture-") + x.d.numero + "-" + gNomCommune(x.d.commune)).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/-+/g, "-") + ".pdf"; }
+  function garDefinition(x) {
+    var t = x.t, d = x.d, cl = gClient(d.commune), tva = Number(String(d.taux_tva || emet("taux_tva") || 20).replace(",", ".")) || 0;
+    var VERT = "#1F3A2E", GRIS = "#666666", ht = 0;
+    var corps = x.lignes.map(function (l) {
+      var q = gNum(l.quantite), pu = gNum(l.prix_unitaire_ht), tl = q * pu; ht += tl;
+      var des = [{ text: String(l.designation || "") }];
+      if (l.site_code) des.push({ text: "Point " + l.site_code, fontSize: 8, color: GRIS });
+      if (l.periode_debut) des.push({ text: "Du " + gDateFR(l.periode_debut) + " au " + gDateFR(l.periode_fin), fontSize: 8, color: GRIS });
+      return [{ stack: des }, { text: String(q).replace(".", ","), alignment: "right" }, { text: gEuros(pu), alignment: "right" }, { text: gEuros(tl), alignment: "right" }];
+    });
+    var mt = ht * tva / 100, ttc = ht + mt;
+    var jours = function (cle, def, base) { var n = Number(emet(cle)) || def, z = new Date((base || new Date().toISOString().slice(0, 10)) + "T12:00:00"); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); };
+    var validite = d.validite || jours("validite_devis_jours", 30, d.date), echeance = d.echeance || jours("delai_paiement_jours", 30, d.date);
+    var titre = t === "devis" ? "DEVIS" : "FACTURE";
+    var em = [{ text: emet("raison_sociale") || "Raison sociale", bold: true, fontSize: 12 }];
+    [emet("forme_juridique"), emet("adresse"), (emet("code_postal") + " " + emet("ville")).trim(), emet("telephone") ? "Tél. " + emet("telephone") : "", emet("email"), emet("siret") ? "SIRET " + emet("siret") : "", emet("tva_intracom") ? "TVA " + emet("tva_intracom") : ""]
+      .filter(Boolean).forEach(function (l) { em.push({ text: l, fontSize: 9, color: "#333333" }); });
+    var dest = [{ text: t === "devis" ? "DESTINATAIRE" : "FACTURÉ À", fontSize: 7, color: "#777777", characterSpacing: 1 }, { text: cl.nom_officiel || ("Mairie de " + gNomCommune(d.commune)), bold: true }];
+    [cl.adresse_facturation, ((cl.code_postal || "") + " " + (cl.ville || "")).trim(), cl.siret ? "SIRET " + cl.siret : "", cl.code_service_chorus ? "Code service Chorus : " + cl.code_service_chorus : ""]
+      .filter(Boolean).forEach(function (l) { dest.push({ text: l, fontSize: 9 }); });
+    var mentions = [];
+    if (!tva && emet("mention_tva")) mentions.push(emet("mention_tva"));
+    if (t === "devis") mentions.push("Devis valable jusqu'au " + gDateFR(validite) + ". Pour accepter, retourner ce devis daté et signé avec la mention « Bon pour accord ».");
+    else {
+      mentions.push("Paiement à " + (Number(emet("delai_paiement_jours")) || 30) + " jours, soit au plus tard le " + gDateFR(echeance) + ", par virement (mandat administratif).");
+      if (emet("iban")) mentions.push("IBAN " + emet("iban") + (emet("bic") ? " · BIC " + emet("bic") : ""));
+      mentions.push("En cas de retard de paiement : intérêts moratoires au taux légal applicable aux pouvoirs adjudicateurs et indemnité forfaitaire pour frais de recouvrement de 40 €.");
+      if (cl.siret) mentions.push("Facture déposée sur Chorus Pro (SIRET destinataire " + cl.siret + (cl.code_service_chorus ? ", service " + cl.code_service_chorus : "") + ").");
+    }
+    if (emet("conditions")) mentions.push(emet("conditions"));
+    if (d.notes) mentions.push(d.notes);
+    var ref = t === "devis" ? (d.objet ? [{ text: [{ text: "Objet : ", bold: true }, d.objet], margin: [0, 0, 0, 8] }] : [])
+      : [{ text: [d.periode_debut ? { text: "Période : ", bold: true } : "", d.periode_debut ? "du " + gDateFR(d.periode_debut) + " au " + gDateFR(d.periode_fin) : "", d.ref_devis ? { text: (d.periode_debut ? "   ·   " : "") + "Devis : ", bold: true } : "", d.ref_devis || ""], margin: [0, 0, 0, 8] }];
+    var tot = [[{ text: "Total HT" }, { text: gEuros(ht), alignment: "right", bold: true }]];
+    if (tva) tot.push([{ text: "TVA " + String(tva).replace(".", ",") + " %" }, { text: gEuros(mt), alignment: "right" }]);
+    tot.push([{ text: "Total TTC", bold: true, color: "#ffffff", fillColor: VERT }, { text: gEuros(ttc), alignment: "right", bold: true, color: "#ffffff", fillColor: VERT }]);
+    var contenu = [
+      { columns: [{ width: "*", stack: em }, { width: "auto", stack: [{ text: titre, fontSize: 22, bold: true, color: VERT, alignment: "right", characterSpacing: 1 }, { text: "N° " + d.numero, bold: true, alignment: "right" },
+        { text: "Date : " + gDateFR(d.date), fontSize: 9, color: "#555555", alignment: "right" }, { text: t === "devis" ? "Valable jusqu'au " + gDateFR(validite) : "Échéance : " + gDateFR(echeance), fontSize: 9, color: "#555555", alignment: "right" }] }] },
+      { columns: [{ width: "*", text: "" }, { width: 240, table: { widths: ["*"], body: [[{ stack: dest, margin: [6, 6, 6, 6] }]] }, layout: { hLineColor: function () { return "#cfd4cd"; }, vLineColor: function () { return "#cfd4cd"; } } }], margin: [0, 28, 0, 18] }
+    ].concat(ref).concat([
+      { table: { headerRows: 1, widths: ["*", 40, 80, 80], body: [[{ text: "DÉSIGNATION", style: "th" }, { text: "QTÉ", style: "th", alignment: "right" }, { text: "PRIX UNIT. HT", style: "th", alignment: "right" }, { text: "TOTAL HT", style: "th", alignment: "right" }]].concat(corps.length ? corps : [[{ text: "Aucune ligne.", colSpan: 4 }, "", "", ""]]) },
+        layout: { fillColor: function (i) { return i === 0 ? VERT : null; }, hLineWidth: function (i) { return i === 0 ? 0 : 0.5; }, vLineWidth: function () { return 0; }, hLineColor: function () { return "#e4e1d8"; }, paddingTop: function () { return 6; }, paddingBottom: function () { return 6; } } },
+      { columns: [{ width: "*", text: "" }, { width: 210, table: { widths: ["*", "auto"], body: tot }, layout: "noBorders", margin: [0, 12, 0, 0] }] },
+      { stack: mentions.map(function (m) { return { text: m, fontSize: 8.5, color: "#444444", margin: [0, 2, 0, 0] }; }), margin: [0, 22, 0, 0] }
+    ]);
+    if (t === "devis") contenu.push({ columns: [{ width: "*", table: { widths: ["*"], heights: [80], body: [[{ text: "Pour " + (emet("raison_sociale") || "l'émetteur"), fontSize: 9, color: "#555555" }]] }, layout: { hLineColor: function () { return "#cfd4cd"; }, vLineColor: function () { return "#cfd4cd"; } } },
+      { width: "*", table: { widths: ["*"], heights: [80], body: [[{ text: "Bon pour accord — date, nom, qualité et signature\nPour la commune de " + gNomCommune(d.commune), fontSize: 9, color: "#555555" }]] }, layout: { hLineColor: function () { return "#cfd4cd"; }, vLineColor: function () { return "#cfd4cd"; } } }], columnGap: 16, margin: [0, 24, 0, 0] });
+    var pied = [emet("raison_sociale"), emet("forme_juridique"), emet("siret") ? "SIRET " + emet("siret") : "", emet("tva_intracom") ? "TVA " + emet("tva_intracom") : ""].filter(Boolean).join(" · ");
+    return { pageSize: "A4", pageMargins: [42, 46, 42, 54], info: { title: (t === "devis" ? "Devis " : "Facture ") + d.numero, author: emet("raison_sociale") || "PAV" },
+      content: contenu, defaultStyle: { fontSize: 10, color: "#1d2420" }, styles: { th: { bold: true, fontSize: 8, color: "#ffffff" } },
+      footer: function (p, n) { return { columns: [{ text: pied, fontSize: 7, color: "#777777" }, { text: p + " / " + n, fontSize: 7, color: "#777777", alignment: "right", width: 40 }], margin: [42, 16, 42, 0] }; } };
+  }
+  function garDossier() {
+    var id = emet("drive_archive_dossier"); if (id) return Promise.resolve(id);
+    return api("archive-dossier", {}).then(function (j) {
+      if (!j.dossier) throw new Error("Dossier Drive non créé.");
+      G.Emetteur = (G.Emetteur || []).filter(function (p) { return p.cle !== "drive_archive_dossier"; }).concat([{ cle: "drive_archive_dossier", valeur: j.dossier }]);
+      return api("gestion", { op: "enregistrer", onglet: "Emetteur", valeurs: { cle: "drive_archive_dossier", valeur: j.dossier, description: "Dossier Google Drive des PDF de devis et factures (créé par la console)" } }).then(function () { return j.dossier; });
+    });
+  }
+  // Archive un devis / une facture : renvoie le lien Drive. idMsg : zone de message (facultatif).
+  function garArchiver(type, numero, idMsg) {
+    var x; try { x = garDoc(type, numero); } catch (e) { return Promise.reject(e); }
+    if (String(numero).indexOf("BROUILLON") === 0) return Promise.reject(new Error("Enregistrez d'abord le document pour obtenir son numéro."));
+    if (idMsg) msg(idMsg, "☁️ Archivage du PDF sur Drive…");
+    var fichier = garFichier(x), dossier;
+    return garDossier().then(function (id) { dossier = id; return garCharger(); }).then(function (pm) {
+      return new Promise(function (ok, ko) { try { pm.createPdf(garDefinition(x)).getBase64(ok); } catch (e) { ko(e); } });
+    }).then(function (b64) {
+      return api("archiver", { type: type, numero: numero, fichier: fichier, dossier: dossier, pdf: b64 });
+    }).then(function (j) {
+      if (!j.lien) throw new Error("Archivage : lien Drive manquant.");
+      return api("gestion", { op: "document", type: type, entete: { numero: numero, pdf_drive: j.lien } }).then(function () { return chargerGestion(true); }).then(function () {
+        if (idMsg) msg(idMsg, "☁️ PDF archivé sur Drive : " + fichier, "ok");
+        if (G_DOC && G_DOC.d.numero === numero) ouvrirDoc(type, numero);
+        return j.lien;
+      });
+    }).catch(function (e) { if (idMsg) msg(idMsg, "Archivage Drive impossible : " + e.message, "ko"); throw e; });
+  }
+  // Éditeur : bouton Drive (ouvrir / archiver) ; archivage automatique à l'émission d'une facture.
+  $("g-doc-pdf").insertAdjacentHTML("afterend", '<button class="second" id="g-doc-drive" type="button" style="flex:1" hidden>☁️ Drive</button>');
+  $("g-doc-drive").addEventListener("click", function () {
+    if (!G_DOC || !G_DOC.d.numero) return;
+    if (G_DOC.d.pdf_drive && !confirm("Ce document est déjà archivé sur Drive.\n\nOK : l'ouvrir · Annuler : créer une nouvelle version")) { garArchiver(G_DOC.type, G_DOC.d.numero, "msg-doc").catch(function () {}); return; }
+    if (G_DOC.d.pdf_drive) { window.open(G_DOC.d.pdf_drive, "_blank", "noopener"); return; }
+    garArchiver(G_DOC.type, G_DOC.d.numero, "msg-doc").catch(function () {});
+  });
+  var GAR_APRES = false;
+  $("g-doc-ok").addEventListener("click", function () { GAR_APRES = !!(G_DOC && G_DOC.type === "facture" && G_DOC.d.statut === "brouillon" && gVal("gd-statut") === "emise"); }, true);
+  (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments); var d = G_DOC && G_DOC.d;
+    var ok = !!(G_DOC && d.numero && String(d.numero).indexOf("BROUILLON") !== 0 && d.statut !== "brouillon");
+    $("g-doc-drive").hidden = !ok; $("g-doc-drive").textContent = d && d.pdf_drive ? "☁️ PDF sur Drive" : "☁️ Archiver sur Drive";
+    if (GAR_APRES && ok && G_DOC.type === "facture" && d.statut === "emise" && !d.pdf_drive) { GAR_APRES = false; var n = d.numero; setTimeout(function () { garArchiver("facture", n, "msg-doc").catch(function () {}); }, 50); }
+    return r; }; })();
+  (function () { var st = document.createElement("style"); st.textContent = ".gdf-a a.gdf-drive{flex:1 1 auto;min-height:42px;display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;font-size:14px;border-radius:10px;border:1px solid var(--trait);background:#fff;color:var(--vert);font-weight:600;text-decoration:none}"; document.head.appendChild(st); })();
 
 })();
