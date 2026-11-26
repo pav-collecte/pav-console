@@ -2516,8 +2516,8 @@
     }).then(function (j) {
       if (!j.lien) throw new Error("Archivage : lien Drive manquant.");
       return api("gestion", { op: "document", type: type, entete: { numero: numero, pdf_drive: j.lien } }).then(function () { return chargerGestion(true); }).then(function () {
-        if (idMsg) msg(idMsg, "☁️ PDF archivé sur Drive : " + fichier, "ok");
         if (G_DOC && G_DOC.d.numero === numero) ouvrirDoc(type, numero);
+        if (idMsg) msg(idMsg, "☁️ PDF archivé sur Drive : " + fichier, "ok");
         return j.lien;
       });
     }).catch(function (e) { if (idMsg) msg(idMsg, "Archivage Drive impossible : " + e.message, "ko"); throw e; });
