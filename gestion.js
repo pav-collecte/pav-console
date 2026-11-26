@@ -2612,4 +2612,74 @@
   })();
   (function () { var st = document.createElement("style"); st.textContent = ".ga-rel{border:1px solid var(--trait);background:#FFF4DF;color:#8a5a00;border-radius:999px;padding:3px 10px;font:600 12.5px system-ui;cursor:pointer;margin-left:4px;white-space:nowrap}"; document.head.appendChild(st); })();
 
+
+  /* ——— À l'ouverture de la console : fenêtre « Aujourd'hui » (événements du jour et en retard) + pastille sur l'onglet Agenda ——— */
+  function gjDuJour() {
+    var auj = new Date().toISOString().slice(0, 10);
+    return evenements().filter(function (x) {
+      if (x.passe || x.type === "echange" || x.type === "fait") return false;
+      return x.date === auj || (x.retard && /^(action|devis|facture)$/.test(x.type));
+    }).sort(function (a, b) { return (b.retard ? 1 : 0) - (a.retard ? 1 : 0) || a.date.localeCompare(b.date); });
+  }
+  function gjPastille() {
+    var b = document.querySelector('nav button[data-onglet="agenda"]'); if (!b || !G) return;
+    var n = gjDuJour().length, p = b.querySelector(".gj-n");
+    if (!n) { if (p) p.remove(); return; }
+    if (!p) { p = document.createElement("span"); p.className = "gj-n"; b.appendChild(p); }
+    p.textContent = n; p.title = n + " événement(s) aujourd'hui ou en retard";
+  }
+  function gjFenetre(forcer) {
+    var l = gjDuJour(), auj = new Date().toISOString().slice(0, 10);
+    gjPastille();
+    if (!l.length && !forcer) return;
+    try { if (!forcer && localStorage.getItem("pav-console-aujourdhui") === auj) return; } catch (e) {}
+    var vieux = $("gj"); if (vieux) vieux.remove();
+    var icone = { action: "📌", devis: "📝", facture: "🧾", anniversaire: "🎂", rappel: "⏰", rdv: "📅" };
+    var lignes = l.map(function (x, i) {
+      var rel = x.type === "action" && x.id && /Relancer le devis (\S+)/.exec(x.titre || "");
+      var bouton = rel ? '<button type="button" class="principal" data-gj-rel="' + gEsc(rel[1]) + '" data-gj-ech="' + gEsc(x.id) + '">📨 Relancer</button>'
+        : x.doc ? '<button type="button" class="second" data-gj-doc="' + gEsc(x.doc[0]) + '" data-gj-num="' + gEsc(x.doc[1]) + '">Ouvrir</button>'
+        : x.commune ? '<button type="button" class="second" data-gj-com="' + gEsc(x.commune) + '">Fiche</button>' : '';
+      return '<div class="gj-l' + (x.retard ? ' retard' : '') + '"><span class="gj-i">' + (icone[x.type] || "•") + '</span><div class="gj-t"><b>' + gEsc(x.titre) + '</b><small>'
+        + gEsc(x.nomCommune || "") + (x.heure ? " · " + gEsc(x.heure) : "") + (x.retard ? ' · <span class="ko">en retard depuis le ' + gDateFR(x.date) + '</span>' : x.date === auj ? " · aujourd'hui" : "") + '</small></div>' + bouton + '</div>';
+    }).join("") || '<p class="petit">Rien de prévu aujourd\'hui, et aucun retard. 👍</p>';
+    var f = document.createElement("div"); f.id = "gj"; f.setAttribute("role", "dialog"); f.setAttribute("aria-label", "Aujourd'hui");
+    f.innerHTML = '<div class="gj-boite"><div class="gj-h"><b>📅 Aujourd\'hui · ' + new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) + '</b><button type="button" id="gj-x" aria-label="Fermer">✕</button></div>'
+      + '<div class="gj-c">' + (l.length ? '<p class="petit">' + l.length + ' élément' + (l.length > 1 ? 's' : '') + ' à traiter' + (l.some(function (x) { return x.retard; }) ? ', dont des retards' : '') + '.</p>' : '') + lignes + '</div>'
+      + '<div class="gj-b"><button type="button" class="second" id="gj-plus">Ne plus afficher aujourd\'hui</button><button type="button" class="principal" id="gj-agenda">Ouvrir l\'Agenda</button></div></div>';
+    document.body.appendChild(f);
+    var fermer = function () { f.remove(); };
+    $("gj-x").onclick = fermer;
+    f.addEventListener("click", function (e) { if (e.target === f) fermer(); });
+    $("gj-plus").onclick = function () { try { localStorage.setItem("pav-console-aujourdhui", auj); } catch (er) {} fermer(); };
+    $("gj-agenda").onclick = function () { fermer(); var b = document.querySelector('nav button[data-onglet="agenda"]'); if (b) b.click(); };
+    f.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-gj-rel],[data-gj-doc],[data-gj-com]"); if (!b) return;
+      fermer();
+      if (b.dataset.gjRel) { var a = document.querySelector('nav button[data-onglet="agenda"]'); if (a) a.click(); relancerDevis(b.dataset.gjRel, b.dataset.gjEch); return; }
+      if (b.dataset.gjDoc) { var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click(); ouvrirDoc(b.dataset.gjDoc, b.dataset.gjNum); return; }
+      var nc = document.querySelector('nav button[data-onglet="clients"]'); if (nc) nc.click();
+      setTimeout(function () { $("g-commune").value = b.dataset.gjCom; dessinerFiche(); }, 40);
+    });
+  }
+  (function () { var o = dessinerAgenda; dessinerAgenda = function () { var r = o.apply(this, arguments); try { gjPastille(); } catch (e) {} return r; }; })();
+  (function () {
+    if (new URLSearchParams(location.search).get("relance")) return;
+    var essais = 0, t = setInterval(function () {
+      var v = $("verrou"); if (++essais > 600) { clearInterval(t); return; }
+      if (v && getComputedStyle(v).display !== "none") return;
+      clearInterval(t);
+      (G_CHARGE ? Promise.resolve() : chargerGestion()).then(function () { if (G) gjFenetre(false); }).catch(function () {});
+    }, 500);
+  })();
+  (function () { var st = document.createElement("style"); st.textContent =
+    "#gj{position:fixed;inset:0;z-index:118;background:rgba(20,30,25,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 12px 12px}"
+    + ".gj-boite{background:#FAF8F3;border-radius:16px;width:100%;max-width:560px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden}"
+    + ".gj-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#1F3A2E;color:#fff;font-size:16px}.gj-h b:first-letter{text-transform:uppercase}#gj-x{border:0;background:transparent;color:#fff;font-size:20px;cursor:pointer}"
+    + ".gj-c{overflow:auto;padding:10px 14px}.gj-l{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--trait);border-radius:12px;background:#fff;margin-bottom:8px}.gj-l.retard{border-color:#f2b8b5;background:#FFF8F7}"
+    + ".gj-i{font-size:20px}.gj-t{flex:1;min-width:0}.gj-t b{display:block;font-size:14.5px;line-height:1.3}.gj-t small{color:var(--doux);font-size:12.5px}.gj-t .ko{color:var(--ko);font-weight:600}"
+    + ".gj-l{flex-wrap:wrap}.gj-t{flex:1 1 170px}.gj-l button{width:auto!important;flex:0 0 auto;margin:0 0 0 auto!important;padding:8px 14px;min-height:40px;white-space:nowrap;font-size:14px}.gj-b{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--trait);flex-wrap:wrap}.gj-b button{flex:1 1 auto;margin:0;min-height:44px}"
+    + ".gj-n{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:999px;background:#B3261E;color:#fff;font-size:12px;font-weight:700;line-height:16px;text-align:center}";
+    document.head.appendChild(st); })();
+
 })();
