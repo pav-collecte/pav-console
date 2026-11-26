@@ -2074,8 +2074,8 @@
   $("g-doc-pdf").insertAdjacentHTML("afterend", '<button class="second" id="g-doc-chorus" type="button" style="flex:1" hidden>🏛 Déposer sur Chorus</button>');
   $("g-doc-chorus").addEventListener("click", function () { if (G_DOC && G_DOC.d.numero) ouvrirChorus(G_DOC.d.numero); });
   (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments); var d = G_DOC && G_DOC.d;
-    $("g-doc-chorus").hidden = !(G_DOC && G_DOC.type === "facture" && d.numero && d.statut !== "brouillon" && d.statut !== "annulee");
-    if (!$("g-doc-chorus").hidden) $("g-doc-chorus").textContent = d.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus Pro"; return r; }; })();
+    $("g-doc-chorus").hidden = !(G_DOC && G_DOC.type === "facture" && d.numero && d.statut !== "annulee");
+    if (!$("g-doc-chorus").hidden) $("g-doc-chorus").textContent = d.statut === "emise" ? "🏛 Déposer sur Chorus" : d.statut === "brouillon" ? "🏛 Chorus Pro (après émission)" : "🏛 Chorus Pro"; return r; }; })();
   // Bouton 🏛 dans les listes, pour les factures émises pas encore déposées.
   function boutonsChorus() {
     ["g-factures-liste", "g-fiche-docs"].forEach(function (id) {
