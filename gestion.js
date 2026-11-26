@@ -1865,6 +1865,7 @@
     + ".gfo-q{width:74px!important;margin:0;height:42px}"
     + ".gfo-off{margin:0;cursor:pointer;display:inline-flex}.gfo-off input{position:absolute;opacity:0;width:1px;height:1px}"
     + ".gfo-off span{display:inline-block;border:1px solid var(--trait);border-radius:999px;padding:9px 14px;font:600 14px system-ui;color:var(--vert);background:#fff;white-space:nowrap}"
+    + ".gfo-off input:disabled+span{opacity:.45;border-style:dashed;cursor:not-allowed}.gfo-aide{grid-column:1 / -1;font-size:13px;color:#8a5a00;background:#FFF4DF;border-radius:8px;padding:6px 10px}"
     + ".gfo-off input:checked+span{background:var(--ok);border-color:var(--ok);color:#fff}.gfo-off input:focus-visible+span{outline:2px solid var(--accent)}"
     + "@media(max-width:480px){.gfo-l{grid-template-columns:30px 1fr 64px}.gfo-off{grid-column:2 / -1;justify-self:start}}"
     + "#gd-apercu{position:fixed;inset:0;z-index:120;background:#3b423e;display:flex;flex-direction:column}"
@@ -1938,5 +1939,16 @@
   });
   // Changer d'onglet à la main annule le retour automatique.
   document.querySelector("nav").addEventListener("click", function (e) { var b = e.target.closest("button[data-onglet]"); if (b && b.dataset.onglet !== "factu") GD_ORIGINE = null; }, true);
+
+  /* « Offerte » grisée : un appui explique ce qui manque (option non cochée ou aucun parrain choisi). */
+  $("g-fiche").addEventListener("click", function (e) {
+    var lab = e.target.closest(".gfo-off"); if (!lab) return;
+    var i = lab.querySelector("input[data-offert]"); if (!i || !i.disabled) return;
+    e.preventDefault();
+    var ligne = lab.closest(".gfo-l"), opt = ligne && ligne.querySelector("input[data-opt]");
+    var vieux = ligne.querySelector(".gfo-aide"); if (vieux) vieux.remove();
+    ligne.insertAdjacentHTML("beforeend", '<div class="gfo-aide">' + (opt && !opt.checked ? "Cochez d'abord l'option (case à gauche)." : "Pour offrir une option, choisissez d'abord la commune marraine dans « Parrainage » ci-dessous.") + '</div>');
+    setTimeout(function () { var a = ligne.querySelector(".gfo-aide"); if (a) a.remove(); }, 5000);
+  });
 
 })();
