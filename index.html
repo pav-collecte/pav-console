@@ -1096,6 +1096,7 @@
         box.appendChild(lab);
         if (p.cle.indexOf("adresses.") === 0) { inp.readOnly = true; inp.style.background = "#F1EFE9"; inp.dataset.ignore = "1"; }
         if (p.cle === "commune.prefixeCode") PREFIXE_INIT = p.valeur;
+        if (p.cle === "commune.nom") setTimeout(function () { ajouterRechercheCommune(inp); }, 0);
         if (p.cle === "commune.logoDrive") {
           var actuel = document.createElement("img"); actuel.alt = "Logo actuel";
           actuel.style.cssText = "display:none;width:96px;height:96px;margin:8px 0;border:1px solid var(--trait);border-radius:10px;background:#fff;object-fit:contain";
