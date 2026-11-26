@@ -2201,4 +2201,27 @@
     + "@media(max-width:480px){.gdf-resume b{font-size:15px}.gdf-a button{flex:1 1 40%}.gdf-a .principal{flex:1 1 100%}}";
     document.head.appendChild(st); })();
 
+
+  /* « Nouvelle facture » dans la fiche : part du devis accepté de la commune (choix s'il y en a plusieurs), sinon facture vierge. */
+  (function () {
+    var b0 = $("gfd-nouveau"); if (!b0) return;
+    b0.insertAdjacentHTML("afterend", '<button class="second" id="gfd-facture" type="button" style="float:right;padding:4px 10px;font-size:13px;margin-right:6px">Nouvelle facture</button>');
+    document.addEventListener("click", function (ev) {
+      if (!ev.target.closest("#gfd-facture")) return;
+      var com = $("g-commune").value; if (!com) return;
+      GD_ORIGINE = com;
+      var acc = (G.Devis || []).filter(function (d) { return d.commune === com && d.statut === "accepte" && !gdFactureDuDevis(d.numero); });
+      if (acc.length === 1) { factureDepuisDevis(acc[0].numero, "msg-fiche-docs"); return; }
+      if (acc.length > 1) {
+        var ch = prompt("Facturer quel devis accepté ? Numéro :\n" + acc.map(function (d, i) { return (i + 1) + ". " + d.numero + " — " + (d.objet || "") + " (" + gEuros(d.total_ht) + " HT)"; }).join("\n") + "\n\n(0 = facture sans devis)", "1");
+        if (ch === null) return;
+        var d = acc[Number(ch) - 1]; if (d) { factureDepuisDevis(d.numero, "msg-fiche-docs"); return; }
+      }
+      var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click();
+      ouvrirDoc("facture", ""); $("gd-commune").value = com; $("gd-commune").dispatchEvent(new Event("change"));
+      msg("msg-doc", acc.length ? "Facture sans devis : ajoutez les lignes, ou choisissez un « Devis d'origine » pour reprendre ses lignes." : "Aucun devis accepté à facturer pour cette commune. Ajoutez les lignes, ou choisissez un « Devis d'origine ».", "info");
+    });
+  })();
+  (function () { var st = document.createElement("style"); st.textContent = "@media(max-width:480px){#gfd-nouveau,#gfd-facture{float:none!important;display:inline-block;margin:6px 6px 0 0!important}}"; document.head.appendChild(st); })();
+
 })();
