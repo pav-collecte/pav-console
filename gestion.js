@@ -908,6 +908,10 @@
     return { an: anc, mode: mode, source: anc ? gEuros(anc) + "/point/an" : "" };
   }
   // Options cochées d'une fiche : « code:quantité;code:quantité ».
+  /* Prix spécial d'une option pour une commune : « code:quantité:prix » dans Clients.options. */
+  function gLirePrix(t) { var o = {}; String(t || "").split(";").forEach(function (p) { var x = p.split(":"); if (x[0] && x[2] !== undefined && x[2] !== "") o[x[0].trim()] = gNum(x[2]); }); return o; }
+  function gPrixOpt(t, prix) { return prix && prix[t.code] !== undefined ? prix[t.code] : gNum(t.prix_ht); }
+  function gQteSens(u) { return /^point/.test(u) ? "nombre de points" : u === "heure" ? "nombre d'heures" : u === "jour" ? "nombre de jours" : u === "an" || u === "mois" ? "quantité " + (u === "an" ? "par an" : "par mois") : u === "unite" ? "nombre d'unités" : "nombre de fois"; }
   function gLireOptions(t) { var o = {}; String(t || "").split(";").forEach(function (p) { var x = p.split(":"); if (x[0]) o[x[0].trim()] = gNum(x[1]) || 1; }); return o; }
   // Proposition chiffrée : abonnement + options, remise appliquée.
   function gProposition(com, c, opts, offertes) {
@@ -918,7 +922,8 @@
     if (pt.points && ab.brut) { rec += ab.brut; l.push(["Abonnement : " + pt.points + " point(s) — " + ab.source, ab.brut, "an"]); }
     gTarifs("option").forEach(function (t) {
       if (!opts[t.code]) return;
-      var q = opts[t.code], m = G_RECURRENT[t.unite], mt = q * gNum(t.prix_ht), lib = t.libelle + " : " + q + " × " + gEuros(t.prix_ht) + " " + gLib(G_UNITES, t.unite);
+      var pr = gPrixOpt(t, gLirePrix(c.options)), special = Math.abs(pr - gNum(t.prix_ht)) > 0.001;
+      var q = opts[t.code], m = G_RECURRENT[t.unite], mt = q * pr, lib = t.libelle + " : " + q + " × " + gEuros(pr) + " " + gLib(G_UNITES, t.unite) + (special ? " (prix spécial, catalogue " + gEuros(t.prix_ht) + ")" : "");
       if (offertes[t.code]) { l.push([lib + " — offert (parrainage" + (c.parrain ? " de " + gNomCommune(c.parrain) : "") + ")", 0, m ? "an" : "une", m ? mt * m : mt]); return; }
       if (m) { rec += mt * m; l.push([lib, mt * m, "an"]); }
       else { une += mt; l.push([lib, mt, "une"]); }
@@ -933,6 +938,11 @@
     var lu = lireConditions(), off = {}; lu.options_offertes.split(";").forEach(function (k) { if (k) off[k] = 1; });
     Array.prototype.forEach.call(box.querySelectorAll("input[data-offert]"), function (i) { i.disabled = !lu.parrain || !box.querySelector('input[data-opt="' + i.dataset.offert + '"]').checked; });
     $("gf-negocie").style.display = lu.calcul_abonnement === "negocie" ? "flex" : "none";
+    Array.prototype.forEach.call(box.querySelectorAll("[data-tot]"), function (el) {
+      var k = el.dataset.tot, q = gNum((box.querySelector('input[data-qte="' + k + '"]') || {}).value), pe = box.querySelector('input[data-prix="' + k + '"]'), pv = gNum(pe && pe.value);
+      var t = gTarifs("option").filter(function (x) { return x.code === k; })[0], sp = t && Math.abs(pv - gNum(t.prix_ht)) > 0.001;
+      el.textContent = "= " + gEuros(q * pv); var sm = pe && pe.parentNode.querySelector("small"); if (sm) sm.innerHTML = sp ? '<b class="gfo-sp">prix spécial</b>' : "modifiable";
+    });
     var c = Object.assign({}, gClient(com), lu);
     var p = gProposition(com, c, opts, off);
     $("gf-proposition").innerHTML = p.lignes.length
@@ -944,7 +954,7 @@
       : 'Renseignez les prix dans l\'onglet Tarifs pour chiffrer la proposition.';
   }
   function htmlConditions(c) {
-    var opts = gLireOptions(c.options), pts = gPotentiel(c.commune).points || 1, off = {};
+    var opts = gLireOptions(c.options), prixC = gLirePrix(c.options), pts = gPotentiel(c.commune).points || 1, off = {};
     String(c.options_offertes || "").split(";").forEach(function (k) { if (k) off[k] = 1; });
     var options = gTarifs("option");
     return '<div id="gf-conditions" style="margin-top:12px;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"><b>Offre commerciale de la commune</b>'
@@ -959,9 +969,12 @@
       + '<div class="petit" style="margin-top:8px"><b>Options pour le devis</b></div>'
       + (options.length ? options.map(function (t) {
           var q = opts[t.code] || (/point/.test(t.unite) ? pts : 1);
+          var pr = gPrixOpt(t, prixC), special = Math.abs(pr - gNum(t.prix_ht)) > 0.001;
           return '<div class="gfo-l"><input type="checkbox" class="gfo-c" data-opt="' + gEsc(t.code) + '" id="gfo-' + gEsc(t.code) + '"' + (opts[t.code] ? ' checked' : '') + '>'
-            + '<label for="gfo-' + gEsc(t.code) + '" class="gfo-lib">' + gEsc(t.libelle) + ' <span class="petit">— ' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : 'prix à définir') + ' ' + gEsc(gLib(G_UNITES, t.unite)) + '</span></label>'
-            + '<input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '" class="gfo-q" aria-label="Quantité">'
+            + '<label for="gfo-' + gEsc(t.code) + '" class="gfo-lib"><b>' + gEsc(t.libelle) + '</b><span class="gfo-base">Catalogue : ' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) + ' HT' : 'prix à définir') + ' ' + gEsc(gLib(G_UNITES, t.unite)) + '</span></label>'
+            + '<div class="gfo-ch"><label>Quantité<small>' + gEsc(gQteSens(t.unite)) + '</small><input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '"></label>'
+            + '<span class="gfo-x">×</span><label>Prix HT<small>' + (special ? '<b class="gfo-sp">prix spécial</b>' : 'modifiable') + '</small><input type="number" min="0" step="0.01" data-prix="' + gEsc(t.code) + '" value="' + gEsc(String(Math.round(pr * 100) / 100)) + '"></label>'
+            + '<span class="gfo-tot" data-tot="' + gEsc(t.code) + '">= ' + gEuros(q * pr) + '</span></div>'
             + '<label class="gfo-off" title="Offerte grâce au parrainage"><input type="checkbox" data-offert="' + gEsc(t.code) + '"' + (off[t.code] ? ' checked' : '') + '><span>🎁 Offerte</span></label></div>';
         }).join("") : '<p class="petit">Aucune option : ajoutez-en dans l\'onglet Tarifs.</p>')
       + '<div style="margin-top:10px">' + gChamp("gf-parrain", "Parrainage — commune qui a recommandé celle-ci", c.parrain || "", null, [["", "Aucun parrainage"]].concat(gCommunes().filter(function (x) { return x[0] !== c.commune; })), "cochez ensuite « offerte » sur la ou les options annulées") + '</div>'
@@ -971,7 +984,12 @@
   function lireConditions() {
     var box = $("gf-conditions"), o = [];
     if (!box) return {};
-    Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) { if (i.checked) { var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'); o.push(i.dataset.opt + ":" + (gNum(q && q.value) || 1)); } });
+    Array.prototype.forEach.call(box.querySelectorAll("input[data-opt]"), function (i) {
+      if (!i.checked) return;
+      var q = box.querySelector('input[data-qte="' + i.dataset.opt + '"]'), pe = box.querySelector('input[data-prix="' + i.dataset.opt + '"]');
+      var t = gTarifs("option").filter(function (x) { return x.code === i.dataset.opt; })[0], base = t ? gNum(t.prix_ht) : 0, pv = pe && pe.value !== "" ? gNum(pe.value) : base;
+      o.push(i.dataset.opt + ":" + (gNum(q && q.value) || 1) + (Math.abs(pv - base) > 0.001 ? ":" + pv : ""));
+    });
     var off = [];
     Array.prototype.forEach.call(box.querySelectorAll("input[data-offert]"), function (i) { if (i.checked && box.querySelector('input[data-opt="' + i.dataset.offert + '"]').checked) off.push(i.dataset.offert); });
     var parrain = gVal("gf-parrain");
@@ -1152,7 +1170,7 @@
     }
     gTarifs("option").forEach(function (t) {
       if (!opts[t.code]) return;
-      var q = opts[t.code], m = G_RECURRENT[t.unite] || 1, pu = gNum(t.prix_ht) * m;
+      var q = opts[t.code], m = G_RECURRENT[t.unite] || 1, pu = gPrixOpt(t, gLirePrix(lu.options)) * m;
       lignes.push({ designation: t.libelle + (m > 1 ? " (12 mois)" : "") + " — " + gLib(G_UNITES, t.unite), site_code: "", quantite: q, prix_unitaire_ht: r2(pu) });
       if (off[t.code]) lignes.push({ designation: "Parrainage" + (c.parrain ? " de " + gNomCommune(c.parrain) : "") + " : " + t.libelle + " offerte", site_code: "", quantite: 1, prix_unitaire_ht: r2(-q * pu) });
       else payant += q * pu;
@@ -1860,14 +1878,20 @@
     ".gd-ent,.gd-cols{display:grid;grid-template-columns:1fr 64px 1fr 96px 34px;gap:6px;align-items:center}.gd-ent{font-size:12px;color:var(--doux);margin:8px 0 -2px;padding:0 2px}"
     + ".gd-cols{margin-top:6px}.gd-cols input{margin:0}.gd-tl{text-align:right;font-variant-numeric:tabular-nums}"
     + "@media(max-width:480px){.gd-ent,.gd-cols{grid-template-columns:1fr 54px 1fr 80px 30px}}"
-    + ".gfo-l{display:grid;grid-template-columns:30px 1fr 74px auto;gap:8px;align-items:center;margin-top:8px;padding:8px 10px;border:1px solid var(--trait);border-radius:10px;background:#fff}"
+    + ".gfo-l{display:grid;grid-template-columns:30px 1fr auto;gap:6px 10px;align-items:center;margin-top:10px;padding:10px 12px;border:1px solid var(--trait);border-radius:12px;background:#fff}"
+    + "#gf-proposition{font-size:16px!important;line-height:1.5}#gf-proposition>div{padding:5px 0;border-bottom:1px solid #EFEAE0}#gf-proposition b{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}"
+    + "#gf-proposition>div:last-child{border-bottom:0;margin-top:8px;padding:10px 12px;background:#EEF5F0;border-radius:10px;font-size:17px}#gf-proposition>div:last-child b{font-size:20px;color:var(--vert)}"
+    + ".gfo-lib b{display:block;font-size:15px}.gfo-base{display:block;font-size:13px;color:var(--doux);margin-top:1px}"
+    + ".gfo-ch{grid-column:2 / -1;display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}.gfo-ch label{margin:0;font-size:12px;color:var(--doux);display:flex;flex-direction:column;gap:2px}"
+    + ".gfo-ch small{font-size:11px;color:var(--doux)}.gfo-ch input{width:110px!important;height:42px;margin:0;font-size:16px}.gfo-x{padding-bottom:10px;color:var(--doux)}"
+    + ".gfo-tot{padding-bottom:10px;font-weight:700;font-variant-numeric:tabular-nums}.gfo-sp{color:#C77700}"
     + ".gfo-c{width:26px!important;height:26px;margin:0;accent-color:var(--vert);cursor:pointer}.gfo-lib{margin:0;cursor:pointer;font-size:15px;line-height:1.35}"
-    + ".gfo-q{width:74px!important;margin:0;height:42px}"
+
     + ".gfo-off{margin:0;cursor:pointer;display:inline-flex}.gfo-off input{position:absolute;opacity:0;width:1px;height:1px}"
     + ".gfo-off span{display:inline-block;border:1px solid var(--trait);border-radius:999px;padding:9px 14px;font:600 14px system-ui;color:var(--vert);background:#fff;white-space:nowrap}"
     + ".gfo-off input:disabled+span{opacity:.45;border-style:dashed;cursor:not-allowed}.gfo-aide{grid-column:1 / -1;font-size:13px;color:#8a5a00;background:#FFF4DF;border-radius:8px;padding:6px 10px}"
     + ".gfo-off input:checked+span{background:var(--ok);border-color:var(--ok);color:#fff}.gfo-off input:focus-visible+span{outline:2px solid var(--accent)}"
-    + "@media(max-width:480px){.gfo-l{grid-template-columns:30px 1fr 64px}.gfo-off{grid-column:2 / -1;justify-self:start}}"
+    + "@media(max-width:480px){.gfo-l{grid-template-columns:30px 1fr}.gfo-off{grid-column:2 / -1;justify-self:start}.gfo-ch input{width:92px!important}}"
     + "#gd-apercu{position:fixed;inset:0;z-index:120;background:#3b423e;display:flex;flex-direction:column}"
     + ".gda-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#1F3A2E;color:#fff;font-size:15px}.gda-barre span{display:flex;gap:8px}"
     + ".gda-barre button{border:0;border-radius:9px;padding:10px 14px;font:700 15px system-ui;cursor:pointer;background:#fff;color:#1F3A2E}#gda-x{background:transparent;color:#fff;font-size:20px;padding:6px 12px}"
