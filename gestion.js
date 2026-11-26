@@ -959,10 +959,10 @@
       + '<div class="petit" style="margin-top:8px"><b>Options pour le devis</b></div>'
       + (options.length ? options.map(function (t) {
           var q = opts[t.code] || (/point/.test(t.unite) ? pts : 1);
-          return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" data-opt="' + gEsc(t.code) + '" id="gfo-' + gEsc(t.code) + '"' + (opts[t.code] ? ' checked' : '') + ' style="width:auto">'
-            + '<label for="gfo-' + gEsc(t.code) + '" style="flex:1;margin:0">' + gEsc(t.libelle) + ' <span class="petit">— ' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : 'prix à définir') + ' ' + gEsc(gLib(G_UNITES, t.unite)) + '</span></label>'
-            + '<input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '" style="width:70px" aria-label="Quantité">'
-            + '<label class="petit" style="margin:0;display:flex;gap:3px;align-items:center;white-space:nowrap" title="Offerte grâce au parrainage"><input type="checkbox" data-offert="' + gEsc(t.code) + '"' + (off[t.code] ? ' checked' : '') + ' style="width:auto">offerte</label></div>';
+          return '<div class="gfo-l"><input type="checkbox" class="gfo-c" data-opt="' + gEsc(t.code) + '" id="gfo-' + gEsc(t.code) + '"' + (opts[t.code] ? ' checked' : '') + '>'
+            + '<label for="gfo-' + gEsc(t.code) + '" class="gfo-lib">' + gEsc(t.libelle) + ' <span class="petit">— ' + (gNum(t.prix_ht) ? gEuros(t.prix_ht) : 'prix à définir') + ' ' + gEsc(gLib(G_UNITES, t.unite)) + '</span></label>'
+            + '<input type="number" min="0" step="any" data-qte="' + gEsc(t.code) + '" value="' + gEsc(q) + '" class="gfo-q" aria-label="Quantité">'
+            + '<label class="gfo-off" title="Offerte grâce au parrainage"><input type="checkbox" data-offert="' + gEsc(t.code) + '"' + (off[t.code] ? ' checked' : '') + '><span>🎁 Offerte</span></label></div>';
         }).join("") : '<p class="petit">Aucune option : ajoutez-en dans l\'onglet Tarifs.</p>')
       + '<div style="margin-top:10px">' + gChamp("gf-parrain", "Parrainage — commune qui a recommandé celle-ci", c.parrain || "", null, [["", "Aucun parrainage"]].concat(gCommunes().filter(function (x) { return x[0] !== c.commune; })), "cochez ensuite « offerte » sur la ou les options annulées") + '</div>'
       + '<div id="gf-proposition" class="petit" style="margin-top:10px"></div>'
@@ -1857,6 +1857,13 @@
     ".gd-ent,.gd-cols{display:grid;grid-template-columns:1fr 64px 1fr 96px 34px;gap:6px;align-items:center}.gd-ent{font-size:12px;color:var(--doux);margin:8px 0 -2px;padding:0 2px}"
     + ".gd-cols{margin-top:6px}.gd-cols input{margin:0}.gd-tl{text-align:right;font-variant-numeric:tabular-nums}"
     + "@media(max-width:480px){.gd-ent,.gd-cols{grid-template-columns:1fr 54px 1fr 80px 30px}}"
+    + ".gfo-l{display:grid;grid-template-columns:30px 1fr 74px auto;gap:8px;align-items:center;margin-top:8px;padding:8px 10px;border:1px solid var(--trait);border-radius:10px;background:#fff}"
+    + ".gfo-c{width:26px!important;height:26px;margin:0;accent-color:var(--vert);cursor:pointer}.gfo-lib{margin:0;cursor:pointer;font-size:15px;line-height:1.35}"
+    + ".gfo-q{width:74px!important;margin:0;height:42px}"
+    + ".gfo-off{margin:0;cursor:pointer;display:inline-flex}.gfo-off input{position:absolute;opacity:0;width:1px;height:1px}"
+    + ".gfo-off span{display:inline-block;border:1px solid var(--trait);border-radius:999px;padding:9px 14px;font:600 14px system-ui;color:var(--vert);background:#fff;white-space:nowrap}"
+    + ".gfo-off input:checked+span{background:var(--ok);border-color:var(--ok);color:#fff}.gfo-off input:focus-visible+span{outline:2px solid var(--accent)}"
+    + "@media(max-width:480px){.gfo-l{grid-template-columns:30px 1fr 64px}.gfo-off{grid-column:2 / -1;justify-self:start}}"
     + "#gd-apercu{position:fixed;inset:0;z-index:120;background:#3b423e;display:flex;flex-direction:column}"
     + ".gda-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#1F3A2E;color:#fff;font-size:15px}.gda-barre span{display:flex;gap:8px}"
     + ".gda-barre button{border:0;border-radius:9px;padding:10px 14px;font:700 15px system-ui;cursor:pointer;background:#fff;color:#1F3A2E}#gda-x{background:transparent;color:#fff;font-size:20px;padding:6px 12px}"
