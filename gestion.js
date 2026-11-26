@@ -1975,4 +1975,136 @@
     setTimeout(function () { var a = ligne.querySelector(".gfo-aide"); if (a) a.remove(); }, 5000);
   });
 
+
+  /* — Assistant de dépôt Chorus Pro (dépôt manuel guidé, sans API PISTE) —
+     Vérifie la facture, prépare le PDF et les données à recopier, puis passe la facture
+     au statut « Déposée sur Chorus Pro » avec sa référence. */
+  var GCH_PORTAIL = "https://portail.chorus-pro.gouv.fr/";
+  function gchSiretOk(s) {
+    s = String(s || "").replace(/\s/g, ""); if (!/^\d{14}$/.test(s)) return false;
+    var t = 0; for (var i = 0; i < 14; i++) { var n = Number(s[13 - i]); if (i % 2) { n *= 2; if (n > 9) n -= 9; } t += n; }
+    return t % 10 === 0 || /^356000000/.test(s); // exception La Poste
+  }
+  function gchNombre(n) { return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(".", ","); }
+  function gchCopier(txt, b) {
+    var fini = function () { if (!b) return; var a = b.textContent; b.textContent = "Copié ✓"; b.classList.add("ok"); setTimeout(function () { b.textContent = a; b.classList.remove("ok"); }, 1400); };
+    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(txt).then(fini, function () { gchCopierVieux(txt); fini(); }); }
+    else { gchCopierVieux(txt); fini(); }
+  }
+  function gchCopierVieux(txt) { var z = document.createElement("textarea"); z.value = txt; z.style.position = "fixed"; z.style.opacity = "0"; document.body.appendChild(z); z.select(); try { document.execCommand("copy"); } catch (e) {} z.remove(); }
+  function gchFacture(numero) {
+    var f = (G.Factures || []).filter(function (x) { return x.numero === numero; })[0]; if (!f) return null;
+    var lignes = (G.Lignes || []).filter(function (l) { return l.document === numero; }).sort(function (a, b) { return Number(a.num) - Number(b.num); });
+    var ht = lignes.reduce(function (s, l) { return s + (Number(String(l.quantite).replace(",", ".")) || 0) * (Number(String(l.prix_unitaire_ht).replace(",", ".")) || 0); }, 0);
+    var tva = Number(String(f.taux_tva || emet("taux_tva") || 20).replace(",", ".")) || 0;
+    if (f.total_ht !== undefined && f.total_ht !== "") ht = Number(String(f.total_ht).replace(",", ".")) || ht;
+    return { f: f, lignes: lignes, ht: ht, tva: tva, mt: ht * tva / 100, ttc: ht * (1 + tva / 100) };
+  }
+  function ouvrirChorus(numero) {
+    var x = gchFacture(numero); if (!x) return;
+    var f = x.f, cl = gClient(f.commune), nomC = gNomCommune(f.commune);
+    var definitif = f.numero && f.numero.indexOf("BROUILLON") !== 0 && f.statut !== "brouillon";
+    var manqueE = ["raison_sociale", "siret", "adresse", "iban"].filter(function (k) { return !emet(k); });
+    var siretC = String(cl.siret || "").replace(/\s/g, "");
+    var fichier = ("Facture-" + f.numero + "-" + nomC).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/-+/g, "-") + ".pdf";
+    var ctrl = [
+      [definitif ? "ok" : "ko", "Facture émise", definitif ? "N° " + f.numero : "Passez d'abord la facture au statut « Émise » pour qu'elle ait son numéro définitif."],
+      [manqueE.length ? "ko" : "ok", "Émetteur complet", manqueE.length ? "À compléter (onglet Factures › Émetteur) : " + manqueE.join(", ") + "." : emet("raison_sociale") + " · SIRET " + emet("siret")],
+      [!siretC ? "ko" : gchSiretOk(siretC) ? "ok" : "ko", "SIRET de la mairie", !siretC ? "Manquant dans la fiche client : Chorus en a besoin pour trouver le destinataire." : gchSiretOk(siretC) ? siretC : siretC + " ne semble pas valide (14 chiffres, clé de contrôle)."],
+      [cl.code_service_chorus ? "ok" : "info", "Code service", cl.code_service_chorus ? cl.code_service_chorus : "Aucun. Laissez le champ vide, sauf si Chorus le rend obligatoire pour cette mairie."],
+      [x.lignes.length && x.ttc > 0 ? "ok" : "ko", "Montant", x.lignes.length ? gEuros(x.ttc) + " TTC (" + x.lignes.length + " ligne" + (x.lignes.length > 1 ? "s" : "") + ")" : "La facture n'a aucune ligne."]
+    ];
+    if (f.statut === "deposee_chorus" || f.ref_chorus) ctrl.push(["info", "Déjà déposée ?", f.ref_chorus ? "Référence Chorus déjà notée : " + f.ref_chorus + ". Ne la déposez pas deux fois." : "Le statut indique un dépôt déjà fait. Ne la déposez pas deux fois."]);
+    var bloquant = ctrl.some(function (c) { return c[0] === "ko"; });
+    var icone = { ok: "✅", ko: "❌", info: "ℹ️" };
+    var copie = function (lib, val, aide) {
+      return '<div class="gch-c"><div><span>' + gEsc(lib) + '</span><b>' + (val ? gEsc(val) : '<i>vide</i>') + '</b>' + (aide ? '<small>' + gEsc(aide) + '</small>' : '') + '</div>'
+        + (val ? '<button type="button" class="second" data-gch-copie="' + gEsc(val) + '">Copier</button>' : '<span></span>') + '</div>';
+    };
+    var etape = function (n, titre, corps) { return '<div class="gch-e"><h3><span>' + n + '</span>' + titre + '</h3>' + corps + '</div>'; };
+    var h = '<div class="gch-barre"><b>Dépôt Chorus Pro — Facture ' + gEsc(definitif ? f.numero : "(brouillon)") + ' · ' + gEsc(nomC) + '</b><button type="button" id="gch-x" aria-label="Fermer">✕</button></div><div class="gch-corps">'
+      + etape(1, "Vérifications", '<ul class="gch-ctrl">' + ctrl.map(function (c) { return '<li class="' + c[0] + '"><span>' + icone[c[0]] + '</span><div><b>' + gEsc(c[1]) + '</b><br>' + gEsc(c[2]) + '</div></li>'; }).join("") + '</ul>'
+        + (bloquant ? '<div class="gch-stop">Corrigez les points ❌ avant de déposer : une facture incomplète est rejetée par Chorus.' + (!siretC || !gchSiretOk(siretC) ? ' <button type="button" class="second" id="gch-fiche">Ouvrir la fiche de ' + gEsc(nomC) + '</button>' : '') + '</div>' : ''))
+      + etape(2, "Enregistrer le PDF", '<p>Ouvrez l\'aperçu puis « Imprimer / Enregistrer en PDF » (destination : <b>Enregistrer au format PDF</b>). Un seul fichier par facture, sans mot de passe.</p>'
+        + copie("Nom de fichier conseillé", fichier) + '<button type="button" class="principal" id="gch-pdf">📄 Ouvrir le PDF de la facture</button>')
+      + etape(3, "Ouvrir Chorus Pro", '<p>Connectez-vous, puis <b>Facturation › Factures émises › Déposer facture</b>. Choisissez le dépôt d\'un fichier <b>PDF</b> et importez le fichier enregistré.</p>'
+        + '<a class="gch-lien" href="' + GCH_PORTAIL + '" target="_blank" rel="noopener">🏛 Ouvrir le portail Chorus Pro ↗</a>')
+      + etape(4, "Compléter les blocs", '<p>Chorus lit le PDF et pré-remplit une partie des champs. Vérifiez chaque bloc avec les valeurs ci-dessous.</p>'
+        + '<h4>Cadre de facturation</h4>' + copie("Cadre", "A1", "A1 = dépôt d'une facture par un fournisseur (cas général)")
+        + '<h4>Destinataire</h4>' + copie("SIRET de la mairie", siretC) + copie("Code service", cl.code_service_chorus || "", cl.code_service_chorus ? "" : "laisser vide s'il n'est pas demandé")
+        + '<h4>Identification</h4>' + copie("Type", "Facture") + copie("Numéro de facture", definitif ? f.numero : "") + copie("Date de facture", gDateFR(f.date))
+        + '<h4>Références</h4>' + copie("Numéro d'engagement", "", "si la mairie vous a donné un bon de commande ou un n° d'engagement, saisissez-le ; sinon laissez vide")
+        + copie("Mode de paiement", "Virement") + copie("Devise", "EUR")
+        + '<h4>Montants</h4>' + copie("Total HT", gchNombre(x.ht)) + copie("TVA " + String(x.tva).replace(".", ",") + " %", gchNombre(x.mt)) + copie("Total TTC", gchNombre(x.ttc))
+        + '<h4>Fournisseur (vous)</h4>' + copie("Votre SIRET", emet("siret")) + copie("IBAN", emet("iban"), "il doit être celui déclaré dans votre compte Chorus Pro"))
+      + etape(5, "Soumettre et noter la référence", '<p>Cliquez sur <b>Valider et envoyer</b> dans Chorus. Recopiez ensuite le <b>numéro de flux</b> ou le numéro attribué par Chorus : il sert à suivre le traitement et le paiement.</p>'
+        + '<label for="gch-ref"><b>Référence Chorus Pro</b></label><input id="gch-ref" value="' + gEsc(f.ref_chorus || "") + '" placeholder="ex. CPP2026_123456789" autocomplete="off">'
+        + '<button type="button" class="principal" id="gch-ok"' + (definitif ? '' : ' disabled') + '>' + (f.statut === "payee" ? "Enregistrer la référence" : "Marquer la facture comme déposée") + '</button><div class="msg" id="msg-gch"></div>'
+        + '<p class="petit">Le suivi se fait ensuite dans Chorus (Factures émises › Consulter). La facture garde son échéance du ' + gDateFR(f.echeance) + ' dans l\'agenda.</p>')
+      + '</div>';
+    var vieux = $("gch"); if (vieux) vieux.remove();
+    var o = document.createElement("div"); o.id = "gch"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Assistant de dépôt Chorus Pro"); o.innerHTML = h;
+    document.body.appendChild(o); document.body.style.overflow = "hidden";
+    var fermer = function () { o.remove(); document.body.style.overflow = ""; };
+    $("gch-x").onclick = fermer;
+    o.addEventListener("click", function (e) { var b = e.target.closest("[data-gch-copie]"); if (b) gchCopier(b.dataset.gchCopie, b); });
+    $("gch-pdf").onclick = function () {
+      var t0 = document.title; document.title = fichier.replace(/\.pdf$/, "");
+      montrerApercu({ t: "facture", d: Object.assign({}, f), lignes: x.lignes });
+      var ap = $("gd-apercu"); if (ap) { ap.style.zIndex = 130; new MutationObserver(function (m, obs) { if (!document.body.contains(ap)) { document.title = t0; document.body.style.overflow = "hidden"; obs.disconnect(); } }).observe(document.body, { childList: true }); }
+    };
+    if ($("gch-fiche")) $("gch-fiche").onclick = function () {
+      fermer(); if ($("g-doc")) $("g-doc").hidden = true;
+      var nb = document.querySelector('nav button[data-onglet="clients"]'); if (nb) nb.click();
+      setTimeout(function () { $("g-commune").value = f.commune; dessinerFiche(); var s = $("gf-siret"); if (s) { s.scrollIntoView({ behavior: "smooth", block: "center" }); s.focus(); } }, 40);
+    };
+    $("gch-ok").onclick = function () {
+      var ref = gVal("gch-ref");
+      if (!ref && !confirm("Aucune référence Chorus saisie. Marquer quand même la facture comme déposée ?")) return;
+      var e = { numero: f.numero };
+      ["commune", "date", "type", "periode_debut", "periode_fin", "ref_devis", "statut", "payee_le", "taux_tva", "notes"].forEach(function (k) { if (f[k] !== undefined) e[k] = f[k]; });
+      e.ref_chorus = ref; if (f.statut !== "payee") e.statut = "deposee_chorus";
+      $("gch-ok").disabled = true;
+      gEnvoyer({ op: "document", type: "facture", entete: e }, "msg-gch", "Facture notée « Déposée sur Chorus Pro »" + (ref ? " (" + ref + ")" : "") + ".")
+        .then(function () { if (G_DOC && G_DOC.type === "facture" && G_DOC.d.numero === f.numero) ouvrirDoc("facture", f.numero); setTimeout(fermer, 1300); })
+        .catch(function () { $("gch-ok").disabled = false; });
+    };
+  }
+  // Bouton dans l'éditeur (factures émises seulement).
+  $("g-doc-pdf").insertAdjacentHTML("afterend", '<button class="second" id="g-doc-chorus" type="button" style="flex:1" hidden>🏛 Déposer sur Chorus</button>');
+  $("g-doc-chorus").addEventListener("click", function () { if (G_DOC && G_DOC.d.numero) ouvrirChorus(G_DOC.d.numero); });
+  (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments); var d = G_DOC && G_DOC.d;
+    $("g-doc-chorus").hidden = !(G_DOC && G_DOC.type === "facture" && d.numero && d.statut !== "brouillon" && d.statut !== "annulee");
+    if (!$("g-doc-chorus").hidden) $("g-doc-chorus").textContent = d.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus Pro"; return r; }; })();
+  // Bouton 🏛 dans les listes, pour les factures émises pas encore déposées.
+  function boutonsChorus() {
+    ["g-factures-liste", "g-fiche-docs"].forEach(function (id) {
+      var box = $(id); if (!box || !G) return;
+      Array.prototype.forEach.call(box.querySelectorAll('a[data-gdoc="facture"]'), function (a) {
+        var f = (G.Factures || []).filter(function (x) { return x.numero === a.dataset.num; })[0];
+        var apres = a.nextElementSibling && a.nextElementSibling.classList.contains("gd-pdfb") ? a.nextElementSibling : a;
+        if (!f || f.statut !== "emise" || (apres.nextElementSibling && apres.nextElementSibling.classList.contains("gch-b"))) return;
+        apres.insertAdjacentHTML("afterend", ' <button type="button" class="gd-pdfb gch-b" data-gch="' + gEsc(f.numero) + '" title="Assistant de dépôt Chorus Pro">🏛 Chorus</button>');
+      });
+    });
+  }
+  ["g-factures-liste", "g-fiche-docs"].forEach(function (id) {
+    var box = $(id); if (!box) return;
+    box.addEventListener("click", function (e) { var b = e.target.closest("[data-gch]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); ouvrirChorus(b.dataset.gch); }, true);
+    new MutationObserver(function () { setTimeout(boutonsChorus, 0); }).observe(box, { childList: true });
+  });
+  (function () { var st = document.createElement("style"); st.textContent =
+    "#gch{position:fixed;inset:0;z-index:125;background:#F4F1EA;display:flex;flex-direction:column}"
+    + ".gch-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#1F3A2E;color:#fff;font-size:15px}#gch-x{border:0;background:transparent;color:#fff;font-size:20px;padding:6px 12px;cursor:pointer}"
+    + ".gch-corps{flex:1;overflow:auto;padding:14px;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}"
+    + ".gch-e{background:#fff;border:1px solid var(--trait);border-radius:14px;padding:14px 16px;margin-bottom:12px}.gch-e h3{margin:0 0 8px;font-size:17px;display:flex;align-items:center;gap:10px}"
+    + ".gch-e h3 span{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#1F3A2E;color:#fff;font-size:14px}.gch-e h4{margin:12px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--doux)}.gch-e p{margin:4px 0 10px;font-size:15px;line-height:1.45}"
+    + ".gch-ctrl{list-style:none;margin:0;padding:0}.gch-ctrl li{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #EFEAE0;font-size:14.5px}.gch-ctrl li:last-child{border-bottom:0}.gch-ctrl li.ko{color:#8a1c14}"
+    + ".gch-stop{margin-top:8px;padding:10px 12px;border-radius:10px;background:#FDECEA;color:#8a1c14;font-size:14px}.gch-stop button{margin-top:8px}"
+    + ".gch-c{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px dashed #EFEAE0}.gch-c div{min-width:0}.gch-c span{display:block;font-size:12.5px;color:var(--doux)}"
+    + ".gch-c b{display:block;font-size:16px;word-break:break-all;font-variant-numeric:tabular-nums}.gch-c i{color:var(--doux);font-weight:400}.gch-c small{display:block;font-size:12px;color:var(--doux)}.gch-c button{padding:6px 12px;font-size:13px;white-space:nowrap;margin:0}.gch-c button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}"
+    + ".gch-lien{display:block;text-align:center;padding:13px;border-radius:12px;background:#1F3A2E;color:#fff;font-weight:700;text-decoration:none;font-size:16px}"
+    + "#gch .principal{width:100%;margin-top:8px}#gch-ref{font-size:16px}.gch-b{color:#5B3A87}";
+    document.head.appendChild(st); })();
+
 })();
