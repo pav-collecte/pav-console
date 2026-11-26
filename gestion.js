@@ -2353,18 +2353,27 @@
       + '<label for="gso-a"><b>À</b>' + (mails.length ? '' : ' <span class="petit" style="color:var(--ko)">— aucune adresse dans la fiche ni dans les contacts</span>') + '</label><input id="gso-a" type="email" list="gso-l" value="' + gEsc(mails[0] || "") + '" placeholder="mairie@exemple.fr" autocomplete="off"><datalist id="gso-l">' + mails.map(function (m) { return '<option value="' + gEsc(m) + '">'; }).join("") + '</datalist>'
       + '<label for="gso-o"><b>Objet</b></label><input id="gso-o" value="' + gEsc(objet) + '">'
       + '<label for="gso-m"><b>Message</b></label><textarea id="gso-m" rows="11">' + gEsc(corps) + '</textarea>'
-      + '<div class="gso-b"><button type="button" class="principal" id="gso-mail">✉️ Ouvrir dans ma messagerie</button><button type="button" class="second" id="gso-gmail">Gmail · ' + gEsc(gCompte()) + '</button><button type="button" class="second" id="gso-copie">Copier le message</button></div>'
-      + '<p class="petit">N\'oubliez pas de joindre le PDF avant d\'envoyer.</p></div>'
-      + '<div class="gch-e"><h3><span>3</span>Noter l\'envoi et la relance</h3>'
+      + '<label for="gso-cc"><b>Copie à</b> <span class="petit">— facultatif</span></label><input id="gso-cc" type="email" list="gso-l" value="" placeholder="ex. secretariat@mairie.fr" autocomplete="off">'
+      + '<div class="gso-n8n"><button type="button" class="principal" id="gso-envoyer">📤 Envoyer avec le PDF joint</button><div class="petit" id="gso-de">Expéditeur : vérification…</div></div>'
+      + '<details class="gso-autres"><summary>Autres façons d\'envoyer (ma messagerie, Gmail, copier)</summary><div class="gso-b"><button type="button" class="second" id="gso-mail">✉️ Ma messagerie</button><button type="button" class="second" id="gso-gmail">Gmail · ' + gEsc(gCompte()) + '</button><button type="button" class="second" id="gso-copie">Copier le message</button></div>'
+      + '<p class="petit">Dans ce cas, joignez le PDF vous-même puis notez l\'envoi à l\'étape 3.</p></details><div class="msg" id="msg-gso-envoi"></div></div>'
+      + '<div class="gch-e"><h3><span>3</span>La relance</h3>'
       + '<label for="gso-r"><b>Relancer le</b> <span class="petit">— la relance apparaît dans l\'agenda (et Google Agenda) et dans « Échanges »</span></label><input id="gso-r" type="date" value="' + relance + '">'
       + '<p class="petit">Validité du devis : jusqu\'au ' + gDateFR(validite) + '.</p>'
-      + '<button type="button" class="principal" id="gso-ok">✅ Devis envoyé : noter et programmer la relance</button><div class="msg" id="msg-gso"></div></div></div>';
+      + '<button type="button" class="second" id="gso-ok">✅ Envoyé par ma messagerie : noter et programmer la relance</button><div class="msg" id="msg-gso"></div></div></div>';
     var vieux = $("gso"); if (vieux) vieux.remove();
     var o = document.createElement("div"); o.id = "gso"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Soumettre le devis"); o.innerHTML = h;
     document.body.appendChild(o); document.body.style.overflow = "hidden";
     var fermer = function () { o.remove(); document.body.style.overflow = ""; };
     $("gso-x").onclick = fermer;
-    if (!d.pdf_drive) garArchiver("devis", d.numero).then(function (lien) {
+    var GSO_LIEN = d.pdf_drive ? Promise.resolve(d.pdf_drive) : null, GSO_DE = "";
+    api("mail-compte", {}).then(function (j) {
+      GSO_DE = j.compte || ""; var e = $("gso-de"); if (!e) return;
+      var bon = GSO_DE.toLowerCase() === gCompte().toLowerCase();
+      e.innerHTML = 'Expéditeur : <b>' + gEsc(GSO_DE) + '</b>' + (bon ? '' : ' <span style="color:var(--ko)">— ce n\'est pas ' + gEsc(gCompte()) + ' (connexion Gmail de n8n à changer)</span>');
+      e.classList.toggle("ko", !bon);
+    }).catch(function (er) { GSO_DE = ""; if ($("gso-de")) $("gso-de").innerHTML = '<span style="color:var(--ko)">Envoi par n8n indisponible : ' + gEsc(er.message) + '</span>'; });
+    if (!d.pdf_drive) GSO_LIEN = garArchiver("devis", d.numero); GSO_LIEN.then(function (lien) {
       if ($("gso-drive")) $("gso-drive").innerHTML = '<a class="gch-lien" href="' + gEsc(gDrive(lien)) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail (compte ' + gEsc(gCompte()) + '), joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>';
     }).catch(function (e) { if ($("gso-drive")) $("gso-drive").innerHTML = '<p class="petit" style="color:var(--ko)">Archivage Drive impossible : ' + gEsc(e.message) + '</p>'; });
     var url = function (gmail) {
@@ -2379,10 +2388,23 @@
       montrerApercu({ t: "devis", d: Object.assign({}, d), lignes: lignes });
       var ap = $("gd-apercu"); if (ap) { ap.style.zIndex = 130; new MutationObserver(function (m, obs) { if (!document.body.contains(ap)) { document.title = t0; document.body.style.overflow = "hidden"; obs.disconnect(); } }).observe(document.body, { childList: true }); }
     };
-    $("gso-ok").onclick = function () {
-      var a = gVal("gso-a"), r = gVal("gso-r");
-      if (!r && !confirm("Aucune date de relance. Continuer sans relance ?")) return;
-      $("gso-ok").disabled = true; msg("msg-gso", "Enregistrement…");
+    $("gso-envoyer").onclick = function () {
+      var a = gVal("gso-a"), r = gVal("gso-r"), b = $("gso-envoyer");
+      if (!a) { msg("msg-gso-envoi", "Indiquez l'adresse du destinataire.", "ko"); $("gso-a").focus(); return; }
+      if (!r && !confirm("Aucune date de relance. Envoyer quand même ?")) return;
+      if (GSO_DE && GSO_DE.toLowerCase() !== gCompte().toLowerCase() && !confirm("Le message partira de " + GSO_DE + " et non de " + gCompte() + ". Envoyer quand même ?")) return;
+      if (!confirm("Envoyer le devis " + d.numero + " (PDF joint) à " + a + (gVal("gso-cc") ? " et " + gVal("gso-cc") : "") + " ?")) return;
+      b.disabled = true; msg("msg-gso-envoi", "Préparation du PDF…");
+      (GSO_LIEN || garArchiver("devis", d.numero)).then(function (lien) {
+        msg("msg-gso-envoi", "Envoi en cours…");
+        return api("envoyer-mail", { type: "devis", numero: d.numero, a: a, cc: gVal("gso-cc"), objet: $("gso-o").value, message: $("gso-m").value, pdf_drive: lien, fichier: fichier, expediteur: emet("raison_sociale") });
+      }).then(function (j) {
+        msg("msg-gso-envoi", "📤 Message envoyé depuis " + (j.compte || "Gmail") + ".", "ok");
+        return gsoNoter(a, r, " par e-mail depuis " + (j.compte || "Gmail"));
+      }).catch(function (er) { msg("msg-gso-envoi", "Envoi impossible : " + er.message, "ko"); b.disabled = false; });
+    };
+    function gsoNoter(a, r, via) {
+      msg("msg-gso", "Enregistrement…");
       var etape = Promise.resolve();
       if (!dejaEnvoye) {
         var e = { numero: d.numero };
@@ -2394,7 +2416,7 @@
       var contact = (contacts.filter(function (c) { return c.email === a; })[0] || {}).nom || a;
       etape.then(function () {
         return api("gestion", { op: "enregistrer", onglet: "Echanges", valeurs: { id: "", commune: d.commune, date: new Date().toISOString().slice(0, 10), type: "email", contact: contact,
-          resume: (dejaEnvoye ? "Devis " + d.numero + " renvoyé" : "Devis " + d.numero + " envoyé") + " (" + gEuros(ht) + " HT)" + (a ? " à " + a : "") + ".", prochaine_action: r ? "Relancer le devis " + d.numero : "", echeance: r, fait: r ? "non" : "oui" } });
+          resume: (dejaEnvoye ? "Devis " + d.numero + " renvoyé" : "Devis " + d.numero + " envoyé") + " (" + gEuros(ht) + " HT)" + (a ? " à " + a : "") + (via || "") + ".", prochaine_action: r ? "Relancer le devis " + d.numero : "", echeance: r, fait: r ? "non" : "oui" } });
       }).then(function () {
         syncAgendaPlusTard(); return chargerGestion(true);
       }).then(function () {
@@ -2402,6 +2424,11 @@
         if (G_DOC && G_DOC.type === "devis" && G_DOC.d.numero === d.numero) ouvrirDoc("devis", d.numero);
         setTimeout(fermer, 1400);
       }).catch(function (er) { msg("msg-gso", er.message, "ko"); $("gso-ok").disabled = false; });
+    }
+    $("gso-ok").onclick = function () {
+      var a = gVal("gso-a"), r = gVal("gso-r");
+      if (!r && !confirm("Aucune date de relance. Continuer sans relance ?")) return;
+      $("gso-ok").disabled = true; gsoNoter(a, r, "");
     };
   }
   // Bouton dans l'éditeur de devis, et ouverture automatique quand on passe le statut à « Soumis ».
@@ -2421,7 +2448,8 @@
   (function () { var st = document.createElement("style"); st.textContent =
     "#gso{position:fixed;inset:0;z-index:125;background:#F4F1EA;display:flex;flex-direction:column}#gso-x{border:0;background:transparent;color:#fff;font-size:20px;padding:6px 12px;cursor:pointer}"
     + "#gso textarea{font:15px/1.45 system-ui;width:100%;box-sizing:border-box}#gso .principal,#gso .second{min-height:44px}#gso-ok{width:100%;margin-top:10px}"
-    + ".gso-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.gso-b button{flex:1 1 auto;margin:0}";
+    + ".gso-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.gso-b button{flex:1 1 auto;margin:0}"
+    + ".gso-n8n{margin-top:12px}.gso-n8n .principal{width:100%;margin:0 0 6px}.gso-autres{margin-top:12px}.gso-autres summary{cursor:pointer;color:var(--vert);font-weight:600;font-size:14px}";
     document.head.appendChild(st); })();
 
 
