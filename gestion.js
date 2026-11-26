@@ -275,7 +275,7 @@
   var G_REGLAGES = [["habitants_par_point", "300", "Réglage : habitants par point de collecte, pour estimer les points d'une commune non relevée"],
     ["carte_centre", "Albon", "Réglage : commune au centre de la carte des prospects"],
     ["carte_rayon_km", "20", "Réglage : rayon par défaut de la carte (km)"],
-    ["rappel_echeance_jours", "30", "Réglage : rappel avant une échéance (facture, devis, anniversaire de contrat), en jours ; 0 = pas de rappel"]];
+    ["rappel_echeance_jours", "30", "Réglage : rappel avant une échéance (facture, devis, anniversaire de contrat), en jours ; 0 = pas de rappel"], ["drive_compte", "pav.collecte@gmail.com", "Compte Google des PDF archivés sur Drive et de Gmail (les liens ☁️ Drive s'ouvrent avec ce compte)"]];
   function gReglage(cle) {
     var l = ((G && G.Emetteur) || []).filter(function (p) { return p.cle === cle; })[0], d = G_REGLAGES.filter(function (r) { return r[0] === cle; })[0];
     var v = l && l.valeur && !/^À REMPLIR/i.test(l.valeur) ? l.valeur : "";
@@ -1341,6 +1341,9 @@
   })();
   function badge(st, liste) { return '<span style="display:inline-block;padding:1px 8px;border-radius:10px;color:#fff;font-size:12px;background:' + (G_COUL_ST[st] || "#9AA39B") + '">' + gEsc(gLib(liste, st)) + '</span>'; }
   // Cartes de devis / facture (fiche client et page Factures). avecCommune : affiche la commune (page Factures).
+  // Compte Google des PDF archivés et de Gmail (réglage drive_compte de l'émetteur).
+  function gCompte() { return (G && emet("drive_compte")) || "pav.collecte@gmail.com"; }
+  function gDrive(u) { if (!u) return u; return u + (u.indexOf("?") < 0 ? "?" : "&") + "authuser=" + encodeURIComponent(gCompte()); }
   function gdfNum(x) { return String(x.numero || "").indexOf("BROUILLON") === 0 ? "Brouillon" : x.numero; }
   function gdfBrouillon(x) { return String(x.numero || "").indexOf("BROUILLON") === 0 || x.statut === "brouillon"; }
   function gdfAct(lib, attrs, cls) { return '<button type="button" class="' + (cls || "second") + '" ' + attrs + '>' + lib + '</button>'; }
@@ -1354,7 +1357,7 @@
       + '<div class="gdf-m"><span>' + gDateFR(d.date) + (info ? '<br><small' + (d.statut === "envoye" && d.validite < auj ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(d.total_ht) + ' <small>HT</small></b></div>'
       + (fac ? '<div class="gdf-lien">🧾 Facturé : <button type="button" class="gdf-lnk" data-gdoc="facture" data-num="' + gEsc(fac.numero) + '">' + gEsc(gdfNum(fac)) + '</button> ' + badge(fac.statut, G_ST_FACT) + '</div>' : '')
       + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="devis" data-num="' + gEsc(d.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="devis" data-num="' + gEsc(d.numero) + '"', "second gd-pdfb")
-      + (d.pdf_drive ? '<a class="second gdf-drive" href="' + gEsc(d.pdf_drive) + '" target="_blank" rel="noopener">☁️ Drive</a>' : '')
+      + (d.pdf_drive ? '<a class="second gdf-drive" href="' + gEsc(gDrive(d.pdf_drive)) + '" target="_blank" rel="noopener" title="Ouvrir avec ' + gEsc(gCompte()) + '">☁️ Drive</a>' : '')
       + (d.statut === "brouillon" || d.statut === "envoye" ? gdfAct(d.statut === "envoye" ? "📨 Renvoyer" : "📨 Soumettre", 'data-gsoum="' + gEsc(d.numero) + '"', d.statut === "brouillon" ? "principal" : "second") : '')
       + (d.statut === "accepte" && !fac ? gdfAct("🧾 Créer la facture", 'data-gfacturer="' + gEsc(d.numero) + '"', "principal") : '')
       + (gdfBrouillon(d) ? gdfAct("Supprimer", 'data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '"', "second gdf-sup") : '') + '</div></div>';
@@ -1370,7 +1373,7 @@
       + '<div class="gdf-o">' + gEsc(details) + (f.ref_devis ? '<br><small>Devis d\'origine : ' + gEsc(f.ref_devis) + '</small>' : '') + (f.ref_chorus ? '<br><small>Chorus : ' + gEsc(f.ref_chorus) + '</small>' : '') + '</div>'
       + '<div class="gdf-m"><span>' + gDateFR(f.date) + (info ? '<br><small' + (retard ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(f.total_ttc) + ' <small>TTC</small></b></div>'
       + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="facture" data-num="' + gEsc(f.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="facture" data-num="' + gEsc(f.numero) + '"', "second gd-pdfb")
-      + (f.pdf_drive ? '<a class="second gdf-drive" href="' + gEsc(f.pdf_drive) + '" target="_blank" rel="noopener">☁️ Drive</a>' : '')
+      + (f.pdf_drive ? '<a class="second gdf-drive" href="' + gEsc(gDrive(f.pdf_drive)) + '" target="_blank" rel="noopener" title="Ouvrir avec ' + gEsc(gCompte()) + '">☁️ Drive</a>' : '')
       + (f.statut !== "annulee" ? gdfAct(f.statut === "emise" ? "🏛 Déposer sur Chorus" : "🏛 Chorus", 'data-gch="' + gEsc(f.numero) + '"', f.statut === "emise" ? "principal" : "second") : '')
       + (gdfBrouillon(f) ? gdfAct("Supprimer", 'data-gsuppr-doc="facture" data-num="' + gEsc(f.numero) + '"', "second gdf-sup") : '') + '</div></div>';
   }
@@ -2057,7 +2060,7 @@
       + etape(1, "Vérifications", '<ul class="gch-ctrl">' + ctrl.map(function (c) { return '<li class="' + c[0] + '"><span>' + icone[c[0]] + '</span><div><b>' + gEsc(c[1]) + '</b><br>' + gEsc(c[2]) + '</div></li>'; }).join("") + '</ul>'
         + (bloquant ? '<div class="gch-stop">Corrigez les points ❌ avant de déposer : une facture incomplète est rejetée par Chorus.' + (!siretC || !gchSiretOk(siretC) ? ' <button type="button" class="second" id="gch-fiche">Ouvrir la fiche de ' + gEsc(nomC) + '</button>' : '') + '</div>' : ''))
       + etape(2, "Enregistrer le PDF", '<p>Ouvrez l\'aperçu puis « Imprimer / Enregistrer en PDF » (destination : <b>Enregistrer au format PDF</b>). Un seul fichier par facture, sans mot de passe.</p>'
-        + (f.pdf_drive ? '<a class="gch-lien" href="' + gEsc(f.pdf_drive) + '" target="_blank" rel="noopener" style="margin-bottom:8px">☁️ PDF archivé sur Drive (à télécharger puis déposer)</a>' : '') + copie("Nom de fichier conseillé", fichier) + '<button type="button" class="' + (f.pdf_drive ? 'second' : 'principal') + '" id="gch-pdf">📄 ' + (f.pdf_drive ? "Ou recréer le PDF depuis la console" : "Ouvrir le PDF de la facture") + '</button>')
+        + (f.pdf_drive ? '<a class="gch-lien" href="' + gEsc(gDrive(f.pdf_drive)) + '" target="_blank" rel="noopener" style="margin-bottom:8px">☁️ PDF archivé sur Drive (à télécharger puis déposer)</a>' : '') + copie("Nom de fichier conseillé", fichier) + '<button type="button" class="' + (f.pdf_drive ? 'second' : 'principal') + '" id="gch-pdf">📄 ' + (f.pdf_drive ? "Ou recréer le PDF depuis la console" : "Ouvrir le PDF de la facture") + '</button>')
       + etape(3, "Ouvrir Chorus Pro", '<p>Connectez-vous, puis <b>Facturation › Factures émises › Déposer facture</b>. Choisissez le dépôt d\'un fichier <b>PDF</b> et importez le fichier enregistré.</p>'
         + '<a class="gch-lien" href="' + GCH_PORTAIL + '" target="_blank" rel="noopener">🏛 Ouvrir le portail Chorus Pro ↗</a>')
       + etape(4, "Compléter les blocs", '<p>Chorus lit le PDF et pré-remplit une partie des champs. Vérifiez chaque bloc avec les valeurs ci-dessous.</p>'
@@ -2344,13 +2347,13 @@
     var dejaEnvoye = d.statut === "envoye";
     var h = '<div class="gch-barre"><b>' + (dejaEnvoye ? "Renvoyer" : "Soumettre") + ' le devis ' + gEsc(d.numero) + ' · ' + gEsc(nomC) + '</b><button type="button" id="gso-x" aria-label="Fermer">✕</button></div><div class="gch-corps">'
       + (dejaEnvoye ? '<div class="gdf-alerte">Ce devis est déjà au statut « Soumis ». Vous pouvez le renvoyer et reprogrammer la relance.</div>' : '')
-      + '<div class="gch-e"><h3><span>1</span>Le PDF à joindre</h3><div id="gso-drive" class="gso-drive">' + (d.pdf_drive ? '<a class="gch-lien" href="' + gEsc(d.pdf_drive) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail, joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>' : '<p class="petit">☁️ Archivage du PDF sur Drive…</p>') + '</div>'
+      + '<div class="gch-e"><h3><span>1</span>Le PDF à joindre</h3><div id="gso-drive" class="gso-drive">' + (d.pdf_drive ? '<a class="gch-lien" href="' + gEsc(gDrive(d.pdf_drive)) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail (compte ' + gEsc(gCompte()) + '), joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>' : '<p class="petit">☁️ Archivage du PDF sur Drive…</p>') + '</div>'
       + '<p class="petit">Ou créez-le ici : « Imprimer / Enregistrer en PDF », nom conseillé <b>' + gEsc(fichier) + '</b>.</p><button type="button" class="second" id="gso-pdf">📄 Ouvrir le PDF du devis</button></div>'
       + '<div class="gch-e"><h3><span>2</span>Le message</h3>'
       + '<label for="gso-a"><b>À</b>' + (mails.length ? '' : ' <span class="petit" style="color:var(--ko)">— aucune adresse dans la fiche ni dans les contacts</span>') + '</label><input id="gso-a" type="email" list="gso-l" value="' + gEsc(mails[0] || "") + '" placeholder="mairie@exemple.fr" autocomplete="off"><datalist id="gso-l">' + mails.map(function (m) { return '<option value="' + gEsc(m) + '">'; }).join("") + '</datalist>'
       + '<label for="gso-o"><b>Objet</b></label><input id="gso-o" value="' + gEsc(objet) + '">'
       + '<label for="gso-m"><b>Message</b></label><textarea id="gso-m" rows="11">' + gEsc(corps) + '</textarea>'
-      + '<div class="gso-b"><button type="button" class="principal" id="gso-mail">✉️ Ouvrir dans ma messagerie</button><button type="button" class="second" id="gso-gmail">Ouvrir dans Gmail</button><button type="button" class="second" id="gso-copie">Copier le message</button></div>'
+      + '<div class="gso-b"><button type="button" class="principal" id="gso-mail">✉️ Ouvrir dans ma messagerie</button><button type="button" class="second" id="gso-gmail">Gmail · ' + gEsc(gCompte()) + '</button><button type="button" class="second" id="gso-copie">Copier le message</button></div>'
       + '<p class="petit">N\'oubliez pas de joindre le PDF avant d\'envoyer.</p></div>'
       + '<div class="gch-e"><h3><span>3</span>Noter l\'envoi et la relance</h3>'
       + '<label for="gso-r"><b>Relancer le</b> <span class="petit">— la relance apparaît dans l\'agenda (et Google Agenda) et dans « Échanges »</span></label><input id="gso-r" type="date" value="' + relance + '">'
@@ -2362,11 +2365,11 @@
     var fermer = function () { o.remove(); document.body.style.overflow = ""; };
     $("gso-x").onclick = fermer;
     if (!d.pdf_drive) garArchiver("devis", d.numero).then(function (lien) {
-      if ($("gso-drive")) $("gso-drive").innerHTML = '<a class="gch-lien" href="' + gEsc(lien) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail, joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>';
+      if ($("gso-drive")) $("gso-drive").innerHTML = '<a class="gch-lien" href="' + gEsc(gDrive(lien)) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail (compte ' + gEsc(gCompte()) + '), joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>';
     }).catch(function (e) { if ($("gso-drive")) $("gso-drive").innerHTML = '<p class="petit" style="color:var(--ko)">Archivage Drive impossible : ' + gEsc(e.message) + '</p>'; });
     var url = function (gmail) {
       var a = gVal("gso-a"), su = encodeURIComponent($("gso-o").value), bo = encodeURIComponent($("gso-m").value);
-      return gmail ? "https://mail.google.com/mail/?view=cm&fs=1&to=" + encodeURIComponent(a) + "&su=" + su + "&body=" + bo : "mailto:" + encodeURIComponent(a).replace(/%40/g, "@") + "?subject=" + su + "&body=" + bo;
+      return gmail ? "https://mail.google.com/mail/?authuser=" + encodeURIComponent(gCompte()) + "&view=cm&fs=1&to=" + encodeURIComponent(a) + "&su=" + su + "&body=" + bo : "mailto:" + encodeURIComponent(a).replace(/%40/g, "@") + "?subject=" + su + "&body=" + bo;
     };
     $("gso-mail").onclick = function () { if (!gVal("gso-a")) { msg("msg-gso", "Indiquez l'adresse du destinataire.", "ko"); $("gso-a").focus(); return; } window.location.href = url(false); };
     $("gso-gmail").onclick = function () { if (!gVal("gso-a")) { msg("msg-gso", "Indiquez l'adresse du destinataire.", "ko"); $("gso-a").focus(); return; } window.open(url(true), "_blank", "noopener"); };
@@ -2527,7 +2530,7 @@
   $("g-doc-drive").addEventListener("click", function () {
     if (!G_DOC || !G_DOC.d.numero) return;
     if (G_DOC.d.pdf_drive && !confirm("Ce document est déjà archivé sur Drive.\n\nOK : l'ouvrir · Annuler : créer une nouvelle version")) { garArchiver(G_DOC.type, G_DOC.d.numero, "msg-doc").catch(function () {}); return; }
-    if (G_DOC.d.pdf_drive) { window.open(G_DOC.d.pdf_drive, "_blank", "noopener"); return; }
+    if (G_DOC.d.pdf_drive) { window.open(gDrive(G_DOC.d.pdf_drive), "_blank", "noopener"); return; }
     garArchiver(G_DOC.type, G_DOC.d.numero, "msg-doc").catch(function () {});
   });
   var GAR_APRES = false;
