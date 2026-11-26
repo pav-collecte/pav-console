@@ -1912,4 +1912,21 @@
   (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments); remplirCatalogue(); return r; }; })();
   (function () { var st = document.createElement("style"); st.textContent = ".gd-outils{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.gd-outils select{flex:2;min-width:200px;margin:0}.gd-outils button{flex:1;min-width:120px}"; document.head.appendChild(st); })();
 
+  /* Devis / facture ouvert depuis la fiche client : « Fermer » ramène à la fiche (sous-onglet Devis & factures). */
+  var GD_ORIGINE = null;
+  $("g-fiche-docs").addEventListener("click", function (e) { if (e.target.closest("a[data-gdoc]")) GD_ORIGINE = $("g-commune").value; }, true);
+  if ($("gfd-nouveau")) $("gfd-nouveau").addEventListener("click", function () { GD_ORIGINE = $("g-commune").value; }, true);
+  $("g-doc-fermer").addEventListener("click", function () {
+    if (!GD_ORIGINE) return;
+    var com = GD_ORIGINE; GD_ORIGINE = null;
+    var nb = document.querySelector('nav button[data-onglet="clients"]'); if (nb) nb.click();
+    setTimeout(function () {
+      if ($("g-commune").value !== com) { $("g-commune").value = com; dessinerFiche(); }
+      GF_PANE = "docs"; gfAppliquerPane();
+      var t = $("gf-titre"); if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 30);
+  });
+  // Changer d'onglet à la main annule le retour automatique.
+  document.querySelector("nav").addEventListener("click", function (e) { var b = e.target.closest("button[data-onglet]"); if (b && b.dataset.onglet !== "factu") GD_ORIGINE = null; }, true);
+
 })();
