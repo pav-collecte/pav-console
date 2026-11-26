@@ -1781,7 +1781,7 @@
     var adrC = [cl.adresse_facturation, ((cl.code_postal || "") + " " + (cl.ville || "")).trim()].filter(Boolean).map(gEsc).join("<br>");
     var titre = t === "devis" ? "Devis" : "Facture";
     var manque = ["raison_sociale", "siret", "adresse", "iban"].filter(function (k) { return !emet(k); });
-    return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + titre + ' ' + gEsc(num) + ' — ' + gEsc(gNomCommune(d.commune)) + '</title><style>'
+    return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + titre + ' ' + gEsc(num) + ' — ' + gEsc(gNomCommune(d.commune)) + '</title><style>'
       + '@page{size:A4;margin:16mm 15mm 18mm}*{box-sizing:border-box}body{font:10.5pt/1.45 "Helvetica Neue",Arial,sans-serif;color:#1d2420;margin:0}'
       + '.barre{position:sticky;top:0;background:#1F3A2E;color:#fff;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:center;font:600 14px system-ui}.barre button{border:0;border-radius:8px;padding:9px 16px;font:700 14px system-ui;cursor:pointer;background:#fff;color:#1F3A2E}'
       + '.page{max-width:180mm;margin:0 auto;padding:12mm 0}.alerte{background:#FDECEA;color:#8a1c14;border:1px solid #f2b8b5;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:9.5pt}'
@@ -1794,6 +1794,9 @@
       + '.mentions{margin-top:9mm;font-size:8.5pt;color:#444}.mentions p{margin:3px 0}.sign{display:flex;gap:20px;margin-top:10mm}.sign div{flex:1;border:1px solid #cfd4cd;border-radius:6px;height:32mm;padding:8px;font-size:9pt;color:#555}'
       + '.pied{margin-top:12mm;padding-top:6px;border-top:1px solid #cfd4cd;font-size:7.5pt;color:#777;text-align:center}'
       + '@media print{.barre{display:none}.page{padding:0;max-width:none}.alerte{display:none}}'
+      + '@media screen and (max-width:720px){body{font-size:10pt}.page{max-width:none;padding:14px 12px 30px}.haut{flex-direction:column-reverse;gap:10px}.titre{text-align:left}.titre h1{font-size:20pt}'
+      + '.blocs{margin:14px 0}.blocs>div:first-child{display:none}.cl{min-width:0;width:100%}'
+      + 'th{font-size:7.5pt;padding:6px 4px}td{padding:7px 4px;font-size:9.5pt}td.n{font-size:9pt}.tot{width:100%}.sign{flex-direction:column}.sign div{height:22mm}}'
       + '</style></head><body><div class="barre">' + titre + ' ' + gEsc(num) + ' — <button type="button" onclick="window.print()">Imprimer / Enregistrer en PDF</button></div><div class="page">'
       + (manque.length ? '<div class="alerte">Émetteur incomplet (onglet Factures › Émetteur) : ' + manque.join(", ") + '. Le document n\'a pas de valeur tant que ces champs sont vides.</div>' : '')
       + (num === "Brouillon" ? '<div class="alerte">Brouillon : enregistrez le document pour obtenir son numéro.</div>' : '')
