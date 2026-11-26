@@ -2594,6 +2594,48 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
 <script src="gestion.js?v=55" defer></script>
+<script>
+/* Icônes PAV sur les onglets et en tête de chaque page de la console : les
+   mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
+(function () {
+  var A = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  var I = {
+    commune: '<path d="M3 21h18M5 21V10l7-5 7 5v11M10 21v-5h4v5"/><path d="M12 8.5v3M10.5 10h3"/>',
+    modifier: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    points: '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><path d="M9.6 8.3h4.8M10.2 8.3l.4 4.4h2.8l.4-4.4M11.2 7.2h1.6"/>',
+    agents: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.8 14.6c2.3.1 4 1.6 4.6 4.4"/>',
+    bac: '<path d="M6 8h12M10 8V6h4v2M7.5 8l1 12h7l1-12"/><path d="M10.5 12v5M13.5 12v5"/>',
+    clients: '<rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9.5" cy="10" r="2"/><path d="M6.5 16c.5-1.6 1.7-2.5 3-2.5s2.5.9 3 2.5M15 9.5h2.5M15 13h2.5"/>',
+    carte: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+    agenda: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/>',
+    tarifs: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+    factu: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+    avis: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>'
+  };
+  var st = document.createElement("style");
+  st.textContent = "nav button{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}"
+    + ".ic-pav{width:17px;height:17px;flex:none}"
+    + "h2 .ic-pav{width:22px;height:22px;vertical-align:-4px;margin-right:7px;color:var(--vert)}";
+  document.head.appendChild(st);
+  var svg = function (k) { return '<svg class="ic-pav" viewBox="0 0 24 24" ' + A + ' aria-hidden="true">' + I[k] + '</svg>'; };
+  function poser() {
+    Array.prototype.forEach.call(document.querySelectorAll("nav button[data-onglet]"), function (b) {
+      var k = b.dataset.onglet; if (!I[k] || b.querySelector(".ic-pav")) return;
+      b.insertAdjacentHTML("afterbegin", svg(k));
+    });
+    Object.keys(I).forEach(function (k) {
+      var sec = document.getElementById(k); if (!sec || sec.tagName !== "SECTION") return;
+      var h = sec.querySelector(".carte:not([hidden]) h2") || sec.querySelector("h2");
+      if (h && !h.querySelector(".ic-pav")) h.insertAdjacentHTML("afterbegin", svg(k));
+    });
+  }
+  poser();
+  document.addEventListener("DOMContentLoaded", poser);
+  window.addEventListener("load", function () { poser(); setTimeout(poser, 1500); });
+  try { new MutationObserver(function () { poser(); }).observe(document.querySelector("nav"), { childList: true }); } catch (e) {}
+})();
+</script>
+
 <script src="https://collecte.mairie-albon.fr/avis.js" data-page="console" data-commune="Console" defer></script>
 <script>
 /* Smartphone : quand le clavier s'ouvre, l'assistant se cale sur la partie visible de l'écran (la saisie reste visible). */
