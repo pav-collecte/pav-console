@@ -767,20 +767,20 @@
     // Événements saisis librement (onglet Rendezvous du classeur).
     (G.Rendezvous || []).forEach(function (r) {
       if (!r.date || r.statut === "annule") return;
-      ev.push({ date: r.date, heure: r.heure || "", type: "rdv", couleur: "#1F7A8C", titre: (r.heure ? r.heure + " · " : "") + (r.titre || "Rendez-vous") + (r.contact ? " (" + r.contact + ")" : ""), commune: r.commune, rdv: r.id, note: r.note, passe: r.date < auj });
+      ev.push({ date: r.date, heure: r.heure || "", type: "rdv", couleur: "#1F7A8C", titre: (r.titre || "Rendez-vous") + (r.contact ? " (" + r.contact + ")" : ""), commune: r.commune, rdv: r.id, note: r.note, passe: r.date < auj });
     });
     ev.forEach(function (x) { x.nomCommune = noms[x.commune] || x.commune || ""; });
     return ev.sort(function (a, b) { return a.date.localeCompare(b.date) || String(a.heure || "99").localeCompare(String(b.heure || "99")); });
   }
   function ligneEv(x) {
-    if (x.rdv) return '<div data-ga-rdv="' + gEsc(x.rdv) + '" style="padding:7px 0;border-bottom:1px solid var(--trait);cursor:pointer">'
-      + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + x.couleur + ';margin-right:6px"></span>'
-      + '<b>' + gDateFR(x.date) + '</b>' + (x.nomCommune ? ' · ' + gEsc(x.nomCommune) : '') + ' — ' + gEsc(x.titre)
-      + (x.note ? '<div class="petit" style="margin:2px 0 0 15px;color:var(--doux);white-space:pre-wrap">' + gEsc(String(x.note).slice(0, 220)) + '</div>' : '') + '</div>';
-    return '<div data-ga-com="' + gEsc(x.commune) + '"' + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + ' style="padding:6px 0;border-bottom:1px solid var(--trait);cursor:pointer' + (x.retard ? ';color:var(--ko)' : '') + '">'
-      + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + x.couleur + ';margin-right:6px"></span>'
-      + '<b>' + gDateFR(x.date) + '</b> · ' + gEsc(x.nomCommune) + ' — ' + gEsc(x.titre)
-      + (x.passe ? '' : ' <a href="' + gEsc(lienGoogle(x)) + '" target="_blank" rel="noopener" data-gcal="1" style="white-space:nowrap;font-size:12px">+ Google Agenda</a>') + '</div>';
+    var cols = '<span class="ga-pt" style="background:' + x.couleur + '"></span><b class="ga-dt">' + gDateFR(x.date).slice(0, 5) + '</b><span class="ga-hr">' + gEsc(x.heure || "") + '</span>';
+    if (x.rdv) return '<div class="ga-l" data-ga-rdv="' + gEsc(x.rdv) + '">' + cols
+      + '<span class="ga-tx">' + gEsc(x.titre) + (x.nomCommune ? ' <i>· ' + gEsc(x.nomCommune) + '</i>' : '')
+      + (x.note ? '<small>' + gEsc(String(x.note).slice(0, 220)) + '</small>' : '') + '</span>'
+      + '<button type="button" class="ga-del" data-gr-suppr="' + gEsc(x.rdv) + '" title="Supprimer l\'événement" aria-label="Supprimer l\'événement">🗑</button></div>';
+    return '<div class="ga-l" data-ga-com="' + gEsc(x.commune) + '"' + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + (x.retard ? ' style="color:var(--ko)"' : '') + '>' + cols
+      + '<span class="ga-tx">' + gEsc(x.titre) + (x.nomCommune ? ' <i>· ' + gEsc(x.nomCommune) + '</i>' : '')
+      + (x.passe ? '' : ' <a href="' + gEsc(lienGoogle(x)) + '" target="_blank" rel="noopener" data-gcal="1" style="white-space:nowrap;font-size:12px">+ Google Agenda</a>') + '</span></div>';
   }
   /* Google Agenda : lien « ajouter » par événement (journée entière), et export .ics de toutes les échéances à venir. */
   function gJourSuivant(d) { var x = new Date(d + "T12:00:00"); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); }
@@ -1633,27 +1633,49 @@
     GR = r || { date: new Date().toISOString().slice(0, 10) };
     var coms = gCommunes(), x = GR;
     var contacts = (G.Contacts || []).filter(function (k) { return !x.commune || k.commune === x.commune; });
-    $("gr-form").innerHTML = '<div style="margin-top:10px;padding:12px;border:1px solid var(--trait);border-radius:10px;background:#FAF8F3">'
-      + '<b style="font-size:17px">' + (x.id ? "Modifier l'événement" : "Nouvel événement") + '</b>'
+    $("gr-form").innerHTML = '<div class="gr-carte">'
+      + '<div class="gr-tete"><b>' + (x.id ? "Modifier l'événement" : "Nouvel événement") + '</b><button type="button" class="gr-x" id="gr-annuler-x" aria-label="Fermer">×</button></div>'
       + gChamp("gr-titre", "Titre", x.titre, "text", null, "ex. Réunion avec le maire, appel de suivi…")
-      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div>' + gChamp("gr-date", "Date", x.date, "date") + '</div><div>' + gChamp("gr-heure", "Heure (facultatif)", x.heure, "time") + '</div><div>'
+      + '<div class="gr-quand"><div class="gr-c gr-d">' + gChamp("gr-date", "Date", x.date, "date") + '</div><div class="gr-c">' + gChamp("gr-heure", "Heure", x.heure, "time") + '</div><div class="gr-c">'
       + gChamp("gr-duree", "Durée", String(x.duree_min || "60"), null, [["15", "15 min"], ["30", "30 min"], ["45", "45 min"], ["60", "1 h"], ["90", "1 h 30"], ["120", "2 h"], ["180", "3 h"], ["240", "4 h"]]) + '</div></div>'
+      + '<p class="petit gr-aide">Heure facultative : sans heure, l\'événement occupe la journée.</p>'
       + gChamp("gr-commune", "Client / prospect (facultatif)", x.commune || "", null, [["", "— aucun —"]].concat(coms))
       + gChamp("gr-contact", "Contact (facultatif)", x.contact || "", null, [["", "— aucun —"]].concat(contacts.map(function (k) { return [k.nom, k.nom + (k.fonction ? " — " + k.fonction : "") + (x.commune ? "" : " (" + gNomCommune(k.commune) + ")")]; })).concat(x.contact && !contacts.some(function (k) { return k.nom === x.contact; }) ? [[x.contact, x.contact]] : []))
       + gChamp("gr-note", "Note", x.note, "zone")
-      + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' + (x.id ? '<button type="button" class="second" id="gr-suppr" style="color:var(--ko)">Supprimer</button>' : '')
-      + '<button type="button" class="second" id="gr-annuler" style="flex:1">Annuler</button><button type="button" class="principal" id="gr-ok" style="flex:2;margin-top:0">Enregistrer</button></div>'
-      + '<p class="petit" style="margin-bottom:0">Avec une heure, l\'événement est placé à l\'heure dite dans Google Agenda (rappel 30 min avant) ; sans heure, sur la journée.</p></div>';
+      + '<div class="gr-actions">' + (x.id ? '<button type="button" class="second" id="gr-suppr">Supprimer</button>' : '')
+      + '<button type="button" class="second" id="gr-annuler">Annuler</button><button type="button" class="principal" id="gr-ok">Enregistrer</button></div>'
+      + '<p class="petit gr-aide" style="margin-bottom:0">Envoyé dans Google Agenda : à l\'heure dite avec un rappel 30 min avant, ou sur la journée.</p></div>';
     $("gr-form").hidden = false; $("gr-titre").focus();
   }
   $("gr-nouveau").addEventListener("click", function () { formRdv(null); });
+  // Téléphone : le champ en cours de saisie remonte au-dessus du clavier.
+  $("gr-form").addEventListener("focusin", function (e) {
+    var el = e.target; if (!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+    setTimeout(function () { el.scrollIntoView({ behavior: "smooth", block: "center" }); }, 350);
+    if (window.visualViewport) setTimeout(function () { var vv = window.visualViewport, r = el.getBoundingClientRect(); if (r.bottom > vv.height - 20) window.scrollBy({ top: r.bottom - vv.height + 90, behavior: "smooth" }); }, 700);
+  });
+  (function () { var st = document.createElement("style"); st.textContent =
+    "#gr-form{padding-bottom:40vh}#gr-form[hidden]{display:none}"
+    + ".gr-carte{margin-top:12px;padding:16px;border:1px solid var(--trait);border-radius:14px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.06)}"
+    + ".gr-tete{display:flex;align-items:center;justify-content:space-between}.gr-tete b{font-size:19px}.gr-x{border:0;background:#F3EFEA;border-radius:50%;width:34px;height:34px;font-size:22px;line-height:1;cursor:pointer;color:var(--doux)}"
+    + ".gr-quand{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:10px;align-items:end}.gr-c label{white-space:nowrap}"
+    + "#gr-form input,#gr-form select{height:48px;box-sizing:border-box;margin:0;font-size:16px}#gr-form textarea{font-size:16px;min-height:90px}"
+    + "#gr-form input[type=date],#gr-form input[type=time]{-webkit-appearance:none;appearance:none;min-width:0;width:100%;text-align:left;padding:0 10px;background:#fff}"
+    + ".gr-aide{margin:6px 0 0;color:var(--doux)}"
+    + ".gr-actions{display:flex;gap:8px;margin-top:14px}.gr-actions button{flex:1;margin:0;height:48px}#gr-ok{flex:2}#gr-suppr{color:var(--ko)}"
+    + "@media(max-width:480px){.gr-quand{grid-template-columns:1fr 1fr}.gr-d{grid-column:1 / -1}}"
+    + ".ga-l{display:grid;grid-template-columns:12px 46px 46px 1fr auto;gap:0 6px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--trait);cursor:pointer;font-size:15px}"
+    + ".ga-l:hover{background:#FAF8F3}.ga-pt{width:9px;height:9px;border-radius:50%;align-self:center}.ga-dt{font-variant-numeric:tabular-nums}.ga-hr{color:var(--vert);font-weight:700;font-variant-numeric:tabular-nums}"
+    + ".ga-tx i{font-style:normal;color:var(--doux)}.ga-tx small{display:block;color:var(--doux);font-size:13px;white-space:pre-wrap;margin-top:2px}"
+    + ".ga-del{border:0;background:transparent;font-size:18px;width:40px;height:36px;border-radius:8px;cursor:pointer;opacity:.6;align-self:center}.ga-del:hover{background:#FDECEA;opacity:1}";
+    document.head.appendChild(st); })();
   $("gr-form").addEventListener("change", function (e) {
     if (e.target.id === "gr-commune") { GR = Object.assign({}, GR, lireRdv(), { contact: "" }); formRdv(GR); }
   });
   function lireRdv() { return { titre: gVal("gr-titre"), date: gVal("gr-date"), heure: gVal("gr-heure"), duree_min: gVal("gr-duree"), commune: gVal("gr-commune"), contact: gVal("gr-contact"), note: gVal("gr-note") }; }
   $("gr-form").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
-    if (b.id === "gr-annuler") { $("gr-form").hidden = true; GR = null; return; }
+    if (b.id === "gr-annuler" || b.id === "gr-annuler-x") { $("gr-form").hidden = true; GR = null; return; }
     if (b.id === "gr-suppr") {
       if (!confirm("Supprimer cet événement ? Il sera aussi retiré de Google Agenda.")) return;
       gEnvoyer({ op: "enregistrer", onglet: "Rendezvous", valeurs: { id: GR.id, statut: "annule" } }, "msg-rdv", "Événement supprimé.").then(function () { $("gr-form").hidden = true; GR = null; }).catch(function () {});
@@ -1673,6 +1695,14 @@
   // Clic sur un événement libre : on l'ouvre en modification (avant le clic « fiche de la commune »).
   ["ga-liste", "ga-retard"].forEach(function (id) {
     $(id).addEventListener("click", function (e) {
+      var del = e.target.closest("[data-gr-suppr]");
+      if (del) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        var rr = (G.Rendezvous || []).filter(function (x) { return x.id === del.dataset.grSuppr; })[0];
+        if (!confirm("Supprimer « " + ((rr && rr.titre) || "cet événement") + " » ? Il sera aussi retiré de Google Agenda.")) return;
+        gEnvoyer({ op: "enregistrer", onglet: "Rendezvous", valeurs: { id: del.dataset.grSuppr, statut: "annule" } }, "msg-rdv", "Événement supprimé.").catch(function () {});
+        return;
+      }
       var l = e.target.closest("[data-ga-rdv]"); if (!l) return;
       e.stopImmediatePropagation(); e.preventDefault();
       var r = (G.Rendezvous || []).filter(function (x) { return x.id === l.dataset.gaRdv; })[0]; if (!r) return;
