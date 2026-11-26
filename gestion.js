@@ -28,7 +28,7 @@
   var G = null, G_CHARGE = false, G_DOC = null;
   var G_STATUTS = [["prospect", "Prospect"], ["demo", "Démo faite"], ["devis", "Devis en cours"], ["client", "Client"], ["suspendu", "Suspendu"], ["perdu", "Perdu"]];
   var G_TYPES_ECH = [["appel", "Appel"], ["email", "E-mail"], ["reunion", "Réunion"], ["demo", "Démonstration"], ["relance", "Relance"], ["courrier", "Courrier"], ["autre", "Autre"]];
-  var G_ST_DEVIS = [["brouillon", "Brouillon"], ["envoye", "Envoyé"], ["accepte", "Accepté"], ["refuse", "Refusé"], ["expire", "Expiré"]];
+  var G_ST_DEVIS = [["brouillon", "Brouillon"], ["envoye", "Soumis (envoyé)"], ["accepte", "Accepté"], ["refuse", "Refusé"], ["expire", "Expiré"]];
   var G_ST_FACT = [["brouillon", "Brouillon"], ["emise", "Émise"], ["deposee_chorus", "Déposée sur Chorus Pro"], ["payee", "Payée"], ["annulee", "Annulée (avoir)"]];
   var G_TYPES_FACT = [["forfait", "Forfait annuel"], ["avenant", "Avenant (points ajoutés)"], ["autre", "Autre"]];
   function gEsc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -1354,6 +1354,7 @@
       + '<div class="gdf-m"><span>' + gDateFR(d.date) + (info ? '<br><small' + (d.statut === "envoye" && d.validite < auj ? ' class="ko"' : '') + '>' + gEsc(info) + '</small>' : '') + '</span><b>' + gEuros(d.total_ht) + ' <small>HT</small></b></div>'
       + (fac ? '<div class="gdf-lien">🧾 Facturé : <button type="button" class="gdf-lnk" data-gdoc="facture" data-num="' + gEsc(fac.numero) + '">' + gEsc(gdfNum(fac)) + '</button> ' + badge(fac.statut, G_ST_FACT) + '</div>' : '')
       + '<div class="gdf-a">' + gdfAct("Ouvrir", 'data-gdoc="devis" data-num="' + gEsc(d.numero) + '"') + gdfAct("📄 PDF", 'data-gpdf="devis" data-num="' + gEsc(d.numero) + '"', "second gd-pdfb")
+      + (d.statut === "brouillon" || d.statut === "envoye" ? gdfAct(d.statut === "envoye" ? "📨 Renvoyer" : "📨 Soumettre", 'data-gsoum="' + gEsc(d.numero) + '"', d.statut === "brouillon" ? "principal" : "second") : '')
       + (d.statut === "accepte" && !fac ? gdfAct("🧾 Créer la facture", 'data-gfacturer="' + gEsc(d.numero) + '"', "principal") : '')
       + (gdfBrouillon(d) ? gdfAct("Supprimer", 'data-gsuppr-doc="devis" data-num="' + gEsc(d.numero) + '"', "second gdf-sup") : '') + '</div></div>';
   }
@@ -2315,6 +2316,103 @@
     + ".gx-filtres button.on{background:var(--vert);border-color:var(--vert);color:#fff}.gx-res{font-size:14px;color:var(--doux);margin:8px 0 4px}#gx-resume{margin-top:8px}"
     + ".gx-n{display:inline-block;background:#EEF5F0;border-radius:999px;padding:1px 9px;font-size:13px;vertical-align:middle;margin-right:6px}.gdf-com{font-weight:700;color:var(--vert);margin-top:2px}"
     + "#g-devis-liste,#g-factures-liste{font-size:15px}@media(max-width:480px){#g-devis-nouveau,#g-facture-nouvelle{float:none!important;display:block;width:100%;margin-top:8px}}";
+    document.head.appendChild(st); })();
+
+
+  /* ——— Soumettre un devis : e-mail préparé (avec le PDF à joindre), statut « Soumis », relance dans l'agenda ——— */
+  function gsoDate(n) { var z = new Date(); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); }
+  function soumettreDevis(numero) {
+    var d = (G.Devis || []).filter(function (x) { return x.numero === numero; })[0]; if (!d) return;
+    if (String(d.numero).indexOf("BROUILLON") === 0 && !d.numero) return;
+    var cl = gClient(d.commune), nomC = gNomCommune(d.commune);
+    var lignes = (G.Lignes || []).filter(function (l) { return l.document === numero; }).sort(function (a, b) { return Number(a.num) - Number(b.num); });
+    var tva = Number(String(d.taux_tva || emet("taux_tva") || 20).replace(",", ".")) || 0, ht = gNum(d.total_ht), ttc = d.total_ttc ? gNum(d.total_ttc) : ht * (1 + tva / 100);
+    var validite = d.validite || (function () { var n = Number(emet("validite_devis_jours")) || 30, z = new Date((d.date || new Date().toISOString().slice(0, 10)) + "T12:00:00"); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); })();
+    var contacts = (G.Contacts || []).filter(function (c) { return c.commune === d.commune && c.email; });
+    var mails = []; [cl.email_facturation].concat(contacts.filter(function (c) { return c.facturation === "oui"; }).map(function (c) { return c.email; }), contacts.map(function (c) { return c.email; })).forEach(function (m) { if (m && mails.indexOf(m) < 0) mails.push(m); });
+    var nj = Number(emet("relance_devis_jours")) || 10, relance = gsoDate(nj);
+    var limite = (function () { var z = new Date(validite + "T12:00:00"); z.setDate(z.getDate() - 3); return z.toISOString().slice(0, 10); })();
+    if (limite > gsoDate(1) && relance > limite) relance = limite;
+    var signature = [emet("raison_sociale"), emet("telephone") ? "Tél. " + emet("telephone") : "", emet("email")].filter(Boolean).join("\n");
+    var objet = "Devis " + d.numero + " — " + (d.objet || "Suivi des points de collecte") ;
+    var corps = "Madame, Monsieur,\n\nVeuillez trouver ci-joint notre devis n° " + d.numero + " du " + gDateFR(d.date) + (d.objet ? " (" + d.objet + ")" : "")
+      + ", d'un montant de " + gEuros(ht) + " HT, soit " + gEuros(ttc) + " TTC. Il est valable jusqu'au " + gDateFR(validite) + ".\n\n"
+      + "Pour l'accepter, il suffit de nous le retourner daté et signé avec la mention « Bon pour accord ».\n\nNous restons à votre disposition pour toute question.\n\nBien cordialement,\n" + signature;
+    var fichier = ("Devis-" + d.numero + "-" + nomC).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/-+/g, "-") + ".pdf";
+    var dejaEnvoye = d.statut === "envoye";
+    var h = '<div class="gch-barre"><b>' + (dejaEnvoye ? "Renvoyer" : "Soumettre") + ' le devis ' + gEsc(d.numero) + ' · ' + gEsc(nomC) + '</b><button type="button" id="gso-x" aria-label="Fermer">✕</button></div><div class="gch-corps">'
+      + (dejaEnvoye ? '<div class="gdf-alerte">Ce devis est déjà au statut « Soumis ». Vous pouvez le renvoyer et reprogrammer la relance.</div>' : '')
+      + '<div class="gch-e"><h3><span>1</span>Le PDF à joindre</h3><p>Ouvrez le devis puis « Imprimer / Enregistrer en PDF ». Nom conseillé : <b>' + gEsc(fichier) + '</b></p><button type="button" class="second" id="gso-pdf">📄 Ouvrir le PDF du devis</button></div>'
+      + '<div class="gch-e"><h3><span>2</span>Le message</h3>'
+      + '<label for="gso-a"><b>À</b>' + (mails.length ? '' : ' <span class="petit" style="color:var(--ko)">— aucune adresse dans la fiche ni dans les contacts</span>') + '</label><input id="gso-a" type="email" list="gso-l" value="' + gEsc(mails[0] || "") + '" placeholder="mairie@exemple.fr" autocomplete="off"><datalist id="gso-l">' + mails.map(function (m) { return '<option value="' + gEsc(m) + '">'; }).join("") + '</datalist>'
+      + '<label for="gso-o"><b>Objet</b></label><input id="gso-o" value="' + gEsc(objet) + '">'
+      + '<label for="gso-m"><b>Message</b></label><textarea id="gso-m" rows="11">' + gEsc(corps) + '</textarea>'
+      + '<div class="gso-b"><button type="button" class="principal" id="gso-mail">✉️ Ouvrir dans ma messagerie</button><button type="button" class="second" id="gso-gmail">Ouvrir dans Gmail</button><button type="button" class="second" id="gso-copie">Copier le message</button></div>'
+      + '<p class="petit">N\'oubliez pas de joindre le PDF avant d\'envoyer.</p></div>'
+      + '<div class="gch-e"><h3><span>3</span>Noter l\'envoi et la relance</h3>'
+      + '<label for="gso-r"><b>Relancer le</b> <span class="petit">— la relance apparaît dans l\'agenda (et Google Agenda) et dans « Échanges »</span></label><input id="gso-r" type="date" value="' + relance + '">'
+      + '<p class="petit">Validité du devis : jusqu\'au ' + gDateFR(validite) + '.</p>'
+      + '<button type="button" class="principal" id="gso-ok">✅ Devis envoyé : noter et programmer la relance</button><div class="msg" id="msg-gso"></div></div></div>';
+    var vieux = $("gso"); if (vieux) vieux.remove();
+    var o = document.createElement("div"); o.id = "gso"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Soumettre le devis"); o.innerHTML = h;
+    document.body.appendChild(o); document.body.style.overflow = "hidden";
+    var fermer = function () { o.remove(); document.body.style.overflow = ""; };
+    $("gso-x").onclick = fermer;
+    var url = function (gmail) {
+      var a = gVal("gso-a"), su = encodeURIComponent($("gso-o").value), bo = encodeURIComponent($("gso-m").value);
+      return gmail ? "https://mail.google.com/mail/?view=cm&fs=1&to=" + encodeURIComponent(a) + "&su=" + su + "&body=" + bo : "mailto:" + encodeURIComponent(a).replace(/%40/g, "@") + "?subject=" + su + "&body=" + bo;
+    };
+    $("gso-mail").onclick = function () { if (!gVal("gso-a")) { msg("msg-gso", "Indiquez l'adresse du destinataire.", "ko"); $("gso-a").focus(); return; } window.location.href = url(false); };
+    $("gso-gmail").onclick = function () { if (!gVal("gso-a")) { msg("msg-gso", "Indiquez l'adresse du destinataire.", "ko"); $("gso-a").focus(); return; } window.open(url(true), "_blank", "noopener"); };
+    $("gso-copie").onclick = function () { gchCopier($("gso-m").value, $("gso-copie")); };
+    $("gso-pdf").onclick = function () {
+      var t0 = document.title; document.title = fichier.replace(/\.pdf$/, "");
+      montrerApercu({ t: "devis", d: Object.assign({}, d), lignes: lignes });
+      var ap = $("gd-apercu"); if (ap) { ap.style.zIndex = 130; new MutationObserver(function (m, obs) { if (!document.body.contains(ap)) { document.title = t0; document.body.style.overflow = "hidden"; obs.disconnect(); } }).observe(document.body, { childList: true }); }
+    };
+    $("gso-ok").onclick = function () {
+      var a = gVal("gso-a"), r = gVal("gso-r");
+      if (!r && !confirm("Aucune date de relance. Continuer sans relance ?")) return;
+      $("gso-ok").disabled = true; msg("msg-gso", "Enregistrement…");
+      var etape = Promise.resolve();
+      if (!dejaEnvoye) {
+        var e = { numero: d.numero };
+        ["commune", "date", "objet", "accepte_le", "accepte_par", "ref_points", "taux_tva", "notes"].forEach(function (k) { if (d[k] !== undefined) e[k] = d[k]; });
+        e.statut = "envoye";
+        var lg = lignes.map(function (l) { return { designation: l.designation, site_code: l.site_code, quantite: l.quantite, prix_unitaire_ht: l.prix_unitaire_ht, periode_debut: l.periode_debut, periode_fin: l.periode_fin }; });
+        etape = api("gestion", { op: "document", type: "devis", entete: e, lignes: lg });
+      }
+      var contact = (contacts.filter(function (c) { return c.email === a; })[0] || {}).nom || a;
+      etape.then(function () {
+        return api("gestion", { op: "enregistrer", onglet: "Echanges", valeurs: { id: "", commune: d.commune, date: new Date().toISOString().slice(0, 10), type: "email", contact: contact,
+          resume: (dejaEnvoye ? "Devis " + d.numero + " renvoyé" : "Devis " + d.numero + " envoyé") + " (" + gEuros(ht) + " HT)" + (a ? " à " + a : "") + ".", prochaine_action: r ? "Relancer le devis " + d.numero : "", echeance: r, fait: r ? "non" : "oui" } });
+      }).then(function () {
+        syncAgendaPlusTard(); return chargerGestion(true);
+      }).then(function () {
+        msg("msg-gso", "Devis noté « Soumis »" + (r ? ", relance programmée le " + gDateFR(r) : "") + ".", "ok");
+        if (G_DOC && G_DOC.type === "devis" && G_DOC.d.numero === d.numero) ouvrirDoc("devis", d.numero);
+        setTimeout(fermer, 1400);
+      }).catch(function (er) { msg("msg-gso", er.message, "ko"); $("gso-ok").disabled = false; });
+    };
+  }
+  // Bouton dans l'éditeur de devis, et ouverture automatique quand on passe le statut à « Soumis ».
+  $("g-doc-pdf").insertAdjacentHTML("afterend", '<button class="second" id="g-doc-soumettre" type="button" style="flex:1" hidden>📨 Soumettre</button>');
+  $("g-doc-soumettre").addEventListener("click", function () { if (G_DOC && G_DOC.d.numero) soumettreDevis(G_DOC.d.numero); });
+  var GSO_APRES = false;
+  $("g-doc-ok").addEventListener("click", function () { GSO_APRES = !!(G_DOC && G_DOC.type === "devis" && G_DOC.d.statut !== "envoye" && gVal("gd-statut") === "envoye"); }, true);
+  (function () { var o = ouvrirDoc; ouvrirDoc = function () { var r = o.apply(this, arguments); var d = G_DOC && G_DOC.d;
+    var ok = !!(G_DOC && G_DOC.type === "devis" && d.numero && (d.statut === "brouillon" || d.statut === "envoye"));
+    $("g-doc-soumettre").hidden = !ok; $("g-doc-soumettre").textContent = d && d.statut === "envoye" ? "📨 Renvoyer" : "📨 Soumettre";
+    if (GSO_APRES && ok && d.statut === "envoye") { GSO_APRES = false; setTimeout(function () { soumettreDevis(d.numero); }, 50); }
+    return r; }; })();
+  ["g-fiche-docs", "g-devis-liste"].forEach(function (id) {
+    var box = $(id); if (!box) return;
+    box.addEventListener("click", function (e) { var b = e.target.closest("[data-gsoum]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); soumettreDevis(b.dataset.gsoum); }, true);
+  });
+  (function () { var st = document.createElement("style"); st.textContent =
+    "#gso{position:fixed;inset:0;z-index:125;background:#F4F1EA;display:flex;flex-direction:column}#gso-x{border:0;background:transparent;color:#fff;font-size:20px;padding:6px 12px;cursor:pointer}"
+    + "#gso textarea{font:15px/1.45 system-ui;width:100%;box-sizing:border-box}#gso .principal,#gso .second{min-height:44px}#gso-ok{width:100%;margin-top:10px}"
+    + ".gso-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.gso-b button{flex:1 1 auto;margin:0}";
     document.head.appendChild(st); })();
 
 })();
