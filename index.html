@@ -149,7 +149,7 @@
       <p class="petit">Les champs viennent du modèle de classeur. Les champs orangés sont à remplir ; les autres ont une valeur par défaut modifiable.
       À la validation : dossiers Drive, copie du classeur modèle, ligne dans l'onglet Communes, dépôt GitHub, site et première diffusion du moteur.</p>
       <form id="form-commune"><div id="champs">Chargement du modèle…</div>
-        <label for="alertes"><b>E-mails des alertes</b> — séparés par des virgules</label>
+        <label for="alertes"><b>E-mails des alertes</b> — séparés par des virgules ; laissé vide, les alertes vous sont envoyées</label>
         <input id="alertes" type="text" inputmode="email" placeholder="services.techniques@mairie-xxx.fr">
         <label style="display:flex;gap:8px;align-items:center;margin:12px 0 0;font-weight:400"><input type="checkbox" id="creer-osm" checked style="width:20px;height:20px;flex:none;margin:0"> Intégrer les points de collecte connus d'OpenStreetMap (ajoutés d'office au brouillon, ou proposés à cocher après une création directe)</label>
         <div id="brouillon-actif" class="petit" hidden style="margin:12px 0 0;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"></div>
@@ -791,8 +791,14 @@
     $("resultat-commune").innerHTML = "";
     msg("msg-commune", "Création en cours (dossiers, classeur, dépôt GitHub)… comptez une minute.");
     if (BROUILLON_ID) msg("msg-commune", "Création de la commune à partir du brouillon (dossiers, classeur, dépôt GitHub)… comptez une minute, puis l'import des points et des agents.");
-    api("creer", { params: params, alertes: $("alertes").value.trim(), logo: LOGO, provisoire: !!($("provisoire") && $("provisoire").checked) }).then(function (j) {
-      msg("msg-commune", "Commune « " + j.nom + " » créée (préfixe " + j.prefixe + ").", "ok");
+    /* Sans adresse des services techniques, les alertes vont à l'administrateur (e-mail de l'émetteur, sinon le compte PAV). */
+    var alSaisi = $("alertes").value.trim();
+    var avant = alSaisi ? Promise.resolve(alSaisi) : (window.PAV && PAV.emailAdmin ? PAV.emailAdmin() : Promise.resolve(""));
+    avant.then(function (alertes) {
+      if (!alSaisi && alertes) $("alertes").value = alertes;
+      return api("creer", { params: params, alertes: alertes, logo: LOGO, provisoire: !!($("provisoire") && $("provisoire").checked) });
+    }).then(function (j) {
+      msg("msg-commune", "Commune « " + j.nom + " » créée (préfixe " + j.prefixe + ")." + (alSaisi ? "" : " Alertes envoyées à " + $("alertes").value + " (pas d'adresse des services techniques)."), "ok");
       var r = $("resultat-commune"); r.innerHTML = "";
       var liens = document.createElement("div"); liens.className = "liens";
       [["Classeur de la commune", j.liens.classeur], ["Dossier Drive", j.liens.dossier], ["Dépôt GitHub", j.liens.depot], ["Site de la commune", j.liens.site]].forEach(function (l) {
@@ -814,6 +820,12 @@
       rafraichirCommunes().then(function () {
         var c = LISTE_COMMUNES.filter(function (x) { return (j.commune && x.commune === j.commune) || (x.nom || "").toLowerCase() === String(j.nom || "").toLowerCase(); })[0];
         if (!c) return;
+        /* La commune devient cliente : fiche remplie avec les infos de la mairie, et le maire en premier contact. */
+        if (window.PAV && PAV.apresCreation) PAV.apresCreation(c.commune, params).then(function (x) {
+          var pc = document.createElement("p"); pc.className = "petit";
+          pc.textContent = "Fiche client créée (statut Client)" + (x && x.contact ? ", avec " + x.maire + " comme premier contact (maire)." : x && x.maire ? " ; le maire figurait déjà dans les contacts." : " ; maire inconnu : ajoutez le contact dans l'onglet Clients.");
+          r.appendChild(pc);
+        }).catch(function (er) { var pc = document.createElement("p"); pc.className = "petit"; pc.textContent = "Fiche client non créée : " + er.message + " (à faire dans l'onglet Clients)."; r.appendChild(pc); });
         if (br) return finaliserBrouillon(br, c, r);
         if (!osm) return;
         var p3 = document.createElement("p"); p3.className = "petit"; p3.textContent = "Recherche des points OpenStreetMap lancée dans l'onglet Points : cochez ceux à créer.";
@@ -947,8 +959,17 @@
       if (!nom) { res.textContent = "Indiquez d’abord le nom de la commune."; inp.focus(); return; }
       window.open("https://www.google.com/search?q=" + encodeURIComponent("mairie " + nom + (dep ? " " + dep : "") + " site officiel horaires maire"), "_blank", "noopener");
     });
-    var res = document.createElement("div"); res.className = "petit"; res.style.margin = "4px 0 10px";
-    inp.parentNode.insertBefore(res, inp.nextSibling); inp.parentNode.insertBefore(bt, res); inp.parentNode.insertBefore(web, res);
+    var res = document.createElement("div"); res.className = "petit"; res.style.margin = "6px 0 0";
+    /* Les deux recherches en tête du formulaire, sous un libellé. */
+    var ent = document.createElement("div"); ent.className = "recherche-entete";
+    ent.style.cssText = "margin:10px 0 14px;padding:10px 12px;border:1px solid var(--trait);border-radius:10px;background:#F7F5EF";
+    var lib = document.createElement("div"); lib.innerHTML = "<b>Infos de la commune</b> <span class=\"petit\">— saisissez le nom de la commune ci-dessous, puis lancez la recherche</span>";
+    var ligneB = document.createElement("div"); ligneB.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px";
+    bt.style.margin = web.style.margin = "0";
+    ligneB.appendChild(bt); ligneB.appendChild(web);
+    ent.appendChild(lib); ent.appendChild(ligneB); ent.appendChild(res);
+    var cont = inp.closest("#champs, #champs-edit") || inp.parentNode, titre = cont.querySelector(":scope > h2");
+    cont.insertBefore(ent, titre ? titre.nextSibling : cont.firstChild);
     function champ(k) { return document.getElementById(pf + k); }
     function poser(c) {
       var set = function (k, v) { var e = champ(k); if (e && v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); } };
@@ -2593,7 +2614,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=55" defer></script>
+<script src="gestion.js?v=56" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */

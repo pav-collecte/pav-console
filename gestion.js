@@ -49,6 +49,31 @@
     return Object.keys(m).sort(function (a, b) { return m[a].localeCompare(m[b], "fr"); }).map(function (k) { return [k, m[k]]; });
   }
   function gNomCommune(com) { return (gCommunes().filter(function (x) { return x[0] === com; })[0] || [com, com])[1]; }
+  /* Après la création d'une commune (onglet Créer) : adresse d'alerte par défaut,
+     fiche client au statut « Client » remplie avec les infos de la mairie, et le
+     maire en premier contact. Les champs déjà remplis de la fiche ne sont pas touchés. */
+  PAV.emailAdmin = function () {
+    return (G_CHARGE ? Promise.resolve() : api("gestion", { op: "lire" }).then(function (j) { G = j.donnees || {}; G_CHARGE = true; }))
+      .then(function () { return emet("email") || gCompte(); }).catch(function () { return "pav.collecte@gmail.com"; });
+  };
+  PAV.apresCreation = function (com, p) {
+    var t = function (v) { v = String(v || "").trim(); return /^À REMPLIR/i.test(v) ? "" : v; };
+    return api("gestion", { op: "lire" }).then(function (j) {
+      G = j.donnees || {}; G_CHARGE = true;
+      var ex = (G.Clients || []).filter(function (c) { return c.commune === com; })[0] || {};
+      var v = Object.assign({}, ex, { commune: com, statut: "client" }); delete v.row_number;
+      [["nom_officiel", p["commune.nom"]], ["code_insee", p["commune.codeInsee"]], ["code_postal", p["commune.codePostal"]], ["ville", p["commune.nom"]],
+       ["maire", p["commune.maire"]], ["telephone_mairie", p["commune.telephone"]], ["email_mairie", p["commune.email"]], ["site_mairie", p["commune.siteMairie"]]]
+        .forEach(function (k) { if (!t(v[k[0]]) && t(k[1])) v[k[0]] = t(k[1]); });
+      var maire = t(v.maire);
+      return api("gestion", { op: "enregistrer", onglet: "Clients", valeurs: v }).then(function () {
+        var deja = !maire || (G.Contacts || []).some(function (k) { return k.commune === com && String(k.nom || "").toLowerCase() === maire.toLowerCase(); });
+        if (deja) return { maire: maire, contact: false };
+        return api("gestion", { op: "enregistrer", onglet: "Contacts", valeurs: { commune: com, nom: maire, fonction: "maire", email: v.email_mairie || "", telephone: v.telephone_mairie || "", facturation: "non", notes: "Premier contact, créé avec la commune" } })
+          .then(function () { return { maire: maire, contact: true }; });
+      });
+    }).then(function (r) { try { chargerGestion(true); } catch (e) {} return r; });
+  };
   function gClient(com) { return (G.Clients || []).filter(function (c) { return c.commune === com; })[0] || { commune: com }; }
 
   function chargerGestion(garderMsg) {
