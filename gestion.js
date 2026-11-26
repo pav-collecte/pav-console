@@ -2326,8 +2326,9 @@
 
   /* ——— Soumettre un devis : e-mail préparé (avec le PDF à joindre), statut « Soumis », relance dans l'agenda ——— */
   function gsoDate(n) { var z = new Date(); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); }
-  function soumettreDevis(numero) {
+  function soumettreDevis(numero, rel) {
     var d = (G.Devis || []).filter(function (x) { return x.numero === numero; })[0]; if (!d) return;
+    rel = rel || null; // relance : { ech: id de l'échange « Relancer le devis … » }
     if (String(d.numero).indexOf("BROUILLON") === 0 && !d.numero) return;
     var cl = gClient(d.commune), nomC = gNomCommune(d.commune);
     var lignes = (G.Lignes || []).filter(function (l) { return l.document === numero; }).sort(function (a, b) { return Number(a.num) - Number(b.num); });
@@ -2335,18 +2336,27 @@
     var validite = d.validite || (function () { var n = Number(emet("validite_devis_jours")) || 30, z = new Date((d.date || new Date().toISOString().slice(0, 10)) + "T12:00:00"); z.setDate(z.getDate() + n); return z.toISOString().slice(0, 10); })();
     var contacts = (G.Contacts || []).filter(function (c) { return c.commune === d.commune && c.email; });
     var mails = []; [cl.email_facturation].concat(contacts.filter(function (c) { return c.facturation === "oui"; }).map(function (c) { return c.email; }), contacts.map(function (c) { return c.email; })).forEach(function (m) { if (m && mails.indexOf(m) < 0) mails.push(m); });
+    var envois = (G.Echanges || []).filter(function (e) { return e.commune === d.commune && new RegExp("Devis " + d.numero.replace(/[-]/g, "\\-") + " (envoyé|renvoyé|relancé)").test(e.resume || ""); }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    var mDernier = envois.length && String(envois[0].resume).match(/ à (\S+@\S+)/); if (mDernier) mDernier[1] = mDernier[1].replace(/[.,;:]+$/, "");
+    if (mDernier && mails.indexOf(mDernier[1]) < 0) mails.unshift(mDernier[1]); else if (mDernier) { mails.splice(mails.indexOf(mDernier[1]), 1); mails.unshift(mDernier[1]); }
+    var nbRel = envois.filter(function (e) { return /relancé/.test(e.resume || ""); }).length;
+    var envoyeLe = (envois.filter(function (e) { return /envoyé/.test(e.resume || ""); }).pop() || {}).date;
     var nj = Number(emet("relance_devis_jours")) || 10, relance = gsoDate(nj);
     var limite = (function () { var z = new Date(validite + "T12:00:00"); z.setDate(z.getDate() - 3); return z.toISOString().slice(0, 10); })();
     if (limite > gsoDate(1) && relance > limite) relance = limite;
     var signature = [emet("raison_sociale"), emet("telephone") ? "Tél. " + emet("telephone") : "", emet("email")].filter(Boolean).join("\n");
-    var objet = "Devis " + d.numero + " — " + (d.objet || "Suivi des points de collecte") ;
+    var objet = (rel ? "Relance — " : "") + "Devis " + d.numero + " — " + (d.objet || "Suivi des points de collecte");
     var corps = "Madame, Monsieur,\n\nVeuillez trouver ci-joint notre devis n° " + d.numero + " du " + gDateFR(d.date) + (d.objet ? " (" + d.objet + ")" : "")
       + ", d'un montant de " + gEuros(ht) + " HT, soit " + gEuros(ttc) + " TTC. Il est valable jusqu'au " + gDateFR(validite) + ".\n\n"
       + "Pour l'accepter, il suffit de nous le retourner daté et signé avec la mention « Bon pour accord ».\n\nNous restons à votre disposition pour toute question.\n\nBien cordialement,\n" + signature;
+    if (rel) corps = "Madame, Monsieur,\n\nNous revenons vers vous au sujet de notre devis n° " + d.numero + " du " + gDateFR(d.date) + (d.objet ? " (" + d.objet + ")" : "")
+      + ", d'un montant de " + gEuros(ht) + " HT" + (envoyeLe ? ", que nous vous avons adressé le " + gDateFR(envoyeLe) : "") + ". Il reste valable jusqu'au " + gDateFR(validite) + ".\n\n"
+      + "Avez-vous pu en prendre connaissance ? Nous restons à votre disposition pour en parler, répondre à vos questions ou l'ajuster à vos besoins.\n\nVous le trouverez à nouveau ci-joint.\n\nBien cordialement,\n" + signature;
     var fichier = ("Devis-" + d.numero + "-" + nomC).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/-+/g, "-") + ".pdf";
-    var dejaEnvoye = d.statut === "envoye";
-    var h = '<div class="gch-barre"><b>' + (dejaEnvoye ? "Renvoyer" : "Soumettre") + ' le devis ' + gEsc(d.numero) + ' · ' + gEsc(nomC) + '</b><button type="button" id="gso-x" aria-label="Fermer">✕</button></div><div class="gch-corps">'
-      + (dejaEnvoye ? '<div class="gdf-alerte">Ce devis est déjà au statut « Soumis ». Vous pouvez le renvoyer et reprogrammer la relance.</div>' : '')
+    var dejaEnvoye = d.statut === "envoye" || !!rel;
+    var h = '<div class="gch-barre"><b>' + (rel ? "Relancer" : dejaEnvoye ? "Renvoyer" : "Soumettre") + ' le devis ' + gEsc(d.numero) + ' · ' + gEsc(nomC) + '</b><button type="button" id="gso-x" aria-label="Fermer">✕</button></div><div class="gch-corps">'
+      + (rel ? '<div class="gdf-alerte">' + (d.statut === "envoye" ? "Relance n° " + (nbRel + 1) + (envoyeLe ? " — devis envoyé le " + gDateFR(envoyeLe) : "") + ". Après l\'envoi, la relance suivante est programmée ci-dessous (videz la date pour ne plus relancer)." : "Ce devis est au statut « " + gLib(G_ST_DEVIS, d.statut) + " » : une relance n\'est sans doute plus utile.") + '</div>'
+        : dejaEnvoye ? '<div class="gdf-alerte">Ce devis est déjà au statut « Soumis ». Vous pouvez le renvoyer et reprogrammer la relance.</div>' : '')
       + '<div class="gch-e"><h3><span>1</span>Le PDF à joindre</h3><div id="gso-drive" class="gso-drive">' + (d.pdf_drive ? '<a class="gch-lien" href="' + gEsc(gDrive(d.pdf_drive)) + '" target="_blank" rel="noopener">☁️ PDF du devis sur Drive</a><p class="petit">Dans Gmail (compte ' + gEsc(gCompte()) + '), joignez-le avec « Insérer depuis Drive » : rien à télécharger.</p>' : '<p class="petit">☁️ Archivage du PDF sur Drive…</p>') + '</div>'
       + '<p class="petit">Ou créez-le ici : « Imprimer / Enregistrer en PDF », nom conseillé <b>' + gEsc(fichier) + '</b>.</p><button type="button" class="second" id="gso-pdf">📄 Ouvrir le PDF du devis</button></div>'
       + '<div class="gch-e"><h3><span>2</span>Le message</h3>'
@@ -2358,9 +2368,9 @@
       + '<details class="gso-autres"><summary>Autres façons d\'envoyer (ma messagerie, Gmail, copier)</summary><div class="gso-b"><button type="button" class="second" id="gso-mail">✉️ Ma messagerie</button><button type="button" class="second" id="gso-gmail">Gmail · ' + gEsc(gCompte()) + '</button><button type="button" class="second" id="gso-copie">Copier le message</button></div>'
       + '<p class="petit">Dans ce cas, joignez le PDF vous-même puis notez l\'envoi à l\'étape 3.</p></details><div class="msg" id="msg-gso-envoi"></div></div>'
       + '<div class="gch-e"><h3><span>3</span>La relance</h3>'
-      + '<label for="gso-r"><b>Relancer le</b> <span class="petit">— la relance apparaît dans l\'agenda (et Google Agenda) et dans « Échanges »</span></label><input id="gso-r" type="date" value="' + relance + '">'
+      + '<label for="gso-r"><b>' + (rel ? "Relance suivante le" : "Relancer le") + '</b> <span class="petit">— la relance apparaît dans l\'agenda (et Google Agenda) et dans « Échanges »</span></label><input id="gso-r" type="date" value="' + relance + '">'
       + '<p class="petit">Validité du devis : jusqu\'au ' + gDateFR(validite) + '.</p>'
-      + '<button type="button" class="second" id="gso-ok">✅ Envoyé par ma messagerie : noter et programmer la relance</button><div class="msg" id="msg-gso"></div></div></div>';
+      + '<button type="button" class="second" id="gso-ok">✅ Envoyé par ma messagerie : noter' + (rel ? " la relance" : "") + ' et programmer la suivante</button><div class="msg" id="msg-gso"></div></div></div>';
     var vieux = $("gso"); if (vieux) vieux.remove();
     var o = document.createElement("div"); o.id = "gso"; o.setAttribute("role", "dialog"); o.setAttribute("aria-label", "Soumettre le devis"); o.innerHTML = h;
     document.body.appendChild(o); document.body.style.overflow = "hidden";
@@ -2393,7 +2403,7 @@
       if (!a) { msg("msg-gso-envoi", "Indiquez l'adresse du destinataire.", "ko"); $("gso-a").focus(); return; }
       if (!r && !confirm("Aucune date de relance. Envoyer quand même ?")) return;
       if (GSO_DE && GSO_DE.toLowerCase() !== gCompte().toLowerCase() && !confirm("Le message partira de " + GSO_DE + " et non de " + gCompte() + ". Envoyer quand même ?")) return;
-      if (!confirm("Envoyer le devis " + d.numero + " (PDF joint) à " + a + (gVal("gso-cc") ? " et " + gVal("gso-cc") : "") + " ?")) return;
+      if (!confirm((rel ? "Envoyer la relance du devis " : "Envoyer le devis ") + d.numero + " (PDF joint) à " + a + (gVal("gso-cc") ? " et " + gVal("gso-cc") : "") + " ?")) return;
       b.disabled = true; msg("msg-gso-envoi", "Préparation du PDF…");
       (GSO_LIEN || garArchiver("devis", d.numero)).then(function (lien) {
         msg("msg-gso-envoi", "Envoi en cours…");
@@ -2414,13 +2424,14 @@
         etape = api("gestion", { op: "document", type: "devis", entete: e, lignes: lg });
       }
       var contact = (contacts.filter(function (c) { return c.email === a; })[0] || {}).nom || a;
+      if (rel && rel.ech) etape = etape.then(function () { return api("gestion", { op: "enregistrer", onglet: "Echanges", valeurs: { id: rel.ech, fait: "oui" } }); });
       etape.then(function () {
         return api("gestion", { op: "enregistrer", onglet: "Echanges", valeurs: { id: "", commune: d.commune, date: new Date().toISOString().slice(0, 10), type: "email", contact: contact,
-          resume: (dejaEnvoye ? "Devis " + d.numero + " renvoyé" : "Devis " + d.numero + " envoyé") + " (" + gEuros(ht) + " HT)" + (a ? " à " + a : "") + (via || "") + ".", prochaine_action: r ? "Relancer le devis " + d.numero : "", echeance: r, fait: r ? "non" : "oui" } });
+          resume: (rel ? "Devis " + d.numero + " relancé (relance n° " + (nbRel + 1) + ")" : dejaEnvoye ? "Devis " + d.numero + " renvoyé" : "Devis " + d.numero + " envoyé") + " (" + gEuros(ht) + " HT)" + (a ? " à " + a : "") + (via || "") + ".", prochaine_action: r ? "Relancer le devis " + d.numero : "", echeance: r, fait: r ? "non" : "oui" } });
       }).then(function () {
         syncAgendaPlusTard(); return chargerGestion(true);
       }).then(function () {
-        msg("msg-gso", "Devis noté « Soumis »" + (r ? ", relance programmée le " + gDateFR(r) : "") + ".", "ok");
+        msg("msg-gso", (rel ? "Relance notée" : "Devis noté « Soumis »") + (r ? ", relance " + (rel ? "suivante " : "") + "programmée le " + gDateFR(r) : "") + ".", "ok");
         if (G_DOC && G_DOC.type === "devis" && G_DOC.d.numero === d.numero) ouvrirDoc("devis", d.numero);
         setTimeout(fermer, 1400);
       }).catch(function (er) { msg("msg-gso", er.message, "ko"); $("gso-ok").disabled = false; });
@@ -2569,5 +2580,36 @@
     if (GAR_APRES && ok && G_DOC.type === "facture" && d.statut === "emise" && !d.pdf_drive) { GAR_APRES = false; var n = d.numero; setTimeout(function () { garArchiver("facture", n, "msg-doc").catch(function () {}); }, 50); }
     return r; }; })();
   (function () { var st = document.createElement("style"); st.textContent = ".gdf-a a.gdf-drive{flex:1 1 auto;min-height:42px;display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;font-size:14px;border-radius:10px;border:1px solid var(--trait);background:#fff;color:var(--vert);font-weight:600;text-decoration:none}"; document.head.appendChild(st); })();
+
+
+  /* ——— Relances de devis : bouton dans l'Agenda, et lien direct (?relance=N°&ech=id) depuis l'e-mail du matin ——— */
+  function relancerDevis(numero, ech) {
+    if (!(G.Devis || []).some(function (x) { return x.numero === numero; })) { msg("msg-rdv", "Devis " + numero + " introuvable.", "ko"); return; }
+    soumettreDevis(numero, { ech: ech || "" });
+  }
+  (function () { var o = ligneEv; ligneEv = function (x) {
+    var h = o.apply(this, arguments), m = x.type === "action" && x.id && /Relancer le devis (\S+)/.exec(x.titre || "");
+    if (!m) return h;
+    return h.replace('</span><button type="button" class="ga-del" data-ga-fait', ' <button type="button" class="ga-rel" data-ga-relance="' + gEsc(m[1]) + '" data-ga-ech="' + gEsc(x.id) + '">📨 Relancer</button></span><button type="button" class="ga-del" data-ga-fait');
+  }; })();
+  ["ga-liste", "ga-retard"].forEach(function (id) {
+    var box = $(id); if (!box) return;
+    box.addEventListener("click", function (e) { var b = e.target.closest("[data-ga-relance]"); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); relancerDevis(b.dataset.gaRelance, b.dataset.gaEch); }, true);
+  });
+  (function () {
+    var q = new URLSearchParams(location.search), n = q.get("relance"); if (!n) return;
+    var ech = q.get("ech") || "", essais = 0;
+    var t = setInterval(function () {
+      var v = $("verrou"); if (++essais > 240) { clearInterval(t); return; }
+      if (v && getComputedStyle(v).display !== "none") return;
+      clearInterval(t);
+      (G_CHARGE ? Promise.resolve() : chargerGestion()).then(function () {
+        var nf = document.querySelector('nav button[data-onglet="agenda"]'); if (nf) nf.click();
+        try { history.replaceState(null, "", location.pathname); } catch (er) {}
+        relancerDevis(n, ech);
+      });
+    }, 500);
+  })();
+  (function () { var st = document.createElement("style"); st.textContent = ".ga-rel{border:1px solid var(--trait);background:#FFF4DF;color:#8a5a00;border-radius:999px;padding:3px 10px;font:600 12.5px system-ui;cursor:pointer;margin-left:4px;white-space:nowrap}"; document.head.appendChild(st); })();
 
 })();
