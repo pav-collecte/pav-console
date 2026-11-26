@@ -64,7 +64,7 @@
     msg(idMsg, "Enregistrement…");
     return api("gestion", donnees).then(function (j) {
       msg(idMsg, ok, "ok");
-      if (/^(Echanges)$/.test(donnees.onglet || "") || /document/.test(donnees.op || "")) syncAgendaPlusTard();
+      if (/^(Echanges|Rendezvous)$/.test(donnees.onglet || "") || /document/.test(donnees.op || "")) syncAgendaPlusTard();
       return chargerGestion(true).then(function () { return j; });
     })
       .catch(function (e) { msg(idMsg, e.message, "ko"); throw e; });
@@ -764,10 +764,19 @@
       var d = new Date(x.date + "T12:00:00"); d.setDate(d.getDate() - nj);
       ev.push({ date: d.toISOString().slice(0, 10), type: "rappel", couleur: "#C9752B", titre: "Rappel J-" + nj + " : " + x.titre + " (le " + gDateFR(x.date) + ")", commune: x.commune, doc: x.doc });
     });
+    // Événements saisis librement (onglet Rendezvous du classeur).
+    (G.Rendezvous || []).forEach(function (r) {
+      if (!r.date || r.statut === "annule") return;
+      ev.push({ date: r.date, heure: r.heure || "", type: "rdv", couleur: "#1F7A8C", titre: (r.heure ? r.heure + " · " : "") + (r.titre || "Rendez-vous") + (r.contact ? " (" + r.contact + ")" : ""), commune: r.commune, rdv: r.id, note: r.note, passe: r.date < auj });
+    });
     ev.forEach(function (x) { x.nomCommune = noms[x.commune] || x.commune || ""; });
-    return ev.sort(function (a, b) { return a.date.localeCompare(b.date); });
+    return ev.sort(function (a, b) { return a.date.localeCompare(b.date) || String(a.heure || "99").localeCompare(String(b.heure || "99")); });
   }
   function ligneEv(x) {
+    if (x.rdv) return '<div data-ga-rdv="' + gEsc(x.rdv) + '" style="padding:7px 0;border-bottom:1px solid var(--trait);cursor:pointer">'
+      + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + x.couleur + ';margin-right:6px"></span>'
+      + '<b>' + gDateFR(x.date) + '</b>' + (x.nomCommune ? ' · ' + gEsc(x.nomCommune) : '') + ' — ' + gEsc(x.titre)
+      + (x.note ? '<div class="petit" style="margin:2px 0 0 15px;color:var(--doux);white-space:pre-wrap">' + gEsc(String(x.note).slice(0, 220)) + '</div>' : '') + '</div>';
     return '<div data-ga-com="' + gEsc(x.commune) + '"' + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + ' style="padding:6px 0;border-bottom:1px solid var(--trait);cursor:pointer' + (x.retard ? ';color:var(--ko)' : '') + '">'
       + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + x.couleur + ';margin-right:6px"></span>'
       + '<b>' + gDateFR(x.date) + '</b> · ' + gEsc(x.nomCommune) + ' — ' + gEsc(x.titre)
@@ -1450,33 +1459,32 @@
     if (!tous.length) { $("gav-liste").innerHTML = "Aucun avis reçu pour l'instant."; return; }
     if (!l.length) { $("gav-liste").innerHTML = GA_FILTRE.vue === "afaire" ? "Rien à traiter 🎉" : "Aucun avis pour ce filtre."; return; }
     $("gav-liste").innerHTML = l.map(function (a) {
-      var n = Math.max(0, Math.min(5, Math.round(Number(a.note) || 0)));
-      var p = a.priorite || "normale", id = a.id || "";
+      var p = a.priorite || "normale", id = a.id || "", n = gavNotes(a), kn = Object.keys(n);
+      if (!kn.length && Number(a.note) >= 1) { n = { simplicite: Math.round(Number(a.note)) }; kn = ["simplicite"]; }
       var contact = a.contact ? (/@/.test(a.contact) ? '<a href="mailto:' + gEsc(a.contact) + '">' + gEsc(a.contact) + '</a>' : /^[+\d][\d .]{6,}$/.test(a.contact) ? '<a href="tel:' + gEsc(a.contact.replace(/\s/g, "")) + '">' + gEsc(a.contact) + '</a>' : gEsc(a.contact)) : "";
-      return '<div class="gav-a p-' + gEsc(p) + (gavFait(a) ? ' fait' : '') + '" data-gav="' + gEsc(id) + '">'
-        + '<div class="gav-h"><span class="gav-num">n° ' + (GA_NUM[id] || "?") + '</span>' + (n ? '<span class="et" title="Simplicité : ' + n + '/5">' + "★★★★★".slice(0, n) + '<span style="color:#d9d4c8">' + "★★★★★".slice(0, 5 - n) + '</span></span>' : '')
-        + '<span class="gav-tag">' + gEsc(a.commune || "commune ?") + '</span><span class="gav-tag">' + gEsc(GA_PAGES[a.page] || a.page || "page ?") + '</span>'
-        + (a.valide === "oui" ? '<span class="gav-tag gav-v">✓ Validé</span>' : '')
-        + (a.etat_traitement ? '<span class="gav-tag gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : (a.version ? '<span class="gav-tag">' + gEsc(a.version) + '</span>' : ''))
-        + '<span class="d">' + gEsc(gavDate(a.date)) + '</span>'
-        + (id ? '<button type="button" class="gav-crayon" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button>' : '') + (id ? '<button type="button" class="gav-crayon" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button>' : '') + '</div>'
-        + (function () { var n = gavNotes(a), k = Object.keys(n); return k.length ? '<div class="gav-crits">' + k.map(function (x) { return '<span>' + GA_CRIT[x] + ' <b>' + n[x] + (x === "global" ? '♥' : '★') + '</b></span>'; }).join("") + '</div>' : ''; })()
-        + '<div class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</div>'
+      var notes = kn.map(function (x) { var g = x === "global", v = n[x]; return '<span class="gav-n"><i>' + GA_CRIT[x] + '</i><b class="' + (g ? 'c' : 'e') + '">' + (g ? '♥' : '★').repeat(v) + '<s>' + (g ? '♥' : '★').repeat(5 - v) + '</s></b></span>'; }).join("");
+      var meta = [gEsc(a.commune || "commune ?"), gEsc(GA_PAGES[a.page] || a.page || "page ?"), a.appareil ? gEsc(gavAppareil(a.appareil)) : ""].filter(Boolean).join(" · ");
+      return '<article class="gav-a p-' + gEsc(p) + (gavFait(a) ? ' fait' : '') + '" data-gav="' + gEsc(id) + '">'
+        + '<header class="gav-top"><span class="gav-num">n° ' + (GA_NUM[id] || "?") + '</span><span class="gav-quand">' + gEsc(gavDate(a.date)) + '</span>'
+        + '<span class="gav-badges">' + (a.valide === "oui" ? '<span class="gav-pill gav-v">✓ Validé</span>' : '')
+        + (a.etat_traitement ? '<span class="gav-pill gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : '') + '</span>'
+        + (id ? '<span class="gav-outils"><button type="button" class="gav-ic" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button><button type="button" class="gav-ic" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button></span>' : '') + '</header>'
+        + '<blockquote class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</blockquote>'
+        + (notes ? '<div class="gav-notes">' + notes + '</div>' : '')
         + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
-        + (contact ? '<div>Contact : ' + contact + '</div>' : '')
+        + (a.suite && GA_EDIT !== id ? '<div class="gav-suivi"><b>Suivi</b>' + gEsc(a.suite) + '</div>' : '')
+        + '<div class="gav-meta">' + meta + (contact ? ' · ' + contact : '') + '</div>'
         + (GA_EDIT === id ? '<div class="gav-edit"><label>Précisions (contexte, reproduction, écran concerné, proposition…)</label>'
           + '<textarea id="gav-e-comp" rows="4" maxlength="3000" placeholder="Ex. sur Android, le bouton est sous le pouce ; proposer un bouton flottant en bas au centre.">' + gEsc(a.complement || "") + '</textarea>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>État du traitement</label><select id="gav-e-etat">' + GA_ETATS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === (a.etat_traitement || "") ? ' selected' : '') + '>' + x[1] + '</option>'; }).join("") + '</select></div>'
           + '<div><label>Version de réalisation</label><input id="gav-e-version" maxlength="40" placeholder="ex. V1.5.0" value="' + gEsc(a.version || "") + '"></div></div>'
           + '<label>Note de suivi</label><textarea id="gav-e-suite" rows="2" maxlength="2000" placeholder="Réponse faite, correctif prévu, version…">' + gEsc(a.suite || "") + '</textarea>'
           + '<div class="gav-eb"><button type="button" class="second" data-gav-annuler>Annuler</button><button type="button" class="principal" data-gav-ok>Enregistrer</button></div></div>' : '')
-        + (id ? '<div class="gav-b"><div class="gav-seg" role="group" aria-label="Priorité">' + GA_PRIO.map(function (x) { return '<button type="button" data-p="' + x[0] + '"' + (x[0] === p ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join("") + '</div>'
-          + '<label class="gav-ok"><input type="checkbox" data-gav-valide' + (a.valide === "oui" ? ' checked' : '') + '> Validé</label>'
-          + '<label class="gav-ok"><input type="checkbox" data-gav-fait' + (gavFait(a) ? ' checked' : '') + '> Traité</label></div>'
-          + (a.suite && GA_EDIT !== id ? '<div class="gav-meta" style="color:var(--vert);font-size:13px">Suivi : ' + gEsc(a.suite) + '</div>' : '')
+        + (id ? '<footer class="gav-b"><div class="gav-seg" role="group" aria-label="Priorité">' + GA_PRIO.map(function (x) { return '<button type="button" data-p="' + x[0] + '"' + (x[0] === p ? ' class="on"' : '') + '>' + x[1] + '</button>'; }).join("") + '</div>'
+          + '<span class="gav-sw"><label class="gav-ok"><input type="checkbox" data-gav-valide' + (a.valide === "oui" ? ' checked' : '') + '><span>Validé</span></label>'
+          + '<label class="gav-ok"><input type="checkbox" data-gav-fait' + (gavFait(a) ? ' checked' : '') + '><span>Traité</span></label></span></footer>'
           : '<div class="gav-meta" style="color:var(--ko)">Avis sans identifiant : actualisez pour le numéroter.</div>')
-        + (a.appareil ? '<div class="gav-meta">' + gEsc(gavAppareil(a.appareil)) + '</div>' : '')
-        + '</div>';
+        + '</article>';
     }).join("");
   }
   function gavAppareil(ua) {
@@ -1617,5 +1625,93 @@
     nb.click();
     setTimeout(function () { var s = $("bac-portee"); if (!s) return; s.value = b.dataset.gfBareme; s.dispatchEvent(new Event("change")); window.scrollTo({ top: 0, behavior: "smooth" }); }, 50);
   });
+
+  /* — Agenda : événements saisis librement (date, heure, note, commune ou contact facultatifs) — */
+  var GR = null;
+  $("ga-grille").insertAdjacentHTML("beforebegin", '<div style="margin:10px 0"><button type="button" class="principal" id="gr-nouveau" style="margin-top:0">+ Nouvel événement</button><div id="gr-form" hidden></div><div class="msg" id="msg-rdv"></div></div>');
+  function formRdv(r) {
+    GR = r || { date: new Date().toISOString().slice(0, 10) };
+    var coms = gCommunes(), x = GR;
+    var contacts = (G.Contacts || []).filter(function (k) { return !x.commune || k.commune === x.commune; });
+    $("gr-form").innerHTML = '<div style="margin-top:10px;padding:12px;border:1px solid var(--trait);border-radius:10px;background:#FAF8F3">'
+      + '<b style="font-size:17px">' + (x.id ? "Modifier l'événement" : "Nouvel événement") + '</b>'
+      + gChamp("gr-titre", "Titre", x.titre, "text", null, "ex. Réunion avec le maire, appel de suivi…")
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div>' + gChamp("gr-date", "Date", x.date, "date") + '</div><div>' + gChamp("gr-heure", "Heure (facultatif)", x.heure, "time") + '</div><div>'
+      + gChamp("gr-duree", "Durée", String(x.duree_min || "60"), null, [["15", "15 min"], ["30", "30 min"], ["45", "45 min"], ["60", "1 h"], ["90", "1 h 30"], ["120", "2 h"], ["180", "3 h"], ["240", "4 h"]]) + '</div></div>'
+      + gChamp("gr-commune", "Client / prospect (facultatif)", x.commune || "", null, [["", "— aucun —"]].concat(coms))
+      + gChamp("gr-contact", "Contact (facultatif)", x.contact || "", null, [["", "— aucun —"]].concat(contacts.map(function (k) { return [k.nom, k.nom + (k.fonction ? " — " + k.fonction : "") + (x.commune ? "" : " (" + gNomCommune(k.commune) + ")")]; })).concat(x.contact && !contacts.some(function (k) { return k.nom === x.contact; }) ? [[x.contact, x.contact]] : []))
+      + gChamp("gr-note", "Note", x.note, "zone")
+      + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' + (x.id ? '<button type="button" class="second" id="gr-suppr" style="color:var(--ko)">Supprimer</button>' : '')
+      + '<button type="button" class="second" id="gr-annuler" style="flex:1">Annuler</button><button type="button" class="principal" id="gr-ok" style="flex:2;margin-top:0">Enregistrer</button></div>'
+      + '<p class="petit" style="margin-bottom:0">Avec une heure, l\'événement est placé à l\'heure dite dans Google Agenda (rappel 30 min avant) ; sans heure, sur la journée.</p></div>';
+    $("gr-form").hidden = false; $("gr-titre").focus();
+  }
+  $("gr-nouveau").addEventListener("click", function () { formRdv(null); });
+  $("gr-form").addEventListener("change", function (e) {
+    if (e.target.id === "gr-commune") { GR = Object.assign({}, GR, lireRdv(), { contact: "" }); formRdv(GR); }
+  });
+  function lireRdv() { return { titre: gVal("gr-titre"), date: gVal("gr-date"), heure: gVal("gr-heure"), duree_min: gVal("gr-duree"), commune: gVal("gr-commune"), contact: gVal("gr-contact"), note: gVal("gr-note") }; }
+  $("gr-form").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.id === "gr-annuler") { $("gr-form").hidden = true; GR = null; return; }
+    if (b.id === "gr-suppr") {
+      if (!confirm("Supprimer cet événement ? Il sera aussi retiré de Google Agenda.")) return;
+      gEnvoyer({ op: "enregistrer", onglet: "Rendezvous", valeurs: { id: GR.id, statut: "annule" } }, "msg-rdv", "Événement supprimé.").then(function () { $("gr-form").hidden = true; GR = null; }).catch(function () {});
+      return;
+    }
+    if (b.id === "gr-ok") {
+      var v = lireRdv();
+      if (!v.titre) { msg("msg-rdv", "Donnez un titre à l'événement.", "ko"); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) { msg("msg-rdv", "Choisissez une date.", "ko"); return; }
+      if (GR && GR.id) v.id = GR.id; v.statut = "actif";
+      gEnvoyer({ op: "enregistrer", onglet: "Rendezvous", valeurs: v }, "msg-rdv", "Événement enregistré : il part dans Google Agenda.").then(function () {
+        $("gr-form").hidden = true; GR = null;
+        var d = new Date(v.date + "T12:00:00"); GA_MOIS = new Date(d.getFullYear(), d.getMonth(), 1); dessinerAgenda();
+      }).catch(function () {});
+    }
+  });
+  // Clic sur un événement libre : on l'ouvre en modification (avant le clic « fiche de la commune »).
+  ["ga-liste", "ga-retard"].forEach(function (id) {
+    $(id).addEventListener("click", function (e) {
+      var l = e.target.closest("[data-ga-rdv]"); if (!l) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      var r = (G.Rendezvous || []).filter(function (x) { return x.id === l.dataset.gaRdv; })[0]; if (!r) return;
+      formRdv(Object.assign({}, r)); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" });
+    }, true);
+  });
+  // Clic sur un jour vide de la grille : nouvel événement ce jour-là.
+  $("ga-grille").addEventListener("click", function (e) {
+    var c = e.target.closest("[data-ga-jour]"); if (!c) return;
+    if (!evenements().some(function (x) { return x.date === c.dataset.gaJour; })) { formRdv({ date: c.dataset.gaJour }); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" }); }
+    else $("ga-liste").insertAdjacentHTML("beforeend", '<p><a href="#" data-gr-jour="' + c.dataset.gaJour + '">+ Ajouter un événement ce jour</a></p>');
+  });
+  $("ga-liste").addEventListener("click", function (e) {
+    var a = e.target.closest("[data-gr-jour]"); if (!a) return; e.preventDefault(); e.stopImmediatePropagation();
+    formRdv({ date: a.dataset.grJour }); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" });
+  }, true);
+
+  /* Avis : présentation sobre (cartes aérées, citation, pastilles). */
+  (function () { var st = document.createElement("style"); st.textContent =
+    "#avis .carte{padding:18px}#avis h2{font-size:21px;letter-spacing:.01em}"
+    + ".gav-syn{gap:10px}.gav-syn div{background:#fff;border:1px solid var(--trait);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--doux);box-shadow:0 1px 2px rgba(0,0,0,.04)}.gav-syn b{font-size:26px;font-weight:800;line-height:1.1}"
+    + ".gav-moy{margin-top:10px}.gav-moy span{background:#fff;border-color:var(--trait);font-size:13px}"
+    + ".gav-filtres{padding:10px 0;border-top:1px solid var(--trait);border-bottom:1px solid var(--trait);margin:14px 0 4px}"
+    + "#gav-liste{display:grid;gap:12px;margin-top:12px}"
+    + ".gav-a{margin:0;border:1px solid var(--trait);border-left:4px solid #c9c2b4;border-radius:14px;padding:14px 16px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.05)}"
+    + ".gav-a.fait{opacity:.7;background:#FBFAF7}"
+    + ".gav-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.gav-num{background:var(--vert);color:#fff;font:700 12px system-ui;border-radius:6px;padding:3px 8px}"
+    + ".gav-quand{color:var(--doux);font-size:13px}.gav-badges{display:flex;gap:6px;flex-wrap:wrap}.gav-outils{margin-left:auto;display:flex;gap:4px}"
+    + ".gav-pill{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;border:1px solid var(--trait)}"
+    + ".gav-ic{border:0;background:transparent;border-radius:8px;width:34px;height:32px;cursor:pointer;font-size:16px;opacity:.65}.gav-ic:hover{background:#F3EFEA;opacity:1}"
+    + ".gav-idee{margin:12px 0 10px;padding:2px 0 2px 14px;border-left:3px solid var(--trait);font-size:17px;line-height:1.5;color:var(--encre);white-space:pre-wrap}.gav-idee.vide{font-size:14px;color:var(--doux);font-style:italic}"
+    + ".gav-notes{display:flex;flex-wrap:wrap;gap:6px 18px;margin:4px 0 8px}.gav-n{display:inline-flex;align-items:center;gap:6px;font-size:13px}.gav-n i{font-style:normal;color:var(--doux)}"
+    + ".gav-n b{letter-spacing:1px;font-size:15px}.gav-n b.e{color:#E08A00}.gav-n b.c{color:#D6334A}.gav-n s{text-decoration:none;color:#DDD6C8}"
+    + ".gav-comp,.gav-suivi{margin:8px 0;padding:8px 12px;border-radius:9px;font-size:14px;white-space:pre-wrap}.gav-comp{background:#FAF8F3}.gav-suivi{background:#EEF5F0;color:var(--vert)}"
+    + ".gav-comp b,.gav-suivi b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--doux);margin-bottom:2px}"
+    + ".gav-meta{font-size:12.5px;color:var(--doux);margin-top:6px}"
+    + ".gav-b{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #EFEAE0}"
+    + ".gav-sw{display:flex;gap:8px}.gav-ok span{border:1px solid var(--trait);border-radius:999px;padding:6px 12px;font-size:14px}.gav-ok input{position:absolute;opacity:0;width:1px;height:1px}"
+    + ".gav-ok input:checked+span{background:var(--ok);border-color:var(--ok);color:#fff}.gav-ok input:focus-visible+span{outline:2px solid var(--accent)}";
+    document.head.appendChild(st); })();
 
 })();
