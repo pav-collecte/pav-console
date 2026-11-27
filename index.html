@@ -731,15 +731,30 @@
 
   /* Nom de la commune : suggestions de l'API officielle geo.api.gouv.fr, qui remplit le département
      (et propose un préfixe si le champ est vide). */
-  /* Préfixe proposé : initiales des mots significatifs (Saint-Rambert-d'Albon → SRA),
-     ou les 3 premières lettres pour un nom d'un seul mot (Albon → ALB). Modifiable. */
+  /* Préfixe proposé : 4 ou 5 lettres, jamais celui d'une commune existante (Andance et
+     Andancette partageaient AND avec 3 lettres). Plusieurs mots : initiales complétées
+     (Saint-Rambert-d'Albon → SRAL). Un mot : début + fin (Andance → ANDE), puis d'autres
+     combinaisons tant que c'est pris. Modifiable ; le serveur refuse aussi les doublons. */
+  function prefixesPris() {
+    return (LISTE_COMMUNES || []).concat(CORBEILLE || []).map(function (c) { return String(c.prefixe || "").toUpperCase(); }).filter(Boolean);
+  }
   function prefixeAuto(n) {
     var vides = ["DE", "DU", "DES", "LA", "LE", "LES", "D", "L", "SUR", "SOUS", "EN", "ET", "AU", "AUX"];
     var mots = n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().split(/[^A-Z]+/)
       .filter(function (m) { return m && vides.indexOf(m) < 0; });
     if (!mots.length) return "";
-    if (mots.length === 1) return mots[0].slice(0, 3);
-    return mots.slice(0, 4).map(function (m) { return m.charAt(0); }).join("");
+    var pris = prefixesPris(), cand = [], tout = mots.join("");
+    if (mots.length > 1) {
+      var ini = mots.slice(0, 5).map(function (m) { return m.charAt(0); }).join("");
+      var der = mots[mots.length - 1];
+      for (var k = 1; k < der.length && ini.length < 4; k++) ini += der.charAt(k);
+      cand.push(ini.slice(0, 5));
+      for (var q = 1; q < der.length; q++) cand.push((ini.slice(0, 3) + der.charAt(q)).slice(0, 4));
+    }
+    cand.push(tout.slice(0, 3) + tout.slice(-1), tout.slice(0, 4), tout.slice(0, 3) + tout.slice(-2), tout.slice(0, 5));
+    for (var a = 3; a < tout.length; a++) cand.push(tout.slice(0, 3) + tout.charAt(a));
+    for (var b = 0; b < cand.length; b++) if (cand[b].length >= 4 && pris.indexOf(cand[b]) < 0) return cand[b];
+    return "";
   }
 
   function brancherCommune() {
@@ -2614,7 +2629,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=76" defer></script>
+<script src="gestion.js?v=77" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
