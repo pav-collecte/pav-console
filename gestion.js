@@ -548,7 +548,7 @@
     + '<section id="agenda"><div class="carte">'
     + '<h2>Agenda des actions</h2>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="second" id="ga-sync" type="button" style="margin:0;flex:none;padding:6px 12px;font-size:14px" title="Synchroniser avec Google Agenda">🔄 Google Agenda</button><button class="second" id="ga-ics" type="button" style="margin:0;flex:none;padding:6px 12px;font-size:14px" title="Exporter l\'agenda (.ics)">⬇ .ics</button><button class="second" id="ga-i" type="button" aria-label="Comment marche la synchronisation ?" aria-expanded="false" style="margin:0;flex:none;width:32px;height:32px;padding:0;border-radius:50%;font:italic 700 15px Georgia,serif">i</button></div>'
-    + '<p class="petit" id="ga-aide" hidden style="margin-top:0;padding:8px 10px;background:#F7F5EF;border-radius:8px">Les échéances vont dans l\'agenda Google « PAV — actions » (créé au premier envoi) ; elles se mettent aussi à jour toutes seules après chaque enregistrement d\'échange, de devis ou de facture. Une action réalisée reste affichée en vert (✓).</p>'
+    + '<p class="petit" id="ga-aide" hidden style="margin-top:0;padding:8px 10px;background:#F7F5EF;border-radius:8px">Les échéances vont dans l\'agenda Google « PAV — actions » (créé au premier envoi) ; elles se mettent aussi à jour toutes seules après chaque enregistrement d\'échange, de devis ou de facture. Une action réalisée reste affichée en vert (✓). Appui court sur un jour : le sélectionner ; appui long : créer un événement ce jour-là.</p>'
     + '<div class="petit" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">Rappel avant chaque échéance (facture, devis, anniversaire de contrat) : <input id="ga-rappel" type="number" min="0" max="365" style="width:70px;margin:0"> jours <button class="second" id="ga-rappel-ok" type="button" style="padding:5px 10px;font-size:13px">Enregistrer</button></div>'
     + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
     + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
@@ -872,7 +872,7 @@
       var iso = gaIso(d), l = ev.filter(function (x) { return x.date === iso; });
       var t = f(d, { weekday: GA_VUE === "jour" ? "long" : "short", day: "numeric", month: "short" });
       var avec = l.filter(function (x) { return x.heure; }), sans = l.filter(function (x) { return !x.heure; });
-      return '<div class="ga-vj' + (iso === auj ? ' ga-vj-auj' : '') + (iso === GA_SEL ? ' ga-vj-sel' : '') + '">'
+      return '<div data-ga-lp="' + iso + '" class="ga-vj' + (iso === auj ? ' ga-vj-auj' : '') + (iso === GA_SEL ? ' ga-vj-sel' : '') + '">'
         + '<div class="ga-vjt"><b data-gv-jour="' + iso + '">' + gEsc(t.charAt(0).toUpperCase() + t.slice(1)) + (iso === auj ? ' <span class="ga-tag">aujourd\'hui</span>' : '') + '</b>'
         + '<button type="button" class="second ga-vjp" data-gr-jour="' + iso + '" aria-label="Ajouter un événement ce jour">+ Ajouter</button></div>'
         + (l.length ? (GA_VUE === "jour" && sans.length && avec.length ? '<div class="petit ga-vjs">Toute la journée</div>' + sans.map(ligneEv).join("") + '<div class="petit ga-vjs">Dans la journée</div>' + avec.map(ligneEv).join("") : l.map(ligneEv).join(""))
@@ -938,9 +938,8 @@
     var c = e.target.closest("[data-ga-jour]"); if (!c) return;
     var d = c.dataset.gaJour;
     GA_SEL = d;   // le cadre reste sur le jour choisi (« Tout le mois » pour revenir à la liste du mois)
-    dessinerAgenda();
-    if (GA_SEL && !evenements().some(function (x) { return x.date === d; })) { formRdv({ date: d }); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" }); }
-    else $("ga-liste").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    dessinerAgenda();   // un simple appui sélectionne seulement ; la création se fait par appui long
+    $("ga-liste").scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
   function ouvrirDepuisAgenda(e) {
     if (e.target.closest("[data-gcal]")) return;   // lien Google Agenda : on le laisse s'ouvrir
@@ -1002,6 +1001,38 @@
       if (x0 === null) return; var t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
       if (Math.abs(dx) > 70 && Math.abs(dy) < 45 && (id === "ga-grille" || GA_VUE !== "mois")) gaDecaler(dx < 0 ? 1 : -1);
     }, { passive: true });
+  });
+  /* Appui long (0,6 s) sur un jour : sélectionne le jour puis ouvre la création d'un événement. */
+  var GA_LP_FAIT = 0;
+  ["ga-liste", "ga-grille"].forEach(function (id) {
+    var minu = null, x0 = 0, y0 = 0, cible = null;
+    function stop() { if (minu) clearTimeout(minu); minu = null; if (cible) cible.classList.remove("ga-appui"); cible = null; }
+    function jourDe(t) {
+      if (t.closest("input,textarea,select,button,a,#gr-form,[data-ga-com]")) return null;
+      return t.closest("[data-ga-jour],[data-ga-lp]");
+    }
+    function debut(x, y, t) {
+      stop(); var c = jourDe(t); if (!c) return;
+      cible = c; x0 = x; y0 = y; c.classList.add("ga-appui");
+      minu = setTimeout(function () {
+        var d = c.dataset.gaJour || c.dataset.gaLp; stop(); GA_LP_FAIT = Date.now();
+        if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) {}
+        GA_SEL = d; dessinerAgenda(); formRdv({ date: d });
+        $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 600);
+    }
+    function bouge(x, y) { if (minu && (Math.abs(x - x0) > 10 || Math.abs(y - y0) > 10)) stop(); }
+    var el = $(id);
+    el.addEventListener("touchstart", function (e) { if (e.touches.length !== 1) { stop(); return; } debut(e.touches[0].clientX, e.touches[0].clientY, e.target); }, { passive: true });
+    el.addEventListener("touchmove", function (e) { bouge(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    el.addEventListener("touchend", stop, { passive: true });
+    el.addEventListener("touchcancel", stop, { passive: true });
+    el.addEventListener("mousedown", function (e) { if (e.button === 0 && !("ontouchstart" in window)) debut(e.clientX, e.clientY, e.target); });
+    el.addEventListener("mousemove", function (e) { bouge(e.clientX, e.clientY); });
+    el.addEventListener("mouseup", stop); el.addEventListener("mouseleave", stop);
+    el.addEventListener("contextmenu", function (e) { if (jourDe(e.target)) e.preventDefault(); });
+    // le clic qui suit un appui long ne doit rien faire d'autre
+    el.addEventListener("click", function (e) { if (Date.now() - GA_LP_FAIT < 700) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   });
   $("ga-liste").addEventListener("click", ouvrirDepuisAgenda);
   $("ga-retard").addEventListener("click", ouvrirDepuisAgenda);
@@ -1887,6 +1918,7 @@
     + ".ga-pts{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin-top:2px}.ga-pts span{width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 1px #fff}.ga-pts b{font-size:11px;line-height:1;color:var(--doux)}.ga-auj .ga-pts b{color:#fff}"
     + ".ga-jt{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:17px}.ga-jt a{font-size:14px}"
     + ".ga-ajout{width:100%;margin:8px 0 4px}"
+    + ".ga-j,.ga-vj{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.ga-appui{transition:transform .6s,box-shadow .6s;transform:scale(.96);box-shadow:0 0 0 3px #F0A04B inset}"
     + "#ga-choix{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center}"
     + ".ga-ch-b{background:#fff;width:min(520px,100%);border-radius:16px 16px 0 0;padding:16px 16px 22px;display:flex;flex-direction:column;gap:8px;box-shadow:0 -6px 24px rgba(0,0,0,.2)}"
     + ".ga-ch-b button{margin:0;height:48px;font-size:16px}.ga-ch-b b{font-size:17px}"
