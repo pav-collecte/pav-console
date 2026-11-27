@@ -555,6 +555,7 @@
     + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
     + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
     + '<div id="ga-grille" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px"></div>'
+    + '<div id="ga-filtre" class="ga-filtre" role="group" aria-label="Filtrer par type"></div>'
     + '<div id="ga-retard" style="margin-top:12px"></div>'
     + '<div id="ga-liste" class="petit" style="margin-top:12px"></div>'
     + '</div></section>');
@@ -778,6 +779,16 @@
   /* ——— Agenda : actions prévues (échanges), devis à relancer, factures à échéance, anniversaires de contrat ——— */
   var GA_MOIS = new Date(); GA_MOIS.setDate(1);
   var GA_SEL = null;   // jour sélectionné dans le calendrier (cadre orange) : la liste et l'ajout portent sur lui
+  /* Filtre par type (pastilles de couleur) : mémorisé sur l'appareil. */
+  var GA_TYPES = [["rappel", "Rappels"], ["action", "Actions"], ["echange", "Échanges"], ["fait", "Réalisés"], ["rdv", "Rendez-vous"], ["devis", "Devis"], ["facture", "Factures"], ["anniversaire", "Anniversaires"]];
+  var GA_MASQ = {}; try { GA_MASQ = JSON.parse(localStorage.getItem("pav-agenda-masques") || "{}") || {}; } catch (e) {}
+  function evAffiches() { return evenements().filter(function (x) { return !GA_MASQ[x.type]; }); }
+  function dessinerFiltre() {
+    var f = $("ga-filtre"); if (!f) return;
+    var n = GA_TYPES.filter(function (t) { return GA_MASQ[t[0]]; }).length;
+    f.innerHTML = GA_TYPES.map(function (t) { return '<button type="button" class="ga-t-' + t[0] + (GA_MASQ[t[0]] ? ' off' : '') + '" data-gf="' + t[0] + '" aria-pressed="' + !GA_MASQ[t[0]] + '">' + t[1] + '</button>'; }).join("")
+      + (n ? '<button type="button" class="ga-ftout" data-gf="*">Tout afficher</button>' : '');
+  }
   function evenements() {
     var ev = [], noms = {}; gCommunes().forEach(function (c) { noms[c[0]] = c[1]; });
     var auj = new Date().toISOString().slice(0, 10);
@@ -855,13 +866,14 @@
   function dessinerAgenda() {
     if (typeof majRappelChamp === "function") majRappelChamp();
     if (!$("ga-grille")) return;
+    dessinerFiltre();
     if ($("ga-vues")) Array.prototype.forEach.call($("ga-vues").querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.gv === GA_VUE); });
     $("ga-grille").style.display = GA_VUE !== "mois" ? "none" : "grid";
     if (GA_VUE !== "mois") { dessinerVue(); return; }
     dessinerMois();
   }
   function dessinerVue() {
-    var ev = evenements(), ref = gaRef(), jours = [];
+    var ev = evAffiches(), ref = gaRef(), jours = [];
     var retards = ev.filter(function (x) { return x.retard; });
     $("ga-retard").innerHTML = retards.length ? '<b style="color:var(--ko)">En retard (' + retards.length + ')</b><div class="petit">' + retards.map(ligneEv).join("") + '</div>' : "";
     if (GA_VUE === "jour") jours = [new Date(ref)];
@@ -883,7 +895,7 @@
     }).join("");
   }
   function dessinerMois() {
-    var ev = evenements(), auj = new Date().toISOString().slice(0, 10);
+    var ev = evAffiches(), auj = new Date().toISOString().slice(0, 10);
     var an = GA_MOIS.getFullYear(), mo = GA_MOIS.getMonth();
     $("ga-mois").textContent = GA_MOIS.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
     var premier = new Date(an, mo, 1), decal = (premier.getDay() + 6) % 7, nbj = new Date(an, mo + 1, 0).getDate();
@@ -908,7 +920,7 @@
   }
   /* Liste d'un jour sélectionné : titre, bouton d'ajout bien visible, événements. */
   function listeJour(d) {
-    var l = evenements().filter(function (x) { return x.date === d; });
+    var l = evAffiches().filter(function (x) { return x.date === d; });
     var dt = new Date(d + "T12:00:00"), titre = dt.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
     var court = dt.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
     $("ga-liste").innerHTML = '<div class="ga-jt"><b>' + gEsc(titre.charAt(0).toUpperCase() + titre.slice(1)) + '</b><a href="#" id="ga-tout">Tout le mois</a></div>'
@@ -920,6 +932,12 @@
     else { var r = gaRef(); r.setDate(r.getDate() + n * (GA_VUE === "jour" ? 1 : 7)); GA_REF = r; GA_MOIS = new Date(r.getFullYear(), r.getMonth(), 1); }
     dessinerAgenda();
   }
+  $("ga-filtre").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-gf]"); if (!b) return;
+    var t = b.dataset.gf; if (t === "*") GA_MASQ = {}; else if (GA_MASQ[t]) delete GA_MASQ[t]; else GA_MASQ[t] = 1;
+    try { localStorage.setItem("pav-agenda-masques", JSON.stringify(GA_MASQ)); } catch (er) {}
+    dessinerAgenda();
+  });
   $("ga-rappel-i").addEventListener("click", function () { var a = $("ga-rappel-aide"); a.hidden = !a.hidden; this.setAttribute("aria-expanded", String(!a.hidden)); });
   $("ga-i").addEventListener("click", function () { var a = $("ga-aide"); a.hidden = !a.hidden; this.setAttribute("aria-expanded", String(!a.hidden)); });
   $("ga-prec").addEventListener("click", function () { gaDecaler(-1); });
@@ -1912,6 +1930,7 @@
     + "@media(max-width:480px){.gr-quand{grid-template-columns:1fr 1fr}.gr-d{grid-column:1 / -1}}"
     + ".ga-l{display:grid;grid-template-columns:12px 46px 46px 1fr auto;gap:0 6px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--trait);cursor:pointer;font-size:15px}"
     + ".ga-l[class*=ga-t-]{border-bottom:0;border-radius:10px;margin:4px 0;padding:9px 6px}.ga-t-rappel{background:#F8CFCB}.ga-t-action{background:#CCE0F6}.ga-t-echange{background:#DFEAF6}.ga-t-fait{background:#D4ECDB}.ga-t-rdv{background:#CBE9E5}.ga-t-devis{background:#E3D5F2}.ga-t-facture{background:#FDE6AE}.ga-t-anniversaire{background:#DDEDCB}.ga-l[class*=ga-t-]:hover{filter:brightness(.97)}"
+    + ".ga-filtre{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.ga-filtre button{margin:0;border:1px solid rgba(0,0,0,.12);border-radius:999px;padding:5px 11px;font-size:13px;color:#222;cursor:pointer;flex:none}.ga-filtre button.off{background:#fff;color:#999;text-decoration:line-through;border-style:dashed}.ga-filtre .ga-ftout{background:#fff;color:var(--vert);font-weight:700}"
     + ".ga-leg{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px}.ga-leg span{padding:2px 8px;border-radius:999px;font-size:12px;color:#333}"
     + ".ga-l:hover{background:#FAF8F3}.ga-pt{width:9px;height:9px;border-radius:50%;align-self:center}.ga-dt{font-variant-numeric:tabular-nums}.ga-hr{color:var(--vert);font-weight:700;font-variant-numeric:tabular-nums}"
     + ".ga-tx i{font-style:normal;color:var(--doux)}.ga-tx small{display:block;color:var(--doux);font-size:13px;white-space:pre-wrap;margin-top:2px}"
