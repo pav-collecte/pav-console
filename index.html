@@ -60,6 +60,9 @@
   button.second.actif { background:var(--vert); color:#fff; border-color:var(--vert); }
   .en-edition { background:#FFF6EC; box-shadow:inset 4px 0 0 var(--accent); padding-left:10px !important; border-radius:6px; }
   .carte.edition { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .grp-edit { border:1px solid var(--trait); border-radius:10px; padding:0 12px; margin:10px 0; background:#fff; }
+  .grp-edit > summary { cursor:pointer; padding:11px 0; font-weight:700; color:var(--encre); }
+  .grp-edit[open] { padding-bottom:12px; }
   .jauge { margin:12px 0 4px; }
   .jauge label { display:flex; justify-content:space-between; align-items:baseline; margin:0 0 2px; }
   .jauge output { font:700 15px ui-monospace, Menlo, monospace; color:var(--vert); }
@@ -1124,13 +1127,29 @@
       cacher("msg-edit"); LOGO_EDIT = null; PREFIXE_INIT = "";
       var titre = document.createElement("h2"); titre.style.marginTop = "14px"; titre.textContent = j.nom;
       box.appendChild(titre);
+      /* Paramètres rangés par thème, en panneaux repliables. */
+      var GROUPES = [
+        ["id", "Identité de la commune", /^commune\.(nom|departement|codePostal|codeInsee|prefixeCode)$/, true],
+        ["contact", "Mairie et alertes", /^commune\.(maire|telephone|email|siteMairie)$/, true],
+        ["logo", "Logo", /^commune\.logo/, false],
+        ["adr", "Adresses publiques", /^adresses\.(application|meteo)$/, false],
+        ["terrain", "Réglages de la tournée", /^terrain\./, false],
+        ["meteo", "Page météo", /^mentions\./, false],
+        ["tech", "Paramètres techniques — ne pas modifier", /./, false]
+      ], ZONES = {};
+      GROUPES.forEach(function (g) {
+        var d = document.createElement("details"); d.className = "grp-edit"; d.open = g[3];
+        d.innerHTML = '<summary>' + g[1] + '</summary>'; box.appendChild(d); ZONES[g[0]] = d;
+      });
+      function groupe(cle) { for (var k = 0; k < GROUPES.length; k++) if (GROUPES[k][2].test(cle)) return ZONES[GROUPES[k][0]]; return ZONES.tech; }
       j.params.forEach(function (p) {
+        var zone = groupe(p.cle);
         var lab = document.createElement("label");
         var b = document.createElement("b"); b.textContent = p.description || p.cle; lab.appendChild(b);
         var petit = document.createElement("span"); petit.className = "petit"; petit.textContent = "  " + p.cle; lab.appendChild(petit);
         var inp = document.createElement("input"); inp.type = "text"; inp.name = p.cle; inp.value = p.valeur;
         lab.htmlFor = inp.id = "e-" + p.cle; verrouTechnique(p.cle, inp, lab);
-        box.appendChild(lab);
+        zone.appendChild(lab);
         if (p.cle.indexOf("adresses.") === 0) { inp.readOnly = true; inp.style.background = "#F1EFE9"; inp.dataset.ignore = "1"; }
         if (p.cle === "commune.prefixeCode") PREFIXE_INIT = p.valeur;
         if (p.cle === "commune.nom") setTimeout(function () { ajouterRechercheCommune(inp); }, 0);
@@ -1142,7 +1161,7 @@
             api("logo", { url: url }).then(function (r) { actuel.src = r.data; actuel.style.display = "block"; })
               .catch(function () { actuel.style.display = "none"; });
           };
-          box.appendChild(actuel);
+          zone.appendChild(actuel);
           apercuLogo(p.valeur);
           inp.addEventListener("change", function () { apercuLogo(inp.value.trim()); });
           var note = document.createElement("p"); note.className = "petit"; note.textContent = "Nouveau logo (facultatif) : il remplace le lien ci-dessous.";
@@ -1155,22 +1174,43 @@
             carre(f.files[0]).then(function (url) { LOGO_EDIT = url; ap.src = url; ap.style.display = "block"; })
               .catch(function () { msg("msg-edit", "Image illisible : essayez un PNG ou un JPG.", "ko"); });
           });
-          box.appendChild(note); box.appendChild(f); box.appendChild(ap);
+          zone.appendChild(note); zone.appendChild(f); zone.appendChild(ap);
           var chE = document.createElement("button"); chE.type = "button"; chE.className = "second";
           chE.textContent = "Chercher le logo de la commune"; chE.style.cssText = "margin:8px 0;padding:8px 12px;font-size:14px";
           var galE = document.createElement("div"); galE.className = "petit"; galE.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start";
           chE.addEventListener("click", function () { chercherLogo(galE, ap, chE, { prefixe: "e-", msg: "msg-edit", poser: function (url) { LOGO_EDIT = url; } }); });
-          box.appendChild(chE); box.appendChild(galE);
+          zone.appendChild(chE); zone.appendChild(galE);
         }
-        box.appendChild(inp);
-        if (inp.readOnly && inp.value) box.appendChild(boutonCopier(inp.value, "Copier l’adresse"));
+        zone.appendChild(inp);
+        if (inp.readOnly && inp.value) zone.appendChild(boutonCopier(inp.value, "Copier l’adresse"));
       });
       var la = document.createElement("label"); la.htmlFor = "e-alertes"; la.innerHTML = "<b>E-mails des alertes</b> — séparés par des virgules";
       var ia = document.createElement("input"); ia.type = "text"; ia.id = "e-alertes"; ia.value = j.alertes || ""; ia.inputMode = "email";
-      box.appendChild(la); box.appendChild(ia);
+      groupe("commune.email").appendChild(la); groupe("commune.email").appendChild(ia);
       var bt = document.createElement("button"); bt.className = "principal"; bt.type = "button"; bt.textContent = "Enregistrer les modifications";
       bt.addEventListener("click", function () { enregistrerCommune(bt); });
       box.appendChild(bt);
+      /* Points de collecte de la commune, consultables ici ; la gestion reste dans l'onglet Points. */
+      var dp = document.createElement("details"); dp.className = "grp-edit"; dp.open = true;
+      dp.innerHTML = '<summary>Points de collecte</summary><div class="petit" id="e-points">Chargement…</div>'
+        + '<button type="button" class="second" id="e-points-gerer" style="margin-top:10px;padding:8px 12px;font-size:14px">Gérer les points dans l’onglet Points</button>';
+      box.appendChild(dp);
+      $("e-points-gerer").addEventListener("click", function () {
+        var sel = $("commune-point"); if (sel) sel.value = COMMUNE_EDIT;
+        var nb = document.querySelector('nav button[data-onglet="points"]'); if (nb) nb.click();
+        if (sel) sel.dispatchEvent(new Event("change"));
+      });
+      var comPts = COMMUNE_EDIT, esc = function (t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+      api("points", { commune: comPts }).then(function (r) {
+        if (comPts !== COMMUNE_EDIT || !$("e-points")) return;
+        var pts = r.points || [];
+        dp.querySelector("summary").textContent = "Points de collecte (" + pts.length + ")";
+        $("e-points").innerHTML = pts.length ? pts.map(function (pt) {
+          var etat = pt.actif === "a_verifier" ? "à vérifier" : (pt.actif && pt.actif !== "oui" ? "retiré" : "actif");
+          return '<div style="display:flex;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--trait)"><b style="color:var(--encre);font-size:14px;flex:1;min-width:0">' + esc(pt.code + " — " + pt.nom) + '</b>'
+            + '<span>' + esc((pt.flux || []).join(", ")) + '</span><span style="white-space:nowrap;' + (etat === "actif" ? "" : "color:var(--ko)") + '">' + etat + '</span></div>';
+        }).join("") : "Aucun point pour l’instant.";
+      }).catch(function (er) { if ($("e-points")) $("e-points").textContent = er.message; });
     }).catch(function (er) { msg("msg-edit", er.message, "ko"); });
   }
   function enregistrerCommune(bt) {
@@ -2645,7 +2685,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=79" defer></script>
+<script src="gestion.js?v=80" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
