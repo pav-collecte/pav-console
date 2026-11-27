@@ -159,6 +159,8 @@
           <summary>Points de collecte</summary>
           <p class="petit" style="margin-top:0">Préparez les points avant de créer la commune : ils sont rangés dans un brouillon (enregistré automatiquement) et créés « à vérifier » avec la commune.</p>
           <div id="creer-points-nb" class="petit" style="margin-bottom:8px"></div>
+          <div id="creer-points-liste" style="margin-bottom:10px;max-height:420px;overflow:auto"></div>
+          <div class="msg" id="msg-creer-points"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="second" type="button" id="creer-pts-osm">Chercher dans OpenStreetMap</button>
             <button class="second" type="button" id="creer-pts-fichier">Importer un fichier…</button>
@@ -398,9 +400,10 @@
     var nom = val("commune.nom"), dep = val("commune.departement"), insee = val("commune.codeInsee");
     if (!nom && !insee) { msg(cible.msg, "Indiquez d'abord le nom de la commune.", "ko"); return; }
     bt.disabled = true; galerie.textContent = "Recherche du logo…";
+    var auto = null;
     var code = insee ? Promise.resolve(insee) : fetch("https://geo.api.gouv.fr/communes?nom=" + encodeURIComponent(nom) + (dep ? "&codeDepartement=" + encodeURIComponent(dep) : "") + "&fields=code,nom&boost=population&limit=1")
       .then(function (r) { return r.json(); }).then(function (l) { if (!l.length) throw new Error("commune introuvable"); return l[0].code; });
-    code.then(function (c) {
+    return code.then(function (c) {
       var q = 'SELECT ?logo ?blason WHERE { ?x wdt:P374 "' + String(c).toUpperCase().replace(/[^0-9AB]/g, "") + '". OPTIONAL { ?x wdt:P154 ?logo } OPTIONAL { ?x wdt:P94 ?blason } }';
       return fetch("https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(q)).then(function (r) { return r.json(); });
     }).then(function (j) {
@@ -424,18 +427,21 @@
         b.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px;font-size:12px";
         var im = document.createElement("img"); im.src = f.url; im.alt = f.titre; im.style.cssText = "width:96px;height:96px;object-fit:contain;background:#fff";
         b.appendChild(im); b.appendChild(document.createTextNode(f.titre + " — choisir"));
-        b.addEventListener("click", function () {
+        var choisir = function () {
           b.disabled = true;
-          fetch(f.url).then(function (r) { return r.blob(); }).then(carre).then(function (url) {
+          return fetch(f.url).then(function (r) { return r.blob(); }).then(carre).then(function (url) {
             cible.poser(url); apercu.src = url; apercu.style.display = "block";
             msg(cible.msg, f.titre + " de la commune retenu (Wikimedia Commons)" + (pf === "e-" ? " : cliquez « Enregistrer les modifications » pour l'appliquer." : ". Vous pouvez encore déposer un autre fichier à la place."), "ok");
           }).catch(function () { msg(cible.msg, "Image illisible : déposez un fichier.", "ko"); }).then(function () { b.disabled = false; });
-        });
+        };
+        b.addEventListener("click", choisir);
         galerie.appendChild(b);
+        auto = auto === null ? choisir : false;   // une seule image : retenue d'office si demandé
       });
       var n = document.createElement("p"); n.className = "petit"; n.style.flexBasis = "100%";
       n.textContent = "Source Wikidata et Wikimedia Commons. Le blason n'est pas forcément le logo actuel de la mairie : vérifiez avec elle.";
       galerie.appendChild(n);
+      if (cible.auto && typeof auto === "function") { n.textContent = "Une seule image trouvée : retenue d'office. " + n.textContent; return auto(); }
     }).catch(function (er) { galerie.textContent = "Rien trouvé (" + er.message + "). Déposez le fichier fourni par la mairie."; })
       .then(function () { bt.disabled = false; });
   }
@@ -703,8 +709,10 @@
           wrap.appendChild(fichier); wrap.appendChild(apercu);
           var chercher = document.createElement("button"); chercher.type = "button"; chercher.className = "second";
           chercher.textContent = "Chercher le logo de la commune"; chercher.style.cssText = "margin:8px 0;padding:8px 12px;font-size:14px";
+          chercher.id = "logo-chercher";
           var galerie = document.createElement("div"); galerie.id = "logo-galerie"; galerie.className = "petit"; galerie.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start";
           chercher.addEventListener("click", function () { chercherLogo(galerie, apercu, chercher, { prefixe: "p-", msg: "msg-commune", poser: function (url) { LOGO = url; } }); });
+          chercher._auto = function () { return chercherLogo(galerie, apercu, chercher, { prefixe: "p-", msg: "msg-commune", auto: true, poser: function (url) { LOGO = url; } }); };
           wrap.appendChild(chercher); wrap.appendChild(galerie);
           var note = document.createElement("p"); note.className = "petit";
           note.textContent = "L'image est remise au carré (fond transparent) et réduite à 1024 px au plus ; n8n en tire ensuite le favicon et les icônes.";
@@ -796,7 +804,8 @@
     liste.style.cssText = "display:none;border:1px solid var(--trait);border-radius:9px;margin-top:4px;background:#fff;overflow:hidden";
     nom.parentNode.appendChild(liste);
     var minuteur = null, dernier = "";
-    nom.addEventListener("input", function () {
+    nom.addEventListener("input", function (ev) {
+      if (ev && ev.isTrusted === false) return;   // valeur posée par le programme (choix fait) : pas de nouvelles suggestions
       clearTimeout(minuteur);
       var q = nom.value.trim();
       if (q.length < 2) { liste.style.display = "none"; return; }
@@ -819,8 +828,9 @@
                 if (insee) insee.value = c.code || "";
                 if (pre) pre.value = prefixeAuto(c.nom);
                 if (ADRESSES) ADRESSES();
+                clearTimeout(minuteur); dernier = ""; liste.innerHTML = "";
                 liste.style.display = "none";
-                enchainerApresChoix(c.nom);
+                enchainerApresChoix(c);
               });
               liste.appendChild(b);
             });
@@ -996,19 +1006,24 @@
      1) la recherche des infos de la mairie (maire, téléphone, e-mail, site),
      2) l'enregistrement du brouillon, qui intègre les points OpenStreetMap si la case est cochée.
      Plus besoin de cliquer sur « Rechercher les infos » ni d'aller dans l'onglet Points. */
-  function enchainerApresChoix(nom) {
-    var infos = document.querySelector("#champs .recherche-entete button");
-    if (infos && !infos.disabled) infos.click();
+  /* Commune choisie dans les suggestions : infos de la commune (cette commune-là, sans redemander),
+     logo (pris d'office s'il n'y en a qu'un), puis brouillon avec les points OpenStreetMap, affichés ici. */
+  function enchainerApresChoix(c) {
+    var nom = c.nom, inp = $("p-commune.nom");
+    if (inp && inp._poser) inp._poser(c);
+    else { var infos = document.querySelector("#champs .recherche-entete button"); if (infos && !infos.disabled) infos.click(); }
+    var lg = $("logo-chercher"), logo = (!LOGO && lg && lg._auto) ? lg._auto() : null;
     var b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
-    if (b && idCommune(b.nom) === idCommune(nom)) return;          // brouillon déjà fait pour cette commune
+    if (b && idCommune(b.nom) === idCommune(nom)) { majPointsCreer(); return; }   // brouillon déjà fait pour cette commune
     if (!$("creer-osm") || !$("creer-osm").checked) return;
-    /* Laisse les infos de la mairie arriver (quelques secondes) avant d'enregistrer le brouillon. */
-    setTimeout(function () {
+    $("creer-points").open = true;
+    $("creer-points-nb").textContent = "Recherche des infos, du logo et des points OpenStreetMap de " + nom + "…";
+    /* Laisse les infos de la mairie et le logo arriver (quelques secondes) avant d'enregistrer le brouillon. */
+    var delai = new Promise(function (ok) { setTimeout(ok, 3500); });
+    Promise.all([delai, Promise.resolve(logo).catch(function () {})]).then(function () {
       if (idCommune(nomFormulaire()) !== idCommune(nom)) return;    // commune changée entre-temps
-      $("creer-points").open = true;
-      $("creer-points-nb").textContent = "Recherche des points OpenStreetMap de " + nom + "…";
-      enregistrerBrouillonAuto().then(majPointsCreer).catch(function (er) { msg("msg-commune", er.message, "ko"); });
-    }, 3500);
+      return enregistrerBrouillonAuto().then(majPointsCreer);
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); });
   }
   function ajouterRechercheCommune(inp) {
     if (!inp.parentNode || inp.dataset.recherche) return; inp.dataset.recherche = "1";
@@ -1061,6 +1076,7 @@
       }).catch(function () { res.textContent = "Recherche impossible pour le moment (réseau)."; }).then(function () { bt.disabled = false; });
     }
     bt.addEventListener("click", chercher);
+    inp._poser = poser;
   }
   function reprendreBrouillon(b) {
     var d = b.donnees || {}, p = d.params || {};
@@ -1377,14 +1393,16 @@
 
   /* Liste des points de la commune choisie, avec suppression. */
   function pointsDuBrouillon(b) { return (b.donnees.points || []).map(function (p, i) { return { code: "B" + (i + 1), nom: p.nom, lat: p.lat, lon: p.lon }; }); }
-  function listerPointsBrouillon(com) {
-    var box = $("liste-points"), b = brouillonDe(com); box.innerHTML = "";
+  function listerPointsBrouillon(com, ext) {
+    var box = ext ? ext.box : $("liste-points"), b = brouillonDe(com), mid = ext ? ext.msg : "msg-liste"; box.innerHTML = "";
     if (!b) { box.textContent = "Brouillon introuvable."; return; }
     var pts = (b.donnees.points = b.donnees.points || []);
-    POINTS_COMMUNE = pointsDuBrouillon(b);
-    var info = document.createElement("p"); info.className = "petit";
-    info.textContent = "Brouillon « " + b.nom + " » : ces points seront créés « à vérifier » à la validation de la commune (onglet Créer).";
-    box.appendChild(info);
+    if (!ext) {
+      POINTS_COMMUNE = pointsDuBrouillon(b);
+      var info = document.createElement("p"); info.className = "petit";
+      info.textContent = "Brouillon « " + b.nom + " » : ces points seront créés « à vérifier » à la validation de la commune (onglet Créer).";
+      box.appendChild(info);
+    }
     if (!pts.length) { var v = document.createElement("div"); v.textContent = "Aucun point pour l'instant : utilisez « Pré-remplir les points » ci-dessous, ou l'assistant."; box.appendChild(v); return; }
     pts.forEach(function (pt, i) {
       var l = document.createElement("div");
@@ -1399,7 +1417,7 @@
       x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
       x.addEventListener("click", function () {
         x.disabled = true; pts.splice(i, 1);
-        sauverBrouillon(b.id, b.donnees).then(function () { listerPoints(); }).catch(function (er) { msg("msg-liste", er.message, "ko"); x.disabled = false; });
+        sauverBrouillon(b.id, b.donnees).then(function () { if (ext && ext.fini) ext.fini(); else listerPoints(); }).catch(function (er) { msg(mid, er.message, "ko"); x.disabled = false; });
       });
       l.appendChild(t); l.appendChild(a); l.appendChild(x); box.appendChild(l);
     });
@@ -2531,7 +2549,9 @@
   function majPointsCreer() {
     var el = $("creer-points-nb"); if (!el) return;
     var b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null, n = b ? (b.donnees.points || []).length : 0;
-    el.textContent = b ? (n ? n + " point" + (n > 1 ? "s" : "") + " dans le brouillon « " + b.nom + " »." : "Aucun point dans le brouillon pour l'instant.") : "Pas encore de brouillon : il sera enregistré au premier clic.";
+    el.textContent = b ? (n ? n + " point" + (n > 1 ? "s" : "") + " dans le brouillon « " + b.nom + " » :" : "Aucun point dans le brouillon pour l'instant.") : "Pas encore de brouillon : il sera enregistré au premier clic.";
+    var bx = $("creer-points-liste"); if (!bx) return;
+    if (b && n) listerPointsBrouillon("brouillon:" + b.id, { box: bx, msg: "msg-creer-points", fini: majPointsCreer }); else bx.innerHTML = "";
   }
   $("creer-pts-osm").addEventListener("click", function () { pointsDepuisCreer("osm"); });
   $("creer-pts-fichier").addEventListener("click", function () { pointsDepuisCreer("fichier"); });
@@ -2771,7 +2791,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=84" defer></script>
+<script src="gestion.js?v=85" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
