@@ -1069,6 +1069,8 @@
   }
   $("brouillon-enregistrer").addEventListener("click", function () {
     var bt = this, d = donneesFormulaire(), anc = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    /* Autre nom de commune que le brouillon ouvert : nouveau brouillon, l'ancien n'est pas écrasé. */
+    if (anc && d.params["commune.nom"] && idCommune(anc.nom) !== idCommune(d.params["commune.nom"])) { anc = null; BROUILLON_ID = ""; }
     if (!d.params["commune.nom"]) { msg("msg-commune", "Indiquez au moins le nom de la commune pour enregistrer le brouillon.", "ko"); return; }
     d.points = anc ? (anc.donnees.points || []) : []; d.agents = anc ? (anc.donnees.agents || []) : [];
     bt.disabled = true; msg("msg-commune", "Enregistrement du brouillon…");
@@ -2142,7 +2144,17 @@
   function afficherPoints(com) {
     var b = document.querySelector('nav button[data-onglet="points"]'); if (b && !b.classList.contains("actif")) b.click();
     COMMUNE = com;
-    Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) { s.value = com; });
+    /* Le menu doit vraiment passer sur cette commune (ou ce brouillon) : si l'option manque
+       encore (brouillon tout juste créé), on l'ajoute. Sinon le menu restait sur la commune
+       d'avant et la liste mélangeait deux communes. */
+    Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (s) {
+      if (![].some.call(s.options, function (o) { return o.value === com; })) {
+        var br = estBrouillon(com) ? brouillonDe(com) : null, o = document.createElement("option");
+        o.value = com; o.textContent = estBrouillon(com) ? "Brouillon — " + (br ? br.nom : "en cours") : com;
+        s.appendChild(o);
+      }
+      s.value = com;
+    });
     listerPoints();
   }
   function preparerOSM(com, ville, dep, insee) {
@@ -2488,6 +2500,8 @@
     var p = donneesFormulaire().params || {};
     if (!p["commune.nom"]) { msg("msg-commune", "Indiquez d'abord le nom de la commune.", "ko"); $("p-commune.nom") && $("p-commune.nom").focus(); return; }
     var deja = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    /* Brouillon ouvert d'une AUTRE commune (repris plus tôt) : on n'y range pas ces points. */
+    if (deja && idCommune(deja.nom) !== idCommune(p["commune.nom"])) { BROUILLON_ID = ""; majBrouillonActif(); deja = null; }
     (deja ? Promise.resolve(deja) : enregistrerBrouillonAuto()).then(function (b) {
       var com = "brouillon:" + b.id;
       if (action === "osm") return preparerOSM(com, p["commune.nom"], p["commune.departement"] || "", p["commune.codeInsee"] || "");
@@ -2738,7 +2752,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=82" defer></script>
+<script src="gestion.js?v=83" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
