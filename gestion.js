@@ -818,7 +818,7 @@
       if (!r.date || r.statut === "annule") return;
       var fait = r.statut === "fait";
       var ty = fait ? "fait" : (GA_COUL[r.type] ? r.type : "rdv");
-      ev.push({ date: r.date, heure: r.heure || "", type: ty, couleur: GA_COUL[ty], titre: (fait ? "✓ " : "") + (r.titre || "Rendez-vous") + (r.contact ? " (" + r.contact + ")" : ""), commune: r.commune, rdv: r.id, note: r.note, passe: r.date < auj || fait, fait: fait });
+      ev.push({ date: r.date, heure: r.heure || "", type: ty, couleur: GA_COUL[ty], titre: (fait ? "✓ " : "") + (r.titre || "Rendez-vous") + (r.contact ? " (" + r.contact + ")" : ""), commune: r.commune, rdv: r.id, note: r.note, lien: r.lien || "", passe: r.date < auj || fait, fait: fait });
     });
     ev.forEach(function (x) { x.nomCommune = noms[x.commune] || x.commune || ""; });
     return ev.sort(function (a, b) { return a.date.localeCompare(b.date) || String(a.heure || "99").localeCompare(String(b.heure || "99")); });
@@ -827,6 +827,7 @@
     var cols = '<span class="ga-pt" style="background:' + x.couleur + '"></span><b class="ga-dt">' + gDateFR(x.date).slice(0, 5) + '</b><span class="ga-hr">' + gEsc(x.heure || "") + '</span>';
     if (x.rdv) return '<div class="ga-l ga-t-' + x.type + '" data-ga-rdv="' + gEsc(x.rdv) + '" data-ga-date="' + gEsc(x.date) + '">' + cols
       + '<span class="ga-tx">' + gEsc(x.titre) + (x.nomCommune ? ' <i>· ' + gEsc(x.nomCommune) + '</i>' : '')
+      + (x.lien ? ' <span class="ga-lien">🔗 ' + gEsc(/^echange:/.test(x.lien) ? "échange" : x.lien.split(":").slice(1).join(":")) + '</span>' : '')
       + (x.note ? '<small>' + gEsc(String(x.note).slice(0, 220)) + '</small>' : '') + '</span>'
       + '<span class="ga-bt">' + (x.fait ? '' : '<button type="button" class="ga-del ga-ok" data-gr-fait="' + gEsc(x.rdv) + '" title="Marquer comme réalisé" aria-label="Marquer comme réalisé">✓</button>')
       + '<button type="button" class="ga-del" data-gr-suppr="' + gEsc(x.rdv) + '" title="Supprimer l\'événement" aria-label="Supprimer l\'événement">🗑</button></span></div>';
@@ -1002,7 +1003,7 @@
     f.innerHTML = '<div class="ga-ch-b"><b>' + gEsc(String(info.titre || "").slice(0, 90)) + '</b><span class="petit">' + gEsc(gNomCommune(info.com)) + (info.date ? ' · ' + gEsc(gDateFR(info.date)) : '') + '</span>'
       + (info.rdv ? '<button type="button" class="principal" data-ch="rdv">Modifier l\'événement</button>' : '')
       + (info.doc ? '<button type="button" class="principal" data-ch="doc">Ouvrir ' + (info.doc[0] === "facture" ? "la facture " : "le devis ") + gEsc(info.doc[1] || "") + '</button>' : '')
-      + (info.com ? '<button type="button" class="' + (info.rdv || info.doc ? 'second' : 'principal') + '" data-ch="fiche">' + (info.ech ? "Modifier l'action (dans l'échange de la fiche client)" : "Ouvrir la fiche client") + '</button>' : '')
+      + (info.com ? '<button type="button" class="' + (info.rdv || info.doc ? 'second' : 'principal') + '" data-ch="fiche">' + (info.ech ? (info.rdv ? "Ouvrir l'échange lié (fiche client)" : "Modifier l'action (dans l'échange de la fiche client)") : "Ouvrir la fiche client") + '</button>' : '')
       + (info.date && GA_VUE !== "jour" ? '<button type="button" class="second" data-ch="jour">Voir ce jour en vue Jour</button>' : '')
       + '<button type="button" class="second" data-ch="x">Annuler</button></div>';
     document.body.appendChild(f);
@@ -1891,6 +1892,20 @@
   /* — Agenda : événements saisis librement (date, heure, note, commune ou contact facultatifs) — */
   var GR = null;
   $("ga-grille").insertAdjacentHTML("beforebegin", '<div style="margin:10px 0"><button type="button" class="principal" id="gr-nouveau" style="margin-top:0">+ Nouvel événement</button><div id="gr-form" hidden></div><div class="msg" id="msg-rdv"></div></div>');
+  /* Lien d'un événement manuel vers un devis, une facture ou un échange (« devis:NUM », « facture:NUM », « echange:ID »). */
+  function champLien(x) {
+    var ty = x.type || "rdv", lien = String(x.lien || ""), com = x.commune || "";
+    var src = ty === "devis" ? (G.Devis || []) : ty === "facture" ? (G.Factures || []) : ty === "echange" ? (G.Echanges || []) : null;
+    if (!src) return "";
+    var opts = src.filter(function (d) { return !com || d.commune === com || ty + ":" + (d.numero || d.id) === lien; })
+      .slice().sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); })
+      .map(function (d) {
+        if (ty === "echange") return ["echange:" + d.id, (d.date ? gDateFR(d.date).slice(0, 5) + " · " : "") + gLib(G_TYPES_ECH, d.type) + " : " + String(d.resume || "").slice(0, 50) + (com ? "" : " (" + gNomCommune(d.commune) + ")")];
+        return [ty + ":" + d.numero, d.numero + (com ? "" : " — " + gNomCommune(d.commune)) + (d.total_ttc ? " · " + gEuros(d.total_ttc) : "") + (d.statut ? " (" + d.statut + ")" : "")];
+      });
+    var lib = { devis: "Devis lié", facture: "Facture liée", echange: "Échange lié (fiche client)" }[ty];
+    return gChamp("gr-lien", lib + " (facultatif)", lien.indexOf(ty + ":") === 0 ? lien : "", null, [["", opts.length ? "— choisir —" : "— aucun" + (com ? " pour ce client" : "") + " —"]].concat(opts));
+  }
   function formRdv(r) {
     GR = r || { date: new Date().toISOString().slice(0, 10) };
     var coms = gCommunes(), x = GR;
@@ -1902,6 +1917,7 @@
           var on = (x.type || "rdv") === t[0];
           return '<button type="button" role="radio" aria-checked="' + on + '" class="ga-t-' + t[0] + (on ? ' on' : '') + '" data-grt="' + t[0] + '">' + GR_LIB[t[0]] + '</button>';
         }).join("") + '</div>'
+      + '<div id="gr-lien-w">' + champLien(x) + '</div>'
       + '<div class="gr-quand"><div class="gr-c gr-d">' + gChamp("gr-date", "Date", x.date, "date") + '</div><div class="gr-c">' + gChamp("gr-heure", "Heure", x.heure, "time") + '</div><div class="gr-c">'
       + gChamp("gr-duree", "Durée", String(x.duree_min || "60"), null, [["15", "15 min"], ["30", "30 min"], ["45", "45 min"], ["60", "1 h"], ["90", "1 h 30"], ["120", "2 h"], ["180", "3 h"], ["240", "4 h"]]) + '</div></div>'
       + '<p class="petit gr-aide">Heure facultative : sans heure, l\'événement occupe la journée.</p>'
@@ -1939,6 +1955,7 @@
     + "@media(max-width:480px){.gr-quand{grid-template-columns:1fr 1fr}.gr-d{grid-column:1 / -1}}"
     + ".ga-l{display:grid;grid-template-columns:12px 46px 46px 1fr auto;gap:0 6px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--trait);cursor:pointer;font-size:15px}"
     + ".ga-l[class*=ga-t-]{border-bottom:0;border-radius:10px;margin:4px 0;padding:9px 6px}.ga-t-rappel{background:#F8CFCB}.ga-t-action{background:#CCE0F6}.ga-t-echange{background:#DFEAF6}.ga-t-fait{background:#D4ECDB}.ga-t-rdv{background:#CBE9E5}.ga-t-devis{background:#E3D5F2}.ga-t-facture{background:#FDE6AE}.ga-t-anniversaire{background:#DDEDCB}.ga-l[class*=ga-t-]:hover{filter:brightness(.97)}"
+    + ".ga-lien{font-size:12px;white-space:nowrap;color:var(--doux)}"
     + ".ga-filtre{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.ga-filtre button{margin:0;border:1px solid rgba(0,0,0,.12);border-radius:999px;padding:5px 11px;font-size:13px;color:#222;cursor:pointer;flex:none}.ga-filtre button.off{background:#fff;color:#999;text-decoration:line-through;border-style:dashed}.ga-filtre .ga-ftout{background:#fff;color:var(--vert);font-weight:700}"
     + ".ga-leg{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px}.ga-leg span{padding:2px 8px;border-radius:999px;font-size:12px;color:#333}"
     + ".ga-l:hover{background:#FAF8F3}.ga-pt{width:9px;height:9px;border-radius:50%;align-self:center}.ga-dt{font-variant-numeric:tabular-nums}.ga-hr{color:var(--vert);font-weight:700;font-variant-numeric:tabular-nums}"
@@ -1964,11 +1981,16 @@
     document.head.appendChild(st); })();
   $("gr-form").addEventListener("change", function (e) {
     if (e.target.id === "gr-commune") { GR = Object.assign({}, GR, lireRdv(), { contact: "" }); formRdv(GR); }
+    if (e.target.id === "gr-lien" && e.target.value && !gVal("gr-commune")) {
+      var pz = e.target.value.split(":"), src = pz[0] === "devis" ? G.Devis : pz[0] === "facture" ? G.Factures : G.Echanges;
+      var o = (src || []).filter(function (d) { return (d.numero || d.id) === pz.slice(1).join(":"); })[0];
+      if (o && o.commune) { GR = Object.assign({}, GR, lireRdv(), { commune: o.commune, contact: "" }); formRdv(GR); }
+    }
   });
-  function lireRdv() { return { titre: gVal("gr-titre"), date: gVal("gr-date"), heure: gVal("gr-heure"), duree_min: gVal("gr-duree"), commune: gVal("gr-commune"), contact: gVal("gr-contact"), note: gVal("gr-note"), type: (document.querySelector("#gr-form [data-grt].on") || { dataset: { grt: "rdv" } }).dataset.grt }; }
+  function lireRdv() { return { titre: gVal("gr-titre"), date: gVal("gr-date"), heure: gVal("gr-heure"), duree_min: gVal("gr-duree"), commune: gVal("gr-commune"), contact: gVal("gr-contact"), note: gVal("gr-note"), type: (document.querySelector("#gr-form [data-grt].on") || { dataset: { grt: "rdv" } }).dataset.grt, lien: $("gr-lien") ? gVal("gr-lien") : "" }; }
   $("gr-form").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return;
-    if (b.dataset.grt) { Array.prototype.forEach.call(b.parentNode.children, function (c) { c.classList.toggle("on", c === b); c.setAttribute("aria-checked", String(c === b)); }); return; }
+    if (b.dataset.grt) { Array.prototype.forEach.call(b.parentNode.children, function (c) { c.classList.toggle("on", c === b); c.setAttribute("aria-checked", String(c === b)); }); $("gr-lien-w").innerHTML = champLien(Object.assign({}, GR, lireRdv(), { type: b.dataset.grt, lien: (GR && GR.lien) || "" })); return; }
     if (b.id === "gr-annuler" || b.id === "gr-annuler-x") { $("gr-form").hidden = true; GR = null; return; }
     if (b.id === "gr-suppr") {
       if (!confirm("Supprimer cet événement ? Il sera aussi retiré de Google Agenda.")) return;
@@ -2018,7 +2040,10 @@
       var l = e.target.closest("[data-ga-rdv]"); if (!l) return;
       e.stopImmediatePropagation(); e.preventDefault();
       var r = (G.Rendezvous || []).filter(function (x) { return x.id === l.dataset.gaRdv; })[0]; if (!r) return;
-      evenementTouche(l, { rdv: r.id, com: r.commune || "", titre: r.titre || "Événement" });
+      var lk = String(r.lien || "").split(":"), plus = { rdv: r.id, com: r.commune || "", titre: r.titre || "Événement" };
+      if ((lk[0] === "devis" || lk[0] === "facture") && lk[1]) plus.doc = [lk[0], lk.slice(1).join(":")];
+      if (lk[0] === "echange" && lk[1]) plus.ech = lk.slice(1).join(":");
+      evenementTouche(l, plus);
     }, true);
   });
   $("ga-liste").addEventListener("click", function (e) {
