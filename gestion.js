@@ -852,7 +852,7 @@
     if (typeof majRappelChamp === "function") majRappelChamp();
     if (!$("ga-grille")) return;
     if ($("ga-vues")) Array.prototype.forEach.call($("ga-vues").querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.gv === GA_VUE); });
-    $("ga-grille").style.display = GA_VUE !== "mois" ? "none" : "";
+    $("ga-grille").style.display = GA_VUE !== "mois" ? "none" : "grid";
     if (GA_VUE !== "mois") { dessinerVue(); return; }
     dessinerMois();
   }
