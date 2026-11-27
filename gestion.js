@@ -808,12 +808,12 @@
   }
   function ligneEv(x) {
     var cols = '<span class="ga-pt" style="background:' + x.couleur + '"></span><b class="ga-dt">' + gDateFR(x.date).slice(0, 5) + '</b><span class="ga-hr">' + gEsc(x.heure || "") + '</span>';
-    if (x.rdv) return '<div class="ga-l" data-ga-rdv="' + gEsc(x.rdv) + '">' + cols
+    if (x.rdv) return '<div class="ga-l" data-ga-rdv="' + gEsc(x.rdv) + '" data-ga-date="' + gEsc(x.date) + '">' + cols
       + '<span class="ga-tx">' + gEsc(x.titre) + (x.nomCommune ? ' <i>· ' + gEsc(x.nomCommune) + '</i>' : '')
       + (x.note ? '<small>' + gEsc(String(x.note).slice(0, 220)) + '</small>' : '') + '</span>'
       + '<span class="ga-bt">' + (x.fait ? '' : '<button type="button" class="ga-del ga-ok" data-gr-fait="' + gEsc(x.rdv) + '" title="Marquer comme réalisé" aria-label="Marquer comme réalisé">✓</button>')
       + '<button type="button" class="ga-del" data-gr-suppr="' + gEsc(x.rdv) + '" title="Supprimer l\'événement" aria-label="Supprimer l\'événement">🗑</button></span></div>';
-    return '<div class="ga-l" data-ga-com="' + gEsc(x.commune) + '"' + (x.ech ? ' data-ga-ech="' + gEsc(x.ech) + '"' : '') + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + (x.retard ? ' style="color:var(--ko)"' : '') + '>' + cols
+    return '<div class="ga-l" data-ga-com="' + gEsc(x.commune) + '" data-ga-date="' + gEsc(x.date) + '"' + (x.ech ? ' data-ga-ech="' + gEsc(x.ech) + '"' : '') + (x.doc ? ' data-ga-doc="' + gEsc(x.doc[0]) + '" data-ga-num="' + gEsc(x.doc[1]) + '"' : '') + (x.retard ? ' style="color:var(--ko)"' : '') + '>' + cols
       + '<span class="ga-tx">' + gEsc(x.titre) + (x.nomCommune ? ' <i>· ' + gEsc(x.nomCommune) + '</i>' : '')
       + (x.passe ? '' : ' <a href="' + gEsc(lienGoogle(x)) + '" target="_blank" rel="noopener" data-gcal="1" style="white-space:nowrap;font-size:12px">+ Google Agenda</a>') + '</span>'
       + (x.type === "action" && x.id ? '<button type="button" class="ga-del ga-ok" data-ga-fait="' + gEsc(x.id) + '" title="Marquer l\'action comme réalisée" aria-label="Marquer l\'action comme réalisée">✓</button>'
@@ -946,13 +946,19 @@
     if (e.target.closest("[data-gcal]")) return;   // lien Google Agenda : on le laisse s'ouvrir
     if (e.target.id === "ga-tout") { e.preventDefault(); GA_SEL = null; dessinerAgenda(); return; }
     var l = e.target.closest("[data-ga-com]"); if (!l) return;
-    if (l.dataset.gaDoc) {
-      var nf = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "factu"; })[0];
-      if (nf) nf.click(); ouvrirDoc(l.dataset.gaDoc, l.dataset.gaNum); return;
+    if (l.dataset.gaDoc) { evenementTouche(l, { doc: [l.dataset.gaDoc, l.dataset.gaNum] }); return; }
+    evenementTouche(l, { ech: l.dataset.gaEch || "" });
+  }
+  /* Toucher un événement : son jour est sélectionné (cadre), puis on demande quoi faire. */
+  function evenementTouche(l, plus) {
+    var tx = (l.querySelector(".ga-tx") || l).childNodes[0];
+    var info = Object.assign({ com: l.dataset.gaCom || "", titre: tx ? String(tx.textContent || "").trim() : "", date: l.dataset.gaDate || "" }, plus || {});
+    if (info.date) {
+      GA_SEL = info.date;
+      if (GA_VUE === "mois") { GA_MOIS = new Date(info.date + "T12:00:00"); GA_MOIS.setDate(1); } else GA_REF = new Date(info.date + "T12:00:00");
+      dessinerAgenda();
     }
-    var tx = (l.querySelector(".ga-tx") || l).childNodes[0], dt = (l.querySelector(".ga-dt") || {}).textContent || "";
-    var evx = evenements().filter(function (x) { return x.commune === l.dataset.gaCom && gDateFR(x.date).slice(0, 5) === dt; })[0];
-    choixOuverture({ com: l.dataset.gaCom, ech: l.dataset.gaEch || "", titre: tx ? String(tx.textContent || "").trim() : "", date: evx ? evx.date : "" });
+    choixOuverture(info);
   }
   /* Ouvre la fiche client d'un événement (échange en modification s'il y en a un), sous-onglet Échanges en vue. */
   function ouvrirFicheEvenement(com, echId) {
@@ -970,14 +976,18 @@
     var vieux = $("ga-choix"); if (vieux) vieux.remove();
     var f = document.createElement("div"); f.id = "ga-choix";
     f.innerHTML = '<div class="ga-ch-b"><b>' + gEsc(String(info.titre || "").slice(0, 90)) + '</b><span class="petit">' + gEsc(gNomCommune(info.com)) + (info.date ? ' · ' + gEsc(gDateFR(info.date)) : '') + '</span>'
-      + '<button type="button" class="principal" data-ch="fiche">' + (info.ech ? "Ouvrir dans la fiche client (modifier)" : "Ouvrir la fiche client") + '</button>'
-      + (info.date ? '<button type="button" class="second" data-ch="jour">Voir ce jour dans le calendrier</button>' : '')
+      + (info.rdv ? '<button type="button" class="principal" data-ch="rdv">Modifier l\'événement</button>' : '')
+      + (info.doc ? '<button type="button" class="principal" data-ch="doc">Ouvrir ' + (info.doc[0] === "facture" ? "la facture " : "le devis ") + gEsc(info.doc[1] || "") + '</button>' : '')
+      + (info.com ? '<button type="button" class="' + (info.rdv || info.doc ? 'second' : 'principal') + '" data-ch="fiche">' + (info.ech ? "Ouvrir dans la fiche client (modifier)" : "Ouvrir la fiche client") + '</button>' : '')
+      + (info.date && GA_VUE !== "jour" ? '<button type="button" class="second" data-ch="jour">Voir ce jour en vue Jour</button>' : '')
       + '<button type="button" class="second" data-ch="x">Annuler</button></div>';
     document.body.appendChild(f);
     f.addEventListener("click", function (e) {
       var b = e.target.closest("[data-ch]"); if (!b && e.target !== f) return; f.remove();
       if (!b || b.dataset.ch === "x") return;
       if (b.dataset.ch === "fiche") { ouvrirFicheEvenement(info.com, info.ech); return; }
+      if (b.dataset.ch === "rdv") { var r = (G.Rendezvous || []).filter(function (x) { return x.id === info.rdv; })[0]; if (r) { formRdv(Object.assign({}, r)); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" }); } return; }
+      if (b.dataset.ch === "doc") { var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click(); ouvrirDoc(info.doc[0], info.doc[1]); return; }
       var na = document.querySelector('nav button[data-onglet="agenda"]'); if (na && !na.classList.contains("actif")) na.click();
       GA_SEL = info.date; GA_VUE = "jour"; GA_REF = new Date(info.date + "T12:00:00"); GA_MOIS = new Date(GA_REF.getFullYear(), GA_REF.getMonth(), 1); dessinerAgenda();
       setTimeout(function () { $("ga-vues").scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
@@ -1942,7 +1952,7 @@
       var l = e.target.closest("[data-ga-rdv]"); if (!l) return;
       e.stopImmediatePropagation(); e.preventDefault();
       var r = (G.Rendezvous || []).filter(function (x) { return x.id === l.dataset.gaRdv; })[0]; if (!r) return;
-      formRdv(Object.assign({}, r)); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" });
+      evenementTouche(l, { rdv: r.id, com: r.commune || "", titre: r.titre || "Événement" });
     }, true);
   });
   $("ga-liste").addEventListener("click", function (e) {
