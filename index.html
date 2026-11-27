@@ -450,11 +450,17 @@
       var url = URL.createObjectURL(file), img = new Image();
       img.onload = function () {
         var w = img.naturalWidth || 512, hh = img.naturalHeight || 512;
-        var s = Math.min(1024, Math.max(w, hh)), k = s / Math.max(w, hh);
-        var c = document.createElement("canvas"); c.width = c.height = s;
-        c.getContext("2d").drawImage(img, (s - w * k) / 2, (s - hh * k) / 2, w * k, hh * k);
+        /* 1024 px au plus, et réduit jusqu'à peser moins de 500 Ko (sinon le brouillon est refusé : trop lourd). */
+        var s = Math.min(1024, Math.max(w, hh)), d = "";
+        for (;;) {
+          var k = s / Math.max(w, hh), c = document.createElement("canvas"); c.width = c.height = s;
+          c.getContext("2d").drawImage(img, (s - w * k) / 2, (s - hh * k) / 2, w * k, hh * k);
+          d = c.toDataURL("image/png");
+          if (d.length <= 500000 || s <= 256) break;
+          s = Math.round(s * 0.75);
+        }
         URL.revokeObjectURL(url);
-        ok(c.toDataURL("image/png"));
+        ok(d);
       };
       img.onerror = function () { URL.revokeObjectURL(url); ko(new Error("image")); };
       img.src = url;
@@ -2791,7 +2797,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=85" defer></script>
+<script src="gestion.js?v=86" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
