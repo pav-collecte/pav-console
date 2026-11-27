@@ -787,7 +787,8 @@
     var f = $("ga-filtre"); if (!f) return;
     var n = GA_TYPES.filter(function (t) { return GA_MASQ[t[0]]; }).length;
     f.innerHTML = GA_TYPES.map(function (t) { return '<button type="button" class="ga-t-' + t[0] + (GA_MASQ[t[0]] ? ' off' : '') + '" data-gf="' + t[0] + '" aria-pressed="' + !GA_MASQ[t[0]] + '">' + t[1] + '</button>'; }).join("")
-      + (n ? '<button type="button" class="ga-ftout" data-gf="*">Tout afficher</button>' : '');
+      + (n ? '<button type="button" class="ga-ftout" data-gf="*">Tout afficher</button>' : '')
+      + (n < GA_TYPES.length ? '<button type="button" class="ga-ftout" data-gf="-">Tout effacer</button>' : '');
   }
   function evenements() {
     var ev = [], noms = {}; gCommunes().forEach(function (c) { noms[c[0]] = c[1]; });
@@ -934,7 +935,7 @@
   }
   $("ga-filtre").addEventListener("click", function (e) {
     var b = e.target.closest("[data-gf]"); if (!b) return;
-    var t = b.dataset.gf; if (t === "*") GA_MASQ = {}; else if (GA_MASQ[t]) delete GA_MASQ[t]; else GA_MASQ[t] = 1;
+    var t = b.dataset.gf; if (t === "*") GA_MASQ = {}; else if (t === "-") { GA_MASQ = {}; GA_TYPES.forEach(function (x) { GA_MASQ[x[0]] = 1; }); } else if (GA_MASQ[t]) delete GA_MASQ[t]; else GA_MASQ[t] = 1;
     try { localStorage.setItem("pav-agenda-masques", JSON.stringify(GA_MASQ)); } catch (er) {}
     dessinerAgenda();
   });
