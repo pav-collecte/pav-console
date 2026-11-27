@@ -1341,17 +1341,31 @@
         var x = document.createElement("button"); x.type = "button"; x.className = "second"; x.textContent = "Supprimer";
         x.style.cssText = "padding:6px 10px;font-size:13px;color:var(--ko)";
         x.addEventListener("click", function () {
-          if (!confirm("Supprimer le point " + pt.code + " (" + pt.nom + ") du Referentiel ?\nLes relevés déjà faits restent dans l'onglet Observations.")) return;
+          if (!confirm("Supprimer définitivement le point " + pt.code + " (" + pt.nom + ") ?\nPossible seulement s'il n'a jamais servi : un point qui a des relevés se retire de la tournée (bouton « Retirer »).")) return;
           x.disabled = true;
           api("supprimer-point", { commune: com, code: pt.code }).then(function () {
             if (EDIT_POINT && EDIT_POINT.code === pt.code) modeNouveau();
             msg("msg-liste", "Point " + pt.code + " supprimé.", "ok"); listerPoints();
           }).catch(function (er) { msg("msg-liste", er.message, "ko"); x.disabled = false; });
         });
+        /* Retirer de la tournée (actif = non) / réactiver : le point garde son code et son historique. */
+        var inactif = pt.actif && pt.actif !== "oui" && pt.actif !== "a_verifier";
+        var rt = document.createElement("button"); rt.type = "button"; rt.className = "second";
+        rt.textContent = inactif ? "Réactiver" : "Retirer"; rt.hidden = pt.actif === "a_verifier";
+        rt.style.cssText = "padding:6px 10px;font-size:13px";
+        rt.addEventListener("click", function () {
+          if (!confirm(inactif
+            ? "Remettre " + pt.code + " (" + pt.nom + ") dans la tournée ?"
+            : "Retirer " + pt.code + " (" + pt.nom + ") de la tournée ?\nIl disparaît de l'appli et de la météo à la prochaine publication (15 min), garde son code et ses relevés, et pourra être réactivé.")) return;
+          rt.disabled = true;
+          api("supprimer-point", { commune: com, code: pt.code, mode: inactif ? "reactiver" : "retirer" }).then(function () {
+            msg("msg-liste", "Point " + pt.code + (inactif ? " réactivé." : " retiré de la tournée.") + " L'appli et la météo suivent à la prochaine publication (15 min).", "ok"); listerPoints();
+          }).catch(function (er) { msg("msg-liste", er.message, "ko"); rt.disabled = false; });
+        });
         var m = document.createElement("button"); m.type = "button"; m.className = "second"; m.textContent = "Modifier";
         m.style.cssText = "padding:6px 10px;font-size:13px";
         m.addEventListener("click", function () { modeEdition(pt, com, m, l); });
-        l.appendChild(t); l.appendChild(carte); l.appendChild(boutonCopier(String(pt.lat).replace(",", ".") + ", " + String(pt.lon).replace(",", "."), "Copier GPS")); l.appendChild(m); l.appendChild(x); box.appendChild(l);
+        l.appendChild(t); l.appendChild(carte); l.appendChild(boutonCopier(String(pt.lat).replace(",", ".") + ", " + String(pt.lon).replace(",", "."), "Copier GPS")); l.appendChild(m); l.appendChild(rt); l.appendChild(x); box.appendChild(l);
       });
     }).catch(function (er) { box.textContent = ""; msg("msg-liste", er.message, "ko"); });
   }
@@ -2629,7 +2643,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=77" defer></script>
+<script src="gestion.js?v=78" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
