@@ -1192,7 +1192,7 @@
       box.appendChild(bt);
       /* Points de collecte de la commune, consultables ici ; la gestion reste dans l'onglet Points. */
       var dp = document.createElement("details"); dp.className = "grp-edit"; dp.open = true;
-      dp.innerHTML = '<summary>Points de collecte</summary><div class="petit" id="e-points">Chargement…</div>'
+      dp.innerHTML = '<summary>Points de collecte</summary><div class="petit" id="e-points">Chargement…</div><div class="msg" id="msg-edit-pts"></div>'
         + '<button type="button" class="second" id="e-points-gerer" style="margin-top:10px;padding:8px 12px;font-size:14px">Gérer les points dans l’onglet Points</button>';
       box.appendChild(dp);
       $("e-points-gerer").addEventListener("click", function () {
@@ -1200,17 +1200,8 @@
         var nb = document.querySelector('nav button[data-onglet="points"]'); if (nb) nb.click();
         if (sel) sel.dispatchEvent(new Event("change"));
       });
-      var comPts = COMMUNE_EDIT, esc = function (t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-      api("points", { commune: comPts }).then(function (r) {
-        if (comPts !== COMMUNE_EDIT || !$("e-points")) return;
-        var pts = r.points || [];
-        dp.querySelector("summary").textContent = "Points de collecte (" + pts.length + ")";
-        $("e-points").innerHTML = pts.length ? pts.map(function (pt) {
-          var etat = pt.actif === "a_verifier" ? "à vérifier" : (pt.actif && pt.actif !== "oui" ? "retiré" : "actif");
-          return '<div style="display:flex;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--trait)"><b style="color:var(--encre);font-size:14px;flex:1;min-width:0">' + esc(pt.code + " — " + pt.nom) + '</b>'
-            + '<span>' + esc((pt.flux || []).join(", ")) + '</span><span style="white-space:nowrap;' + (etat === "actif" ? "" : "color:var(--ko)") + '">' + etat + '</span></div>';
-        }).join("") : "Aucun point pour l’instant.";
-      }).catch(function (er) { if ($("e-points")) $("e-points").textContent = er.message; });
+      listerPoints({ box: $("e-points"), com: COMMUNE_EDIT, msg: "msg-edit-pts",
+        fini: function (n) { dp.querySelector("summary").textContent = "Points de collecte (" + n + ")"; } });
     }).catch(function (er) { msg("msg-edit", er.message, "ko"); });
   }
   function enregistrerCommune(bt) {
@@ -1364,10 +1355,14 @@
       l.appendChild(t); l.appendChild(a); l.appendChild(x); box.appendChild(l);
     });
   }
-  function listerPoints() {
-    var box = $("liste-points"), com = $("commune-point").value;
+  /* Liste des points avec ses actions. Sans argument : onglet Points. Avec { box, com, msg } :
+     la même liste ailleurs (page « Modifier une commune »). */
+  function listerPoints(ext) {
+    if (ext && !ext.box) ext = null;   // appel par un écouteur : l'argument est l'événement
+    var box = ext ? ext.box : $("liste-points"), com = ext ? ext.com : $("commune-point").value, mid = ext ? ext.msg : "msg-liste";
+    var relister = function () { listerPoints(ext); };
     if (!com) { box.textContent = "—"; return; }
-    if (estBrouillon(com)) return listerPointsBrouillon(com);
+    if (estBrouillon(com)) { if (ext) { box.textContent = "Commune en brouillon : points dans l'onglet Points."; return; } return listerPointsBrouillon(com); }
     box.textContent = "Chargement…"; cacher("msg-liste");
     api("points", { commune: com }).then(function (j) {
       box.innerHTML = ""; POINTS_COMMUNE = j.points;
@@ -1387,8 +1382,8 @@
           x.disabled = true;
           api("supprimer-point", { commune: com, code: pt.code }).then(function () {
             if (EDIT_POINT && EDIT_POINT.code === pt.code) modeNouveau();
-            msg("msg-liste", "Point " + pt.code + " supprimé.", "ok"); listerPoints();
-          }).catch(function (er) { msg("msg-liste", er.message, "ko"); x.disabled = false; });
+            msg(mid, "Point " + pt.code + " supprimé.", "ok"); relister();
+          }).catch(function (er) { msg(mid, er.message, "ko"); x.disabled = false; });
         });
         /* Retirer de la tournée (actif = non) / réactiver : le point garde son code et son historique. */
         var inactif = pt.actif && pt.actif !== "oui" && pt.actif !== "a_verifier";
@@ -1401,15 +1396,22 @@
             : "Retirer " + pt.code + " (" + pt.nom + ") de la tournée ?\nIl disparaît de l'appli et de la météo à la prochaine publication (15 min), garde son code et ses relevés, et pourra être réactivé.")) return;
           rt.disabled = true;
           api("supprimer-point", { commune: com, code: pt.code, mode: inactif ? "reactiver" : "retirer" }).then(function () {
-            msg("msg-liste", "Point " + pt.code + (inactif ? " réactivé." : " retiré de la tournée.") + " L'appli et la météo suivent à la prochaine publication (15 min).", "ok"); listerPoints();
-          }).catch(function (er) { msg("msg-liste", er.message, "ko"); rt.disabled = false; });
+            msg(mid, "Point " + pt.code + (inactif ? " réactivé." : " retiré de la tournée.") + " L'appli et la météo suivent à la prochaine publication (15 min).", "ok"); relister();
+          }).catch(function (er) { msg(mid, er.message, "ko"); rt.disabled = false; });
         });
         var m = document.createElement("button"); m.type = "button"; m.className = "second"; m.textContent = "Modifier";
         m.style.cssText = "padding:6px 10px;font-size:13px";
-        m.addEventListener("click", function () { modeEdition(pt, com, m, l); });
+        m.addEventListener("click", function () {
+          if (!ext) { modeEdition(pt, com, m, l); return; }
+          /* Depuis « Modifier une commune » : le formulaire du point est dans l'onglet Points. */
+          var sel = $("commune-point"); if (sel) sel.value = com;
+          var nb = document.querySelector('nav button[data-onglet="points"]'); if (nb) nb.click();
+          setTimeout(function () { modeEdition(pt, com, null, null); }, 50);
+        });
         l.appendChild(t); l.appendChild(carte); l.appendChild(boutonCopier(String(pt.lat).replace(",", ".") + ", " + String(pt.lon).replace(",", "."), "Copier GPS")); l.appendChild(m); l.appendChild(rt); l.appendChild(x); box.appendChild(l);
       });
-    }).catch(function (er) { box.textContent = ""; msg("msg-liste", er.message, "ko"); });
+      if (ext && ext.fini) ext.fini(j.points.length);
+    }).catch(function (er) { box.textContent = ""; msg(mid, er.message, "ko"); });
   }
   $("rafraichir-points").addEventListener("click", listerPoints);
   $("commune-point").addEventListener("change", listerPoints);
@@ -2685,7 +2687,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=80" defer></script>
+<script src="gestion.js?v=81" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
