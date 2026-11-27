@@ -472,7 +472,9 @@
     if (b.id === "ge-ok") {
       var v = { id: G_ECHANGE ? G_ECHANGE.id : "", commune: $("g-commune").value, date: gVal("ge-date"), type: gVal("ge-type"), contact: gVal("ge-contact"), resume: gVal("ge-resume"), prochaine_action: gVal("ge-action"), echeance: gVal("ge-echeance"), fait: gVal("ge-fait") };
       if (!v.resume) { msg("msg-echange", "Résumez l'échange en une phrase.", "ko"); return; }
-      gEnvoyer({ op: "enregistrer", onglet: "Echanges", valeurs: v }, "msg-echange", "Échange enregistré.").then(function () { G_ECHANGE = null; dessinerEchanges(); retourAgenda(); }).catch(function () {});
+      if (b.disabled) return;
+      var lib0 = b.textContent; b.disabled = true; b.textContent = "Enregistrement…";
+      gEnvoyer({ op: "enregistrer", onglet: "Echanges", valeurs: v }, "msg-echange", "Échange enregistré ✓").then(function () { G_ECHANGE = null; dessinerEchanges(); retourAgenda(); }).catch(function () { b.disabled = false; b.textContent = lib0; });
     }
   });
   $("g-emetteur-ok").addEventListener("click", function () {
@@ -545,7 +547,7 @@
     + '</div></section>'
     + '<section id="agenda"><div class="carte">'
     + '<h2>Agenda des actions</h2>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="principal" id="ga-sync" type="button" style="margin-top:0;flex:2">Synchroniser avec Google Agenda</button><button class="second" id="ga-ics" type="button" style="flex:1">Exporter (.ics)</button></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="second" id="ga-sync" type="button" style="margin:0;flex:none;padding:6px 12px;font-size:14px" title="Synchroniser avec Google Agenda">🔄 Google Agenda</button><button class="second" id="ga-ics" type="button" style="margin:0;flex:none;padding:6px 12px;font-size:14px" title="Exporter l\'agenda (.ics)">⬇ .ics</button></div>'
     + '<p class="petit" style="margin-top:0">Les échéances vont dans l\'agenda Google « PAV — actions » (créé au premier envoi) ; elles se mettent aussi à jour toutes seules après chaque enregistrement d\'échange, de devis ou de facture. Une action faite disparaît de l\'agenda.</p>'
     + '<div class="petit" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">Rappel avant chaque échéance (facture, devis, anniversaire de contrat) : <input id="ga-rappel" type="number" min="0" max="365" style="width:70px;margin:0"> jours <button class="second" id="ga-rappel-ok" type="button" style="padding:5px 10px;font-size:13px">Enregistrer</button></div>'
     + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
@@ -947,6 +949,8 @@
       var nf = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "factu"; })[0];
       if (nf) nf.click(); ouvrirDoc(l.dataset.gaDoc, l.dataset.gaNum); return;
     }
+    if (!l.dataset.gaChoisi) { choixOuverture(l); return; }
+    delete l.dataset.gaChoisi;
     var nb = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "clients"; })[0];
     if (nb) nb.click();
     /* Action ou échange : ouvert directement en modification ; après l'enregistrement, retour à l'agenda. */
@@ -954,8 +958,37 @@
     $("g-commune").value = l.dataset.gaCom; G_CONTACT = null; G_ECHANGE = ech ? Object.assign({}, ech) : null; G_AUTO = null; dessinerFiche();
     GA_RETOUR = !!ech;
     try { GF_PANE = "echanges"; gfAppliquerPane(); } catch (er) {}   // sous-onglet Échanges de la fiche
-    setTimeout(function () { ($(ech ? "g-echange-form" : "g-echanges") || {}).scrollIntoView && $(ech ? "g-echange-form" : "g-echanges").scrollIntoView({ behavior: "smooth", block: "center" }); }, 60);
+    /* On place les sous-onglets de la fiche en haut de l'écran (Échanges en surbrillance) : on voit où l'on est. */
+    setTimeout(function () { var o = $("gf-onglets"); if (!o) return; var y = o.getBoundingClientRect().top + window.scrollY - (document.querySelector("header") ? document.querySelector("header").offsetHeight + 8 : 120); window.scrollTo({ top: y, behavior: "smooth" });
+      var bt = o.querySelector('[data-p="echanges"]'); if (bt) o.scrollLeft = bt.offsetLeft - (o.clientWidth - bt.offsetWidth) / 2; }, 80);
   }
+  /* Événement lié à une commune : on demande où l'ouvrir. */
+  function choixOuverture(l) {
+    var vieux = $("ga-choix"); if (vieux) vieux.remove();
+    var t = (l.querySelector(".ga-tx") || l).childNodes[0], titre = t ? String(t.textContent || "").trim() : "";
+    var f = document.createElement("div"); f.id = "ga-choix";
+    f.innerHTML = '<div class="ga-ch-b"><b>' + gEsc(titre.slice(0, 90)) + '</b><span class="petit">' + gEsc(gNomCommune(l.dataset.gaCom)) + '</span>'
+      + '<button type="button" class="principal" data-ch="fiche">' + (l.dataset.gaEch ? "Ouvrir dans la fiche client (modifier)" : "Ouvrir la fiche client") + '</button>'
+      + '<button type="button" class="second" data-ch="jour">Voir ce jour dans le calendrier</button>'
+      + '<button type="button" class="second" data-ch="x">Annuler</button></div>';
+    document.body.appendChild(f);
+    f.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-ch]"); if (!b && e.target !== f) return; f.remove();
+      if (!b || b.dataset.ch === "x") return;
+      if (b.dataset.ch === "fiche") { l.dataset.gaChoisi = "1"; ouvrirDepuisAgenda({ target: l, preventDefault: function () {} }); return; }
+      var d = (l.querySelector(".ga-dt") || {}).textContent || "", ev = evenements().filter(function (x) { return x.commune === l.dataset.gaCom && gDateFR(x.date).slice(0, 5) === d; })[0];
+      if (ev) { GA_SEL = ev.date; GA_VUE = "jour"; GA_REF = new Date(ev.date + "T12:00:00"); GA_MOIS = new Date(GA_REF.getFullYear(), GA_REF.getMonth(), 1); dessinerAgenda(); $("ga-vues").scrollIntoView({ behavior: "smooth", block: "start" }); }
+    });
+  }
+  /* Balayer à gauche / à droite : jour, semaine ou mois suivant / précédent. */
+  ["ga-liste", "ga-grille"].forEach(function (id) {
+    var x0 = null, y0 = 0;
+    $(id).addEventListener("touchstart", function (e) { if (e.touches.length !== 1 || e.target.closest("input,textarea,select,#gr-form")) { x0 = null; return; } x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    $(id).addEventListener("touchend", function (e) {
+      if (x0 === null) return; var t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
+      if (Math.abs(dx) > 70 && Math.abs(dy) < 45 && (id === "ga-grille" || GA_VUE !== "mois")) gaDecaler(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  });
   $("ga-liste").addEventListener("click", ouvrirDepuisAgenda);
   $("ga-retard").addEventListener("click", ouvrirDepuisAgenda);
 
@@ -1840,6 +1873,10 @@
     + ".ga-pts{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin-top:2px}.ga-pts span{width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 1px #fff}.ga-pts b{font-size:11px;line-height:1;color:var(--doux)}.ga-auj .ga-pts b{color:#fff}"
     + ".ga-jt{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:17px}.ga-jt a{font-size:14px}"
     + ".ga-ajout{width:100%;margin:8px 0 4px}"
+    + "#ga-choix{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center}"
+    + ".ga-ch-b{background:#fff;width:min(520px,100%);border-radius:16px 16px 0 0;padding:16px 16px 22px;display:flex;flex-direction:column;gap:8px;box-shadow:0 -6px 24px rgba(0,0,0,.2)}"
+    + ".ga-ch-b button{margin:0;height:48px;font-size:16px}.ga-ch-b b{font-size:17px}"
+    + "#agenda{padding-bottom:90px}"
     + ".ga-vues{display:flex;gap:0;margin:0 0 8px;border:1px solid var(--trait);border-radius:10px;overflow:hidden}.ga-vues button{flex:1;border:0;background:#fff;padding:9px 0;font:600 15px system-ui;color:var(--vert);cursor:pointer}.ga-vues button+button{border-left:1px solid var(--trait)}.ga-vues button.on{background:var(--vert);color:#fff}"
     + ".ga-vj{border:1px solid var(--trait);border-radius:10px;padding:6px 10px;margin:8px 0;background:#fff}.ga-vj-auj{border-color:var(--vert);box-shadow:inset 4px 0 0 var(--vert)}.ga-vj-sel{box-shadow:0 0 0 2px var(--accent)}"
     + ".ga-vjt{display:flex;align-items:center;justify-content:space-between;gap:8px}.ga-vjt b{cursor:pointer;font-size:16px}.ga-tag{font-size:12px;font-weight:600;color:#fff;background:var(--vert);border-radius:6px;padding:1px 6px;margin-left:4px}"
@@ -1863,10 +1900,13 @@
       if (!v.titre) { msg("msg-rdv", "Donnez un titre à l'événement.", "ko"); return; }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) { msg("msg-rdv", "Choisissez une date.", "ko"); return; }
       if (GR && GR.id) v.id = GR.id; v.statut = GR && GR.statut === "fait" ? "fait" : "actif";
-      gEnvoyer({ op: "enregistrer", onglet: "Rendezvous", valeurs: v }, "msg-rdv", "Événement enregistré : il part dans Google Agenda.").then(function () {
+      if (b.disabled) return;   // un seul envoi : pas de doublon sur double appui
+      b.disabled = true; b.textContent = "Enregistrement…";
+      gEnvoyer({ op: "enregistrer", onglet: "Rendezvous", valeurs: v }, "msg-rdv", "Événement enregistré ✓ — il part dans Google Agenda.").then(function () {
         $("gr-form").hidden = true; GR = null;
         var d = new Date(v.date + "T12:00:00"); GA_MOIS = new Date(d.getFullYear(), d.getMonth(), 1); dessinerAgenda();
-      }).catch(function () {});
+        $("msg-rdv").scrollIntoView({ behavior: "smooth", block: "center" });
+      }).catch(function () { b.disabled = false; b.textContent = "Enregistrer"; });
     }
   });
   // Clic sur un événement libre : on l'ouvre en modification (avant le clic « fiche de la commune »).
