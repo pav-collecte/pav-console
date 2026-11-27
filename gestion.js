@@ -1558,8 +1558,10 @@
         + '<div class="gav-top"><span class="gav-num">n° ' + (GA_NUM[id] || "?") + '</span><span class="gav-quand">' + gEsc(gavDate(a.date)) + '</span>'
         + '<span class="gav-badges">' + (a.valide === "oui" ? '<span class="gav-pill gav-v">✓ Validé</span>' : '')
         + (a.etat_traitement ? '<span class="gav-pill gav-et-' + gEsc(a.etat_traitement) + '">' + gEsc(gLib(GA_ETATS, a.etat_traitement)) + (a.version ? ' · ' + gEsc(a.version) : '') + '</span>' : '') + '</span>'
-        + (id ? '<span class="gav-outils"><button type="button" class="gav-ic" data-gav-edit title="Compléter l\'avis" aria-label="Compléter l\'avis">✏️</button><button type="button" class="gav-ic" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button></span>' : '') + '</div>'
-        + '<blockquote class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</blockquote>'
+        + (id ? '<span class="gav-outils"><button type="button" class="gav-ic" data-gav-edit title="Modifier l\'avis (texte, précisions, suivi)" aria-label="Modifier l\'avis">✏️</button><button type="button" class="gav-ic" data-gav-suppr title="Supprimer l\'avis" aria-label="Supprimer l\'avis">🗑</button></span>' : '') + '</div>'
+        + (GA_EDIT === id
+          ? '<div class="gav-edit" style="margin-top:6px"><label>Texte de l\'avis (corrigeable : fautes, précision, reformulation)</label><textarea id="gav-e-idee" rows="4" maxlength="3000">' + gEsc(a.idee || "") + '</textarea></div>'
+          : '<blockquote class="gav-idee' + (a.idee ? '' : ' vide') + '">' + (a.idee ? gEsc(a.idee) : 'Note seule, sans commentaire.') + '</blockquote>')
         + (notes ? '<div class="gav-notes">' + notes + '</div>' : '')
         + (a.complement && GA_EDIT !== id ? '<div class="gav-comp"><b>Précisions</b>' + gEsc(a.complement) + '</div>' : '')
         + (a.suite && GA_EDIT !== id ? '<div class="gav-suivi"><b>Suivi</b>' + gEsc(a.suite) + '</div>' : '')
@@ -1585,7 +1587,7 @@
   }
   function gavEnregistrer(id, valeurs, carte) {
     var a = gavListe().filter(function (x) { return x.id === id; })[0]; if (!a) return;
-    var avant = { priorite: a.priorite, traite: a.traite, suite: a.suite, valide: a.valide, complement: a.complement, etat_traitement: a.etat_traitement, version: a.version };
+    var avant = { priorite: a.priorite, traite: a.traite, suite: a.suite, valide: a.valide, complement: a.complement, etat_traitement: a.etat_traitement, version: a.version, idee: a.idee };
     Object.assign(a, valeurs); dessinerAvis();   // affichage immédiat
     GA_ENVOI[id] = (GA_ENVOI[id] || Promise.resolve()).then(function () {
       return api("gestion", { op: "enregistrer", onglet: "Avis", valeurs: Object.assign({ id: id }, valeurs) });
@@ -1598,7 +1600,7 @@
   $("gav-recharger").addEventListener("click", function () { chargerGestion(); });
   $("gav-liste").addEventListener("click", function (e) {
     var c0 = e.target.closest("[data-gav]");
-    if (c0 && e.target.closest("[data-gav-edit]")) { GA_EDIT = GA_EDIT === c0.dataset.gav ? null : c0.dataset.gav; dessinerAvis(); var t = $("gav-e-comp"); if (t) t.focus(); return; }
+    if (c0 && e.target.closest("[data-gav-edit]")) { GA_EDIT = GA_EDIT === c0.dataset.gav ? null : c0.dataset.gav; dessinerAvis(); var t = $("gav-e-idee") || $("gav-e-comp"); if (t) t.focus(); return; }
     if (c0 && e.target.closest("[data-gav-annuler]")) { GA_EDIT = null; dessinerAvis(); return; }
     if (c0 && e.target.closest("[data-gav-suppr]")) {
       var idS = c0.dataset.gav;
@@ -1610,6 +1612,7 @@
     }
     if (c0 && e.target.closest("[data-gav-ok]")) {
       var v = { complement: $("gav-e-comp").value.trim(), suite: $("gav-e-suite").value.trim(), etat_traitement: $("gav-e-etat").value, version: $("gav-e-version").value.trim() };
+      if ($("gav-e-idee")) v.idee = $("gav-e-idee").value.trim();
       if (v.etat_traitement === "realise") v.traite = "oui";
       GA_EDIT = null; gavEnregistrer(c0.dataset.gav, v); return;
     }
