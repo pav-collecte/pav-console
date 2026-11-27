@@ -155,6 +155,16 @@
         <label for="alertes"><b>E-mails des alertes</b> — séparés par des virgules ; laissé vide, les alertes vous sont envoyées</label>
         <input id="alertes" type="text" inputmode="email" placeholder="services.techniques@mairie-xxx.fr">
         <label style="display:flex;gap:8px;align-items:center;margin:12px 0 0;font-weight:400"><input type="checkbox" id="creer-osm" checked style="width:20px;height:20px;flex:none;margin:0"> Intégrer les points de collecte connus d'OpenStreetMap (ajoutés d'office au brouillon, ou proposés à cocher après une création directe)</label>
+        <details class="grp-edit" id="creer-points" open>
+          <summary>Points de collecte</summary>
+          <p class="petit" style="margin-top:0">Préparez les points avant de créer la commune : ils sont rangés dans un brouillon (enregistré automatiquement) et créés « à vérifier » avec la commune.</p>
+          <div id="creer-points-nb" class="petit" style="margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="second" type="button" id="creer-pts-osm">Chercher dans OpenStreetMap</button>
+            <button class="second" type="button" id="creer-pts-fichier">Importer un fichier…</button>
+            <button class="second" type="button" id="creer-pts-voir">Voir / gérer les points</button>
+          </div>
+        </details>
         <div id="brouillon-actif" class="petit" hidden style="margin:12px 0 0;padding:10px 12px;background:#FAF8F3;border:1px solid var(--trait);border-radius:9px"></div>
         <button class="second" type="button" id="brouillon-enregistrer" style="width:100%;margin-top:12px">Enregistrer comme brouillon (la commune n'est pas encore créée)</button>
         <button class="principal" type="submit" id="creer">Créer la commune</button>
@@ -646,6 +656,21 @@
     api("modele").then(function (j) {
       FLUX = j.flux || [];
       var box = $("champs"); box.innerHTML = "";
+      /* Mêmes panneaux par thème que « Modifier une commune ». Un panneau qui contient un champ
+         à remplir est ouvert ; un champ obligatoire oublié rouvre son panneau à la validation. */
+      var GRP = [
+        ["Identité de la commune", /^commune\.(nom|departement|codePostal|codeInsee|prefixeCode)$/],
+        ["Mairie", /^commune\.(maire|telephone|email|siteMairie)$/],
+        ["Logo", /^commune\.logo/],
+        ["Adresses publiques", /^adresses\.(application|meteo)$/],
+        ["Réglages de la tournée", /^terrain\./],
+        ["Page météo", /^mentions\./],
+        ["Paramètres techniques — ne pas modifier", /./]
+      ], Z = GRP.map(function (g) {
+        var d = document.createElement("details"); d.className = "grp-edit"; d.innerHTML = "<summary>" + g[0] + "</summary>"; box.appendChild(d); return d;
+      });
+      var zoneDe = function (cle) { for (var k = 0; k < GRP.length; k++) if (GRP[k][1].test(cle)) return Z[k]; return Z[Z.length - 1]; };
+      Z[0].open = true; Z[1].open = true;
       j.params.forEach(function (p) {
         var wrap = document.createElement("div");
         if (p.aRemplir) wrap.className = "requis";
@@ -685,8 +710,10 @@
           note.textContent = "L'image est remise au carré (fond transparent) et réduite à 1024 px au plus ; n8n en tire ensuite le favicon et les icônes.";
           wrap.appendChild(note);
         }
-        wrap.appendChild(inp); box.appendChild(wrap);
+        wrap.appendChild(inp); var zz = zoneDe(p.cle); zz.appendChild(wrap); if (p.aRemplir) zz.open = true;
       });
+      Z.forEach(function (d) { if (!d.querySelector("input")) d.remove(); });
+      box.addEventListener("invalid", function (e) { var d = e.target.closest && e.target.closest("details"); if (d) d.open = true; }, true);
       dessinerFlux();
       brancherCommune();
       brancherAdresses();
@@ -877,6 +904,7 @@
     });
   }
   function majBrouillonActif() {
+    setTimeout(function () { try { majPointsCreer(); } catch (e) {} }, 0);
     var box = $("brouillon-actif"), b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
     if (!b) { BROUILLON_ID = ""; box.hidden = true; $("creer").textContent = "Créer la commune"; return; }
     var d = b.donnees || {};
@@ -2454,6 +2482,29 @@
   /* Si l’assistant prépare les points ou les agents d’une commune saisie dans l’onglet Créer mais pas encore enregistrée,
      on enregistre d’abord le brouillon (les îlots OpenStreetMap y sont intégrés d’office), puis on relance l’outil. */
   function nomFormulaire() { var e = document.getElementById("p-commune.nom"); return e ? String(e.value || "").trim() : ""; }
+  /* Onglet Créer, panneau « Points de collecte » : enregistre le brouillon si besoin, puis ouvre
+     la recherche de points de l'onglet Points sur ce brouillon. */
+  function pointsDepuisCreer(action) {
+    var p = donneesFormulaire().params || {};
+    if (!p["commune.nom"]) { msg("msg-commune", "Indiquez d'abord le nom de la commune.", "ko"); $("p-commune.nom") && $("p-commune.nom").focus(); return; }
+    var deja = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    (deja ? Promise.resolve(deja) : enregistrerBrouillonAuto()).then(function (b) {
+      var com = "brouillon:" + b.id;
+      if (action === "osm") return preparerOSM(com, p["commune.nom"], p["commune.departement"] || "", p["commune.codeInsee"] || "");
+      afficherPoints(com);
+      if (action === "fichier") { $("import-choisir").scrollIntoView({ behavior: "smooth", block: "center" }); $("import-choisir").click(); }
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); });
+  }
+  function majPointsCreer() {
+    var el = $("creer-points-nb"); if (!el) return;
+    var b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null, n = b ? (b.donnees.points || []).length : 0;
+    el.textContent = b ? (n ? n + " point" + (n > 1 ? "s" : "") + " dans le brouillon « " + b.nom + " »." : "Aucun point dans le brouillon pour l'instant.") : "Pas encore de brouillon : il sera enregistré au premier clic.";
+  }
+  $("creer-pts-osm").addEventListener("click", function () { pointsDepuisCreer("osm"); });
+  $("creer-pts-fichier").addEventListener("click", function () { pointsDepuisCreer("fichier"); });
+  $("creer-pts-voir").addEventListener("click", function () { pointsDepuisCreer("voir"); });
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"), function (b) { if (b.dataset.onglet === "commune") b.addEventListener("click", majPointsCreer); });
+  setTimeout(majPointsCreer, 0);
   function enregistrerBrouillonAuto() {
     var bt = $("brouillon-enregistrer");
     if (!nomFormulaire()) return Promise.reject(new Error("aucun nom de commune dans l’onglet Créer"));
@@ -2687,7 +2738,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=81" defer></script>
+<script src="gestion.js?v=82" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
