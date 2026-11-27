@@ -773,6 +773,7 @@
 
   /* ——— Agenda : actions prévues (échanges), devis à relancer, factures à échéance, anniversaires de contrat ——— */
   var GA_MOIS = new Date(); GA_MOIS.setDate(1);
+  var GA_SEL = null;   // jour sélectionné dans le calendrier (cadre orange) : la liste et l'ajout portent sur lui
   function evenements() {
     var ev = [], noms = {}; gCommunes().forEach(function (c) { noms[c[0]] = c[1]; });
     var auj = new Date().toISOString().slice(0, 10);
@@ -855,29 +856,42 @@
     for (var j = 1; j <= nbj; j++) {
       var d = an + "-" + String(mo + 1).padStart(2, "0") + "-" + String(j).padStart(2, "0");
       var duJour = ev.filter(function (x) { return x.date === d; });
-      h += '<div data-ga-jour="' + d + '" style="min-height:44px;padding:3px;border-radius:7px;border:1px solid ' + (d === auj ? "var(--accent)" : "var(--trait)") + ';background:#fff;cursor:' + (duJour.length ? "pointer" : "default") + '">'
-        + '<div class="petit" style="font-weight:' + (d === auj ? 700 : 400) + '">' + j + '</div>'
-        + '<div style="display:flex;flex-wrap:wrap;gap:2px">' + duJour.slice(0, 6).map(function (x) { return '<span title="' + gEsc(x.titre) + '" style="width:8px;height:8px;border-radius:50%;background:' + x.couleur + '"></span>'; }).join("") + '</div></div>';
+      var estAuj = d === auj, estSel = d === GA_SEL;
+      h += '<div data-ga-jour="' + d + '" class="ga-j' + (estAuj ? ' ga-auj' : '') + (estSel ? ' ga-sel' : '') + '"' + (estAuj ? ' title="Aujourd\'hui"' : '') + '>'
+        + '<div class="ga-jn">' + j + '</div>'
+        + '<div class="ga-pts">' + duJour.slice(0, duJour.length > 4 ? 3 : 4).map(function (x) { return '<span title="' + gEsc(x.titre) + '" style="background:' + x.couleur + '"></span>'; }).join("")
+        + (duJour.length > 4 ? '<b>+' + (duJour.length - 3) + '</b>' : '') + '</div></div>';
     }
     $("ga-grille").innerHTML = h;
     var retards = ev.filter(function (x) { return x.retard; });
     $("ga-retard").innerHTML = retards.length ? '<b style="color:var(--ko)">En retard (' + retards.length + ')</b><div class="petit">' + retards.map(ligneEv).join("") + '</div>' : "";
     var debut = an + "-" + String(mo + 1).padStart(2, "0") + "-01", fin = an + "-" + String(mo + 1).padStart(2, "0") + "-31";
+    if (GA_SEL && GA_SEL >= debut && GA_SEL <= fin) { listeJour(GA_SEL); return; }
     var duMois = ev.filter(function (x) { return x.date >= debut && x.date <= fin; });
     $("ga-liste").innerHTML = '<b>' + gEsc($("ga-mois").textContent) + ' — ' + duMois.length + ' élément(s)</b>' + (duMois.map(ligneEv).join("") || '<p>Rien ce mois-ci.</p>');
+  }
+  /* Liste d'un jour sélectionné : titre, bouton d'ajout bien visible, événements. */
+  function listeJour(d) {
+    var l = evenements().filter(function (x) { return x.date === d; });
+    var dt = new Date(d + "T12:00:00"), titre = dt.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    var court = dt.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    $("ga-liste").innerHTML = '<div class="ga-jt"><b>' + gEsc(titre.charAt(0).toUpperCase() + titre.slice(1)) + '</b><a href="#" id="ga-tout">Tout le mois</a></div>'
+      + '<button type="button" class="principal ga-ajout" data-gr-jour="' + d + '">+ Ajouter un événement le ' + gEsc(court) + '</button>'
+      + (l.map(ligneEv).join("") || '<p class="petit">Rien ce jour-là.</p>');
   }
   $("ga-prec").addEventListener("click", function () { GA_MOIS.setMonth(GA_MOIS.getMonth() - 1); dessinerAgenda(); });
   $("ga-suiv").addEventListener("click", function () { GA_MOIS.setMonth(GA_MOIS.getMonth() + 1); dessinerAgenda(); });
   $("ga-grille").addEventListener("click", function (e) {
     var c = e.target.closest("[data-ga-jour]"); if (!c) return;
-    var d = c.dataset.gaJour, l = evenements().filter(function (x) { return x.date === d; });
-    if (!l.length) return;
-    $("ga-liste").innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><b>' + gDateFR(d) + '</b><button type="button" class="second" data-gr-jour="' + d + '" style="margin:0;padding:6px 12px;font-size:14px">+ Événement ce jour</button></div>'
-      + l.map(ligneEv).join("") + '<p><a href="#" id="ga-tout">Tout le mois</a></p>';
+    var d = c.dataset.gaJour;
+    GA_SEL = GA_SEL === d ? null : d;   // retoucher le jour sélectionné : retour au mois
+    dessinerAgenda();
+    if (GA_SEL && !evenements().some(function (x) { return x.date === d; })) { formRdv({ date: d }); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" }); }
+    else $("ga-liste").scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
   function ouvrirDepuisAgenda(e) {
     if (e.target.closest("[data-gcal]")) return;   // lien Google Agenda : on le laisse s'ouvrir
-    if (e.target.id === "ga-tout") { e.preventDefault(); dessinerAgenda(); return; }
+    if (e.target.id === "ga-tout") { e.preventDefault(); GA_SEL = null; dessinerAgenda(); return; }
     var l = e.target.closest("[data-ga-com]"); if (!l) return;
     if (l.dataset.gaDoc) {
       var nf = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "factu"; })[0];
@@ -1742,7 +1756,7 @@
       + '<p class="petit gr-aide" style="margin-bottom:0">Envoyé dans Google Agenda : à l\'heure dite avec un rappel 30 min avant, ou sur la journée.</p></div>';
     $("gr-form").hidden = false; $("gr-titre").focus();
   }
-  $("gr-nouveau").addEventListener("click", function () { formRdv(null); });
+  $("gr-nouveau").addEventListener("click", function () { formRdv(GA_SEL ? { date: GA_SEL } : null); });
   // Téléphone : le champ en cours de saisie remonte au-dessus du clavier.
   $("gr-form").addEventListener("focusin", function (e) {
     var el = e.target; if (!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
@@ -1762,7 +1776,15 @@
     + ".ga-l{display:grid;grid-template-columns:12px 46px 46px 1fr auto;gap:0 6px;align-items:baseline;padding:9px 2px;border-bottom:1px solid var(--trait);cursor:pointer;font-size:15px}"
     + ".ga-l:hover{background:#FAF8F3}.ga-pt{width:9px;height:9px;border-radius:50%;align-self:center}.ga-dt{font-variant-numeric:tabular-nums}.ga-hr{color:var(--vert);font-weight:700;font-variant-numeric:tabular-nums}"
     + ".ga-tx i{font-style:normal;color:var(--doux)}.ga-tx small{display:block;color:var(--doux);font-size:13px;white-space:pre-wrap;margin-top:2px}"
-    + ".ga-del{border:0;background:transparent;font-size:18px;width:40px;height:36px;border-radius:8px;cursor:pointer;opacity:.6;align-self:center}.ga-del:hover{background:#FDECEA;opacity:1}.ga-ok{color:#2E7D4F;font-weight:700;opacity:.85}.ga-ok:hover{background:#E6F2EA}.ga-bt{display:flex;align-self:center}.ga-auto{width:40px;text-align:center;font-size:14px;opacity:.45;align-self:center;cursor:help}";
+    + ".ga-del{border:0;background:transparent;font-size:18px;width:40px;height:36px;border-radius:8px;cursor:pointer;opacity:.6;align-self:center}.ga-del:hover{background:#FDECEA;opacity:1}.ga-ok{color:#2E7D4F;font-weight:700;opacity:.85}"
+    + ".ga-j{min-height:48px;padding:3px 4px;border-radius:8px;border:1px solid var(--trait);background:#fff;cursor:pointer;box-sizing:border-box}"
+    + ".ga-j:hover{border-color:var(--accent)}.ga-jn{font-size:13px;color:var(--doux)}"
+    + ".ga-auj{background:var(--vert);border-color:var(--vert)}.ga-auj .ga-jn{color:#fff;font-weight:800}"
+    + ".ga-sel{box-shadow:0 0 0 3px var(--accent);border-color:var(--accent)}"
+    + ".ga-pts{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin-top:2px}.ga-pts span{width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 1px #fff}.ga-pts b{font-size:11px;line-height:1;color:var(--doux)}.ga-auj .ga-pts b{color:#fff}"
+    + ".ga-jt{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:17px}.ga-jt a{font-size:14px}"
+    + ".ga-ajout{width:100%;margin:8px 0 4px}"
+    + ".ga-ok:hover{background:#E6F2EA}.ga-bt{display:flex;align-self:center}.ga-auto{width:40px;text-align:center;font-size:14px;opacity:.45;align-self:center;cursor:help}";
     document.head.appendChild(st); })();
   $("gr-form").addEventListener("change", function (e) {
     if (e.target.id === "gr-commune") { GR = Object.assign({}, GR, lireRdv(), { contact: "" }); formRdv(GR); }
@@ -1818,11 +1840,6 @@
       var r = (G.Rendezvous || []).filter(function (x) { return x.id === l.dataset.gaRdv; })[0]; if (!r) return;
       formRdv(Object.assign({}, r)); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" });
     }, true);
-  });
-  // Clic sur un jour vide de la grille : nouvel événement ce jour-là.
-  $("ga-grille").addEventListener("click", function (e) {
-    var c = e.target.closest("[data-ga-jour]"); if (!c) return;
-    if (!evenements().some(function (x) { return x.date === c.dataset.gaJour; })) { formRdv({ date: c.dataset.gaJour }); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" }); }
   });
   $("ga-liste").addEventListener("click", function (e) {
     var a = e.target.closest("[data-gr-jour]"); if (!a) return; e.preventDefault(); e.stopImmediatePropagation();
