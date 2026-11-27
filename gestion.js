@@ -950,37 +950,40 @@
       var nf = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "factu"; })[0];
       if (nf) nf.click(); ouvrirDoc(l.dataset.gaDoc, l.dataset.gaNum); return;
     }
-    if (!l.dataset.gaChoisi) { choixOuverture(l); return; }
-    delete l.dataset.gaChoisi;
-    var nb = Array.prototype.filter.call(document.querySelectorAll("nav button"), function (x) { return x.dataset.onglet === "clients"; })[0];
-    if (nb) nb.click();
-    /* Action ou échange : ouvert directement en modification ; après l'enregistrement, retour à l'agenda. */
-    var ech = l.dataset.gaEch ? (G.Echanges || []).filter(function (x) { return x.id === l.dataset.gaEch; })[0] : null;
-    $("g-commune").value = l.dataset.gaCom; G_CONTACT = null; G_ECHANGE = ech ? Object.assign({}, ech) : null; G_AUTO = null; dessinerFiche();
+    var tx = (l.querySelector(".ga-tx") || l).childNodes[0], dt = (l.querySelector(".ga-dt") || {}).textContent || "";
+    var evx = evenements().filter(function (x) { return x.commune === l.dataset.gaCom && gDateFR(x.date).slice(0, 5) === dt; })[0];
+    choixOuverture({ com: l.dataset.gaCom, ech: l.dataset.gaEch || "", titre: tx ? String(tx.textContent || "").trim() : "", date: evx ? evx.date : "" });
+  }
+  /* Ouvre la fiche client d'un événement (échange en modification s'il y en a un), sous-onglet Échanges en vue. */
+  function ouvrirFicheEvenement(com, echId) {
+    var nb = document.querySelector('nav button[data-onglet="clients"]'); if (nb) nb.click();
+    var ech = echId ? (G.Echanges || []).filter(function (x) { return x.id === echId; })[0] : null;
+    $("g-commune").value = com; G_CONTACT = null; G_ECHANGE = ech ? Object.assign({}, ech) : null; G_AUTO = null; dessinerFiche();
     GA_RETOUR = !!ech;
-    try { GF_PANE = "echanges"; gfAppliquerPane(); } catch (er) {}   // sous-onglet Échanges de la fiche
-    /* On place les sous-onglets de la fiche en haut de l'écran (Échanges en surbrillance) : on voit où l'on est. */
+    try { GF_PANE = "echanges"; gfAppliquerPane(); } catch (er) {}
     setTimeout(function () { var o = $("gf-onglets"); if (!o) return; var y = o.getBoundingClientRect().top + window.scrollY - (document.querySelector("header") ? document.querySelector("header").offsetHeight + 8 : 120); window.scrollTo({ top: y, behavior: "smooth" });
       var bt = o.querySelector('[data-p="echanges"]'); if (bt) o.scrollLeft = bt.offsetLeft - (o.clientWidth - bt.offsetWidth) / 2; }, 80);
   }
-  /* Événement lié à une commune : on demande où l'ouvrir. */
-  function choixOuverture(l) {
+  /* Événement lié à une commune, d'où qu'on l'ouvre (agenda, fenêtre Aujourd'hui…) : fiche client ou calendrier ?
+     info = { com, ech (id d'échange), titre, date (AAAA-MM-JJ) } */
+  function choixOuverture(info) {
     var vieux = $("ga-choix"); if (vieux) vieux.remove();
-    var t = (l.querySelector(".ga-tx") || l).childNodes[0], titre = t ? String(t.textContent || "").trim() : "";
     var f = document.createElement("div"); f.id = "ga-choix";
-    f.innerHTML = '<div class="ga-ch-b"><b>' + gEsc(titre.slice(0, 90)) + '</b><span class="petit">' + gEsc(gNomCommune(l.dataset.gaCom)) + '</span>'
-      + '<button type="button" class="principal" data-ch="fiche">' + (l.dataset.gaEch ? "Ouvrir dans la fiche client (modifier)" : "Ouvrir la fiche client") + '</button>'
-      + '<button type="button" class="second" data-ch="jour">Voir ce jour dans le calendrier</button>'
+    f.innerHTML = '<div class="ga-ch-b"><b>' + gEsc(String(info.titre || "").slice(0, 90)) + '</b><span class="petit">' + gEsc(gNomCommune(info.com)) + (info.date ? ' · ' + gEsc(gDateFR(info.date)) : '') + '</span>'
+      + '<button type="button" class="principal" data-ch="fiche">' + (info.ech ? "Ouvrir dans la fiche client (modifier)" : "Ouvrir la fiche client") + '</button>'
+      + (info.date ? '<button type="button" class="second" data-ch="jour">Voir ce jour dans le calendrier</button>' : '')
       + '<button type="button" class="second" data-ch="x">Annuler</button></div>';
     document.body.appendChild(f);
     f.addEventListener("click", function (e) {
       var b = e.target.closest("[data-ch]"); if (!b && e.target !== f) return; f.remove();
       if (!b || b.dataset.ch === "x") return;
-      if (b.dataset.ch === "fiche") { l.dataset.gaChoisi = "1"; ouvrirDepuisAgenda({ target: l, preventDefault: function () {} }); return; }
-      var d = (l.querySelector(".ga-dt") || {}).textContent || "", ev = evenements().filter(function (x) { return x.commune === l.dataset.gaCom && gDateFR(x.date).slice(0, 5) === d; })[0];
-      if (ev) { GA_SEL = ev.date; GA_VUE = "jour"; GA_REF = new Date(ev.date + "T12:00:00"); GA_MOIS = new Date(GA_REF.getFullYear(), GA_REF.getMonth(), 1); dessinerAgenda(); $("ga-vues").scrollIntoView({ behavior: "smooth", block: "start" }); }
+      if (b.dataset.ch === "fiche") { ouvrirFicheEvenement(info.com, info.ech); return; }
+      var na = document.querySelector('nav button[data-onglet="agenda"]'); if (na && !na.classList.contains("actif")) na.click();
+      GA_SEL = info.date; GA_VUE = "jour"; GA_REF = new Date(info.date + "T12:00:00"); GA_MOIS = new Date(GA_REF.getFullYear(), GA_REF.getMonth(), 1); dessinerAgenda();
+      setTimeout(function () { $("ga-vues").scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
     });
   }
+  window.PAV.choixOuverture = choixOuverture;
   /* Balayer à gauche / à droite : jour, semaine ou mois suivant / précédent. */
   ["ga-liste", "ga-grille"].forEach(function (id) {
     var x0 = null, y0 = 0;
@@ -2801,7 +2804,7 @@
       var rel = x.type === "action" && x.id && /Relancer le devis (\S+)/.exec(x.titre || "");
       var bouton = rel ? '<button type="button" class="principal" data-gj-rel="' + gEsc(rel[1]) + '" data-gj-ech="' + gEsc(x.id) + '">📨 Relancer</button>'
         : x.doc ? '<button type="button" class="second" data-gj-doc="' + gEsc(x.doc[0]) + '" data-gj-num="' + gEsc(x.doc[1]) + '">Ouvrir</button>'
-        : x.commune ? '<button type="button" class="second" data-gj-com="' + gEsc(x.commune) + '">Fiche</button>' : '';
+        : x.commune ? '<button type="button" class="second" data-gj-com="' + gEsc(x.commune) + '" data-gj-e="' + gEsc(x.ech || "") + '" data-gj-date="' + gEsc(x.date) + '" data-gj-titre="' + gEsc(x.titre) + '">Ouvrir</button>' : '';
       return '<div class="gj-l' + (x.retard ? ' retard' : '') + '"><span class="gj-i">' + (icone[x.type] || "•") + '</span><div class="gj-t"><b>' + gEsc(x.titre) + '</b><small>'
         + gEsc(x.nomCommune || "") + (x.heure ? " · " + gEsc(x.heure) : "") + (x.retard ? ' · <span class="ko">en retard depuis le ' + gDateFR(x.date) + '</span>' : x.date === auj ? " · aujourd'hui" : "") + '</small></div>' + bouton + '</div>';
     }).join("") || '<p class="petit">Rien de prévu aujourd\'hui, et aucun retard. 👍</p>';
@@ -2820,8 +2823,7 @@
       fermer();
       if (b.dataset.gjRel) { var a = document.querySelector('nav button[data-onglet="agenda"]'); if (a) a.click(); relancerDevis(b.dataset.gjRel, b.dataset.gjEch); return; }
       if (b.dataset.gjDoc) { var nf = document.querySelector('nav button[data-onglet="factu"]'); if (nf) nf.click(); ouvrirDoc(b.dataset.gjDoc, b.dataset.gjNum); return; }
-      var nc = document.querySelector('nav button[data-onglet="clients"]'); if (nc) nc.click();
-      setTimeout(function () { $("g-commune").value = b.dataset.gjCom; dessinerFiche(); }, 40);
+      choixOuverture({ com: b.dataset.gjCom, ech: b.dataset.gjE || "", titre: b.dataset.gjTitre || "", date: b.dataset.gjDate || "" });
     });
   }
   (function () { var o = dessinerAgenda; dessinerAgenda = function () { var r = o.apply(this, arguments); try { gjPastille(); } catch (e) {} return r; }; })();
