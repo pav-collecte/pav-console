@@ -549,7 +549,9 @@
     + '<h2>Agenda des actions</h2>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="second" id="ga-sync" type="button" style="margin:0;flex:none;padding:6px 12px;font-size:14px" title="Synchroniser avec Google Agenda">🔄 Google Agenda</button><button class="second" id="ga-ics" type="button" style="margin:0;flex:none;padding:6px 12px;font-size:14px" title="Exporter l\'agenda (.ics)">⬇ .ics</button><button class="second" id="ga-i" type="button" aria-label="Comment marche la synchronisation ?" aria-expanded="false" style="margin:0;flex:none;width:32px;height:32px;padding:0;border-radius:50%;font:italic 700 15px Georgia,serif">i</button></div>'
     + '<p class="petit" id="ga-aide" hidden style="margin-top:0;padding:8px 10px;background:#F7F5EF;border-radius:8px">Les échéances vont dans l\'agenda Google « PAV — actions » (créé au premier envoi) ; elles se mettent aussi à jour toutes seules après chaque enregistrement d\'échange, de devis ou de facture. Une action réalisée reste affichée en vert (✓). Appui court sur un jour : le sélectionner ; appui long : créer un événement ce jour-là.</p>'
-    + '<div class="petit" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">Rappel avant chaque échéance (facture, devis, anniversaire de contrat) : <input id="ga-rappel" type="number" min="0" max="365" style="width:70px;margin:0"> jours <button class="second" id="ga-rappel-ok" type="button" style="padding:5px 10px;font-size:13px">Enregistrer</button></div>'
+    + '<div class="petit" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">Rappel avant chaque échéance (facture, devis, anniversaire de contrat) : <input id="ga-rappel" type="number" min="0" max="365" style="width:70px;margin:0"> jours <button class="second" id="ga-rappel-ok" type="button" style="padding:5px 10px;font-size:13px">Enregistrer</button>'
+    + '<button class="second" id="ga-rappel-i" type="button" aria-label="À quoi sert ce rappel ?" aria-expanded="false" style="margin:0;flex:none;width:26px;height:26px;padding:0;border-radius:50%;font:italic 700 13px Georgia,serif">i</button></div>'
+    + '<p class="petit" id="ga-rappel-aide" hidden style="margin-top:0;padding:8px 10px;background:#F7F5EF;border-radius:8px">Nombre de jours avant une échéance où Google Agenda vous prévient : paiement d\'une facture, fin de validité d\'un devis, anniversaire d\'un contrat. Exemple : 7 = un rappel une semaine avant. À régler une fois.</p>'
     + '<p class="petit" id="ga-info" hidden style="color:var(--accent)"></p>'
     + '<div style="display:flex;align-items:center;gap:8px"><button class="second" type="button" id="ga-prec" aria-label="Mois précédent">‹</button><b id="ga-mois" style="flex:1;text-align:center"></b><button class="second" type="button" id="ga-suiv" aria-label="Mois suivant">›</button></div>'
     + '<div id="ga-grille" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px"></div>'
@@ -918,6 +920,7 @@
     else { var r = gaRef(); r.setDate(r.getDate() + n * (GA_VUE === "jour" ? 1 : 7)); GA_REF = r; GA_MOIS = new Date(r.getFullYear(), r.getMonth(), 1); }
     dessinerAgenda();
   }
+  $("ga-rappel-i").addEventListener("click", function () { var a = $("ga-rappel-aide"); a.hidden = !a.hidden; this.setAttribute("aria-expanded", String(!a.hidden)); });
   $("ga-i").addEventListener("click", function () { var a = $("ga-aide"); a.hidden = !a.hidden; this.setAttribute("aria-expanded", String(!a.hidden)); });
   $("ga-prec").addEventListener("click", function () { gaDecaler(-1); });
   $("ga-suiv").addEventListener("click", function () { gaDecaler(1); });
