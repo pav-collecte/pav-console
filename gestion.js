@@ -977,7 +977,7 @@
     f.innerHTML = '<div class="ga-ch-b"><b>' + gEsc(String(info.titre || "").slice(0, 90)) + '</b><span class="petit">' + gEsc(gNomCommune(info.com)) + (info.date ? ' · ' + gEsc(gDateFR(info.date)) : '') + '</span>'
       + (info.rdv ? '<button type="button" class="principal" data-ch="rdv">Modifier l\'événement</button>' : '')
       + (info.doc ? '<button type="button" class="principal" data-ch="doc">Ouvrir ' + (info.doc[0] === "facture" ? "la facture " : "le devis ") + gEsc(info.doc[1] || "") + '</button>' : '')
-      + (info.com ? '<button type="button" class="' + (info.rdv || info.doc ? 'second' : 'principal') + '" data-ch="fiche">' + (info.ech ? "Ouvrir dans la fiche client (modifier)" : "Ouvrir la fiche client") + '</button>' : '')
+      + (info.com ? '<button type="button" class="' + (info.rdv || info.doc ? 'second' : 'principal') + '" data-ch="fiche">' + (info.ech ? "Modifier l'action (dans l'échange de la fiche client)" : "Ouvrir la fiche client") + '</button>' : '')
       + (info.date && GA_VUE !== "jour" ? '<button type="button" class="second" data-ch="jour">Voir ce jour en vue Jour</button>' : '')
       + '<button type="button" class="second" data-ch="x">Annuler</button></div>';
     document.body.appendChild(f);
