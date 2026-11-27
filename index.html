@@ -204,24 +204,10 @@
 
   <section id="points">
     <div class="carte">
-      <h2 id="titre-point">Nouveau point de collecte</h2>
-      <p class="petit">À faire sur place, devant les conteneurs : la position GPS est celle du téléphone.</p>
+      <h2>Points de la commune <button class="second" id="rafraichir-points" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>
       <label for="commune-point"><b>Commune</b></label>
       <select id="commune-point" class="choix-commune"></select>
-      <label for="nom-point"><b>Nom du point</b></label>
-      <input id="nom-point" type="text" placeholder="Îlot Place de la Mairie">
-      <label><b>Position</b></label>
-      <div class="gps"><button class="second" id="btn-gps" type="button">Prendre la position</button><output id="gps-etat">—</output></div>
-      <label><b>Nombre de conteneurs par flux</b></label>
-      <div class="grille" id="grille-flux"></div>
-      <label id="bloc-actif" style="display:none;gap:10px;align-items:center;margin-top:12px;color:var(--encre);font-size:14px"><input type="checkbox" id="point-actif" style="width:20px;height:20px;flex:none" checked> Point actif (décochez pour le retirer des tournées sans le supprimer)</label>
-      <button class="principal" id="ajouter-point">Enregistrer le point</button>
-      <button class="second" id="annuler-point" type="button" style="display:none;width:100%;margin-top:8px">Annuler la modification</button>
-      <div class="msg" id="msg-point"></div>
-    </div>
-    <div class="carte">
-      <h2>Points de la commune <button class="second" id="rafraichir-points" type="button" style="float:right;padding:4px 10px;font-size:13px">Actualiser</button></h2>
-      <div id="liste-points" class="petit">—</div>
+      <div id="liste-points" class="petit" style="margin-top:10px">—</div>
       <div class="msg" id="msg-liste"></div>
     </div>
     <div class="carte" id="carte-prerempli">
@@ -245,6 +231,21 @@
       <button class="principal" id="candidats-creer" type="button" style="display:none">Créer les points cochés (à vérifier)</button>
       <p class="petit" style="margin-top:10px">Données OpenStreetMap © contributeurs OpenStreetMap, licence ODbL.</p>
     </div>
+    <!-- Création à la main, sur place : rarement utilisée, donc repliée sous la recherche de points. -->
+    <details class="carte" id="carte-point-manuel">
+      <summary style="cursor:pointer;list-style:revert"><h2 id="titre-point" style="display:inline;margin:0">Nouveau point de collecte</h2> <span class="petit">— à la main, sur place</span></summary>
+      <p class="petit">À faire sur place, devant les conteneurs : la position GPS est celle du téléphone.</p>
+      <label for="nom-point"><b>Nom du point</b></label>
+      <input id="nom-point" type="text" placeholder="Îlot Place de la Mairie">
+      <label><b>Position</b></label>
+      <div class="gps"><button class="second" id="btn-gps" type="button">Prendre la position</button><output id="gps-etat">—</output></div>
+      <label><b>Nombre de conteneurs par flux</b></label>
+      <div class="grille" id="grille-flux"></div>
+      <label id="bloc-actif" style="display:none;gap:10px;align-items:center;margin-top:12px;color:var(--encre);font-size:14px"><input type="checkbox" id="point-actif" style="width:20px;height:20px;flex:none" checked> Point actif (décochez pour le retirer des tournées sans le supprimer)</label>
+      <button class="principal" id="ajouter-point">Enregistrer le point</button>
+      <button class="second" id="annuler-point" type="button" style="display:none;width:100%;margin-top:8px">Annuler la modification</button>
+      <div class="msg" id="msg-point"></div>
+    </details>
   </section>
 
   <section id="agents">
@@ -1238,7 +1239,7 @@
   function marquerEdition(bouton, ligne) {
     Array.prototype.forEach.call(document.querySelectorAll("#liste-points .en-edition"), function (e) { e.classList.remove("en-edition"); });
     Array.prototype.forEach.call(document.querySelectorAll("#liste-points button.actif"), function (e) { e.classList.remove("actif"); e.textContent = "Modifier"; });
-    $("titre-point").parentNode.classList.toggle("edition", !!bouton);
+    $("carte-point-manuel").classList.toggle("edition", !!bouton);
     if (bouton) { bouton.classList.add("actif"); bouton.textContent = "En cours ↑"; }
     if (ligne) ligne.classList.add("en-edition");
   }
@@ -1263,6 +1264,7 @@
     $("gps-etat").textContent = "position actuelle conservée (" + pt.lat + ", " + pt.lon + ") — reprenez-la pour la changer";
     Array.prototype.forEach.call($("grille-flux").querySelectorAll("input"), function (i) { i.value = String((pt.unites || {})[i.dataset.flux] || 0); });
     cacher("msg-point");
+    $("carte-point-manuel").open = true;
     $("titre-point").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   $("annuler-point").addEventListener("click", function () { modeNouveau(); cacher("msg-point"); });
@@ -2643,7 +2645,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=78" defer></script>
+<script src="gestion.js?v=79" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
