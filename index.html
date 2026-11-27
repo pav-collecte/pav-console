@@ -820,6 +820,7 @@
                 if (pre) pre.value = prefixeAuto(c.nom);
                 if (ADRESSES) ADRESSES();
                 liste.style.display = "none";
+                enchainerApresChoix(c.nom);
               });
               liste.appendChild(b);
             });
@@ -991,6 +992,24 @@
   }
   var msgSimple = msg;
   msg = function (id, texte, genre) { msgSimple(id, texte, genre); if (genre === "ko") allerAuChamp(id, texte); };
+  /* Onglet Créer : dès qu'une commune est choisie dans la liste, on enchaîne tout seul
+     1) la recherche des infos de la mairie (maire, téléphone, e-mail, site),
+     2) l'enregistrement du brouillon, qui intègre les points OpenStreetMap si la case est cochée.
+     Plus besoin de cliquer sur « Rechercher les infos » ni d'aller dans l'onglet Points. */
+  function enchainerApresChoix(nom) {
+    var infos = document.querySelector("#champs .recherche-entete button");
+    if (infos && !infos.disabled) infos.click();
+    var b = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    if (b && idCommune(b.nom) === idCommune(nom)) return;          // brouillon déjà fait pour cette commune
+    if (!$("creer-osm") || !$("creer-osm").checked) return;
+    /* Laisse les infos de la mairie arriver (quelques secondes) avant d'enregistrer le brouillon. */
+    setTimeout(function () {
+      if (idCommune(nomFormulaire()) !== idCommune(nom)) return;    // commune changée entre-temps
+      $("creer-points").open = true;
+      $("creer-points-nb").textContent = "Recherche des points OpenStreetMap de " + nom + "…";
+      enregistrerBrouillonAuto().then(majPointsCreer).catch(function (er) { msg("msg-commune", er.message, "ko"); });
+    }, 3500);
+  }
   function ajouterRechercheCommune(inp) {
     if (!inp.parentNode || inp.dataset.recherche) return; inp.dataset.recherche = "1";
     var pf = inp.id.slice(0, inp.id.indexOf("commune.nom"));
@@ -2752,7 +2771,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=83" defer></script>
+<script src="gestion.js?v=84" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
