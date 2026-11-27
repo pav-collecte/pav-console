@@ -60,6 +60,12 @@
   button.second.actif { background:var(--vert); color:#fff; border-color:var(--vert); }
   .en-edition { background:#FFF6EC; box-shadow:inset 4px 0 0 var(--accent); padding-left:10px !important; border-radius:6px; }
   .carte.edition { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .prog { margin:8px 0 10px; }
+  .prog[hidden] { display:none; }
+  .prog .jg-t { font-size:13px; color:var(--encre); margin-bottom:5px; }
+  .prog .jg-b { height:10px; border-radius:6px; background:#ECE8DF; overflow:hidden; }
+  .prog .jg-r { height:100%; width:0; border-radius:6px; background:#2E7D5B; transition:width .6s ease; }
+  .prog.ko .jg-r { background:var(--ko); }
   .grp-edit { border:1px solid var(--trait); border-radius:10px; padding:0 12px; margin:10px 0; background:#fff; }
   .grp-edit > summary { cursor:pointer; padding:11px 0; font-weight:700; color:var(--encre); }
   .grp-edit[open] { padding-bottom:12px; }
@@ -158,6 +164,7 @@
         <details class="grp-edit" id="creer-points" open>
           <summary>Points de collecte</summary>
           <p class="petit" style="margin-top:0">Préparez les points avant de créer la commune : ils sont rangés dans un brouillon (enregistré automatiquement) et créés « à vérifier » avec la commune.</p>
+          <div id="jauge-points" class="prog" hidden><div class="jg-t"></div><div class="jg-b"><div class="jg-r"></div></div></div>
           <div id="creer-points-nb" class="petit" style="margin-bottom:8px"></div>
           <div id="creer-points-liste" style="margin-bottom:10px;max-height:420px;overflow:auto"></div>
           <div class="msg" id="msg-creer-points"></div>
@@ -171,6 +178,7 @@
         <button class="second" type="button" id="brouillon-enregistrer" style="width:100%;margin-top:12px">Enregistrer comme brouillon (la commune n'est pas encore créée)</button>
         <button class="principal" type="submit" id="creer">Créer la commune</button>
       </form>
+      <div id="jauge-creer" class="prog" hidden><div class="jg-t"></div><div class="jg-b"><div class="jg-r"></div></div></div>
       <div class="msg" id="msg-commune"></div>
       <div id="resultat-commune"></div>
     </div>
@@ -853,6 +861,8 @@
     var bouton = $("creer"); bouton.disabled = true;
     $("resultat-commune").innerHTML = "";
     msg("msg-commune", "Création en cours (dossiers, classeur, dépôt GitHub)… comptez une minute.");
+    var brC = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
+    progres("jauge-creer", 3, "Création de la commune : dossiers, classeur, dépôt GitHub (environ une minute)", brC ? 45 : 92);
     if (BROUILLON_ID) msg("msg-commune", "Création de la commune à partir du brouillon (dossiers, classeur, dépôt GitHub)… comptez une minute, puis l'import des points et des agents.");
     /* Sans adresse des services techniques, les alertes vont à l'administrateur (e-mail de l'émetteur, sinon le compte PAV). */
     var alSaisi = $("alertes").value.trim();
@@ -861,6 +871,7 @@
       if (!alSaisi && alertes) $("alertes").value = alertes;
       return api("creer", { params: params, alertes: alertes, logo: LOGO, provisoire: !!($("provisoire") && $("provisoire").checked) });
     }).then(function (j) {
+      if (brC) progres("jauge-creer", 48, "Commune créée — préparation de l'import du brouillon", 52); else progresFin("jauge-creer", true, "Commune créée — 100 %");
       msg("msg-commune", "Commune « " + j.nom + " » créée (préfixe " + j.prefixe + ")." + (alSaisi ? "" : " Alertes envoyées à " + $("alertes").value + " (pas d'adresse des services techniques)."), "ok");
       var r = $("resultat-commune"); r.innerHTML = "";
       var liens = document.createElement("div"); liens.className = "liens";
@@ -882,7 +893,7 @@
       var osm = $("creer-osm") && $("creer-osm").checked, br = BROUILLON_ID ? brouillonDe("brouillon:" + BROUILLON_ID) : null;
       rafraichirCommunes().then(function () {
         var c = LISTE_COMMUNES.filter(function (x) { return (j.commune && x.commune === j.commune) || (x.nom || "").toLowerCase() === String(j.nom || "").toLowerCase(); })[0];
-        if (!c) return;
+        if (!c) { if (brC) progresFin("jauge-creer", false, "Commune créée, mais introuvable dans la liste : import du brouillon non fait"); return; }
         /* La commune devient cliente : fiche remplie avec les infos de la mairie, et le maire en premier contact. */
         if (window.PAV && PAV.apresCreation) PAV.apresCreation(c.commune, params).then(function (x) {
           var pc = document.createElement("p"); pc.className = "petit";
@@ -895,7 +906,7 @@
         r.appendChild(p3);
         preparerOSM(c.commune, j.nom || c.nom || "", "", params["commune.codeInsee"] || "").catch(function () {});
       });
-    }).catch(function (er) { msg("msg-commune", er.message, "ko"); })
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); progresFin("jauge-creer", false, "Création interrompue : " + er.message); })
       .then(function () { bouton.disabled = false; });
   });
 
@@ -919,6 +930,25 @@
       dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES); majBrouillonActif();
       return b;
     });
+  }
+  /* Jauge de progression. pct : étape atteinte ; vers : avance lentement jusque-là pendant une attente
+     dont on ne connaît pas la durée (appel au serveur). progresFin(id, ok) : terminée ou en échec. */
+  var JAUGES = {};
+  function progres(id, pct, texte, vers) {
+    var el = $(id); if (!el) return;
+    var j = JAUGES[id] = JAUGES[id] || {}; clearInterval(j.t); clearTimeout(j.h);
+    el.hidden = false; el.classList.remove("ko");
+    var maj = function () { el.querySelector(".jg-r").style.width = j.p + "%"; el.querySelector(".jg-t").textContent = texte + " — " + Math.round(j.p) + " %"; };
+    j.p = Math.max(pct, j.p && j.p < 100 ? j.p : 0); maj();
+    if (vers) j.t = setInterval(function () { j.p += (vers - j.p) * 0.04; maj(); }, 600);
+  }
+  function progresFin(id, ok, texte) {
+    var el = $(id); if (!el) return;
+    var j = JAUGES[id] = JAUGES[id] || {}; clearInterval(j.t); clearTimeout(j.h); j.p = 0;
+    el.hidden = false; el.classList.toggle("ko", !ok);
+    el.querySelector(".jg-r").style.width = "100%";
+    el.querySelector(".jg-t").textContent = texte || (ok ? "Terminé — 100 %" : "Interrompu");
+    j.h = setTimeout(function () { el.hidden = true; }, ok ? 5000 : 15000);
   }
   function majBrouillonActif() {
     setTimeout(function () { try { majPointsCreer(); } catch (e) {} }, 0);
@@ -1023,13 +1053,14 @@
     if (b && idCommune(b.nom) === idCommune(nom)) { majPointsCreer(); return; }   // brouillon déjà fait pour cette commune
     if (!$("creer-osm") || !$("creer-osm").checked) return;
     $("creer-points").open = true;
-    $("creer-points-nb").textContent = "Recherche des infos, du logo et des points OpenStreetMap de " + nom + "…";
+    $("creer-points-nb").textContent = "";
+    progres("jauge-points", 5, "Infos de la commune et logo", 20);
     /* Laisse les infos de la mairie et le logo arriver (quelques secondes) avant d'enregistrer le brouillon. */
     var delai = new Promise(function (ok) { setTimeout(ok, 3500); });
     Promise.all([delai, Promise.resolve(logo).catch(function () {})]).then(function () {
-      if (idCommune(nomFormulaire()) !== idCommune(nom)) return;    // commune changée entre-temps
+      if (idCommune(nomFormulaire()) !== idCommune(nom)) { progresFin("jauge-points", false, "Commune changée : recherche abandonnée"); return; }
       return enregistrerBrouillonAuto().then(majPointsCreer);
-    }).catch(function (er) { msg("msg-commune", er.message, "ko"); });
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); progresFin("jauge-points", false, "Échec : " + er.message); });
   }
   function ajouterRechercheCommune(inp) {
     if (!inp.parentNode || inp.dataset.recherche) return; inp.dataset.recherche = "1";
@@ -1097,13 +1128,22 @@
     $("form-commune").scrollIntoView({ behavior: "smooth", block: "start" });
     msg("msg-commune", "Brouillon « " + b.nom + " » repris. Complétez si besoin, enregistrez, ou validez pour créer la commune.", "ok");
   }
+  /* Formulaire Créer remis à neuf (après suppression du brouillon qu'il affichait). */
+  function viderFormulaire() {
+    LOGO = null; $("alertes").value = ""; $("resultat-commune").innerHTML = "";
+    if ($("creer-points-liste")) $("creer-points-liste").innerHTML = "";
+    var jp = $("jauge-points"); if (jp) jp.hidden = true;
+    chargerModele();
+  }
   function supprimerBrouillon(b) {
     if (!confirm("Supprimer définitivement le brouillon « " + b.nom + " » ?\n\n" + ((b.donnees.points || []).length) + " point(s) et " + ((b.donnees.agents || []).length) + " agent(s) préparés seront effacés.\nAucune commune n'a encore été créée : rien d'autre n'est touché.")) return;
     msg("msg-commune", "Suppression du brouillon « " + b.nom + " »…");
     api("brouillon-supprimer", { id: b.id }).then(function () {
       BROUILLONS = BROUILLONS.filter(function (x) { return x.id !== b.id; });
+      var ouvert = BROUILLON_ID === b.id || idCommune(nomFormulaire()) === idCommune(b.nom);
       if (BROUILLON_ID === b.id) BROUILLON_ID = "";
       dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES); majBrouillonActif();
+      if (ouvert) viderFormulaire();
       msg("msg-commune", "✓ Brouillon « " + b.nom + " » supprimé : ses " + ((b.donnees.points || []).length) + " point(s) et " + ((b.donnees.agents || []).length) + " agent(s) préparés ont été effacés. Aucune commune n'avait été créée.", "ok");
       $("msg-commune").scrollIntoView({ behavior: "smooth", block: "center" });
     }).catch(function (er) { msg("msg-commune", "Suppression impossible : " + er.message, "ko"); $("msg-commune").scrollIntoView({ behavior: "smooth", block: "center" }); });
@@ -1116,19 +1156,22 @@
     d.points = anc ? (anc.donnees.points || []) : []; d.agents = anc ? (anc.donnees.agents || []) : [];
     bt.disabled = true; msg("msg-commune", "Enregistrement du brouillon…");
     var nouveau = !anc, osm = $("creer-osm") && $("creer-osm").checked;
+    if (nouveau && osm) { $("creer-points").open = true; progres("jauge-points", 22, "Enregistrement du brouillon", 32); }
     sauverBrouillon(anc ? anc.id : "", d).then(function (b) {
       BROUILLON_ID = b.id; majBrouillonActif(); dessinerBrouillons();
       msg("msg-commune", "Brouillon « " + b.nom + " » enregistré : la commune n'est pas encore créée." + (nouveau && osm ? " Recherche des points OpenStreetMap…" : " Préparez ses points et ses agents (choisissez « Brouillon — " + b.nom + " » dans les onglets Points et Agents), puis revenez valider."), "ok");
       if (nouveau && osm) return integrerOSMBrouillon(b);
-    }).catch(function (er) { msg("msg-commune", er.message, "ko"); }).then(function () { bt.disabled = false; });
+    }).catch(function (er) { msg("msg-commune", er.message, "ko"); if (nouveau && osm) progresFin("jauge-points", false, "Échec : " + er.message); }).then(function () { bt.disabled = false; });
   });
   /* À la création d'un brouillon : les conteneurs connus d'OpenStreetMap sont ajoutés d'office au brouillon
      (points « à vérifier », retirables dans l'onglet Points). En cas d'homonymes, on laisse choisir dans l'onglet Points. */
   function integrerOSMBrouillon(b) {
     var p = b.donnees.params || {};
+    progres("jauge-points", 35, "Recherche des points OpenStreetMap (jusqu'à une minute)", 80);
     return api("osm-chercher", { commune: "brouillon:" + b.id, brouillon: true, ville: p["commune.nom"] || b.nom,
       departement: p["commune.departement"] || "", insee: p["commune.codeInsee"] || "" }).then(function (j) {
       if (j.choix && j.choix.length) {
+        progresFin("jauge-points", true, "Plusieurs communes homonymes : choix à faire dans l'onglet Points");
         msg("msg-commune", "Brouillon « " + b.nom + " » enregistré. Plusieurs communes portent ce nom : ouvrez l'onglet Points (« Brouillon — " + b.nom + " ») et lancez « Chercher dans OpenStreetMap » pour choisir la bonne.", "ok");
         return;
       }
@@ -1140,13 +1183,16 @@
         if (!Object.keys(u).length) FLUX.forEach(function (f) { u[f.id] = 1; });
         return { nom: c.nom, lat: c.lat, lon: c.lon, unites: u };
       });
-      if (!ajout.length) { msg("msg-commune", "Brouillon « " + b.nom + " » enregistré. Aucun conteneur trouvé sur OpenStreetMap pour " + (j.commune || b.nom) + " : ajoutez les points dans l'onglet Points (fichier, assistant).", "ok"); return; }
+      if (!ajout.length) { progresFin("jauge-points", true, "Aucun conteneur sur OpenStreetMap"); msg("msg-commune", "Brouillon « " + b.nom + " » enregistré. Aucun conteneur trouvé sur OpenStreetMap pour " + (j.commune || b.nom) + " : ajoutez les points dans l'onglet Points (fichier, assistant).", "ok"); return; }
       var liste = (b.donnees.points = b.donnees.points || []);
       ajout.forEach(function (x) { liste.push(x); });
+      progres("jauge-points", 85, "Ajout de " + ajout.length + " point(s) au brouillon", 97);
       return sauverBrouillon(b.id, b.donnees).then(function () {
+        progresFin("jauge-points", true, ajout.length + " point(s) ajouté(s) au brouillon — 100 %");
         msg("msg-commune", "Brouillon « " + b.nom + " » enregistré avec " + ajout.length + " point(s) OpenStreetMap (" + (j.commune || b.nom) + "), à vérifier sur le terrain après création. Retirez ceux qui n'existent pas dans l'onglet Points ; préparez les agents dans l'onglet Agents, puis revenez valider.", "ok");
       });
     }).catch(function (er) {
+      progresFin("jauge-points", false, "Recherche OpenStreetMap en échec");
       msg("msg-commune", "Brouillon « " + b.nom + " » enregistré, mais la recherche OpenStreetMap a échoué (" + er.message + "). Relancez-la depuis l'onglet Points.", "ko");
     });
   }
@@ -1154,19 +1200,23 @@
     var d = br.donnees || {}, pts = d.points || [], ags = d.agents || [], lignes = [], p = Promise.resolve();
     if (pts.length) p = p.then(function () {
       msg("msg-commune", "Commune créée. Import des " + pts.length + " point(s) du brouillon…");
+      progres("jauge-creer", 52, "Création des " + pts.length + " point(s) de collecte (peut prendre une à deux minutes)", ags.length ? 80 : 95);
       return api("points-importer", { commune: c.commune, points: pts }).then(function (j) { lignes.push(j.codes.length + " point(s) créé(s) « à vérifier » : " + j.codes.join(", ")); });
     });
     ags.forEach(function (nom, i) {
       p = p.then(function () {
         msg("msg-commune", "Création des codes d'agents… " + (i + 1) + " / " + ags.length);
+        progres("jauge-creer", 80 + 18 * i / ags.length, "Création des codes d'agents " + (i + 1) + " / " + ags.length, 80 + 18 * (i + 1) / ags.length);
         return api("agent", { commune: c.commune, nom: nom }).then(function (j) { lignes.push("Agent " + j.nom + " : " + j.code); });
       });
     });
     return p.then(function () { return api("brouillon-supprimer", { id: br.id }); }).then(function () {
       BROUILLONS = BROUILLONS.filter(function (x) { return x.id !== br.id; }); BROUILLON_ID = "";
       majBrouillonActif(); dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES);
+      progresFin("jauge-creer", true, "Commune, points et agents créés — 100 %");
       msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon.", "ok");
     }).catch(function (er) {
+      progresFin("jauge-creer", false, "Import du brouillon interrompu");
       msg("msg-commune", "Commune créée, mais l'import du brouillon s'est arrêté : " + er.message + ". Le brouillon est conservé ; terminez depuis les onglets Points et Agents.", "ko");
     }).then(function () {
       if (!lignes.length) return;
@@ -2797,7 +2847,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=86" defer></script>
+<script src="gestion.js?v=87" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
