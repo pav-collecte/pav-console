@@ -937,7 +937,7 @@
   $("ga-grille").addEventListener("click", function (e) {
     var c = e.target.closest("[data-ga-jour]"); if (!c) return;
     var d = c.dataset.gaJour;
-    GA_SEL = GA_SEL === d ? null : d;   // retoucher le jour sélectionné : retour au mois
+    GA_SEL = d;   // le cadre reste sur le jour choisi (« Tout le mois » pour revenir à la liste du mois)
     dessinerAgenda();
     if (GA_SEL && !evenements().some(function (x) { return x.date === d; })) { formRdv({ date: d }); $("gr-form").scrollIntoView({ behavior: "smooth", block: "center" }); }
     else $("ga-liste").scrollIntoView({ behavior: "smooth", block: "nearest" });
