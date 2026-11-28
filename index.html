@@ -523,6 +523,68 @@
     });
     return bt;
   }
+  /* Message prêt à envoyer à un agent : lien personnel (le code est dedans) + mode d'emploi. */
+  function messageAcces(ag, com) {
+    var site = siteCommune(com), c = (LISTE_COMMUNES || []).filter(function (x) { return x.commune === com; })[0];
+    var nomC = c ? (c.nom || c.commune) : com, lien = site + "/?code=" + encodeURIComponent(ag.code);
+    return { lien: lien, texte: "Bonjour" + (ag.nom ? " " + ag.nom : "") + ",\n\nVoici ton accès personnel à l'application de tournée des points de collecte de " + nomC + " :\n" + lien
+      + "\n\n1. Ouvre ce lien sur ton téléphone : ton code est déjà enregistré.\n2. Ajoute l'appli à l'écran d'accueil (menu du navigateur → « Ajouter à l'écran d'accueil » / « Installer »).\n3. Autorise la localisation et l'appareil photo quand l'appli le demande.\n\nTon code, si l'appli te le redemande (sur iPhone, l'appli posée sur l'écran d'accueil ne reprend pas toujours celui du lien) : " + ag.code
+      + "\n\nCe lien est personnel : ne le transfère pas." };
+  }
+  function boutonPartager(ag, com) {
+    var b = document.createElement("button"); b.type = "button"; b.className = "second"; b.textContent = "Envoyer l'accès";
+    b.title = "Envoyer à l'agent son lien d'installation (SMS, WhatsApp, mail…) : son code y est déjà";
+    b.style.cssText = "padding:6px 10px;font-size:13px;flex:none";
+    b.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (!siteCommune(com)) { alert("Adresse du site de la commune inconnue."); return; }
+      var m = messageAcces(ag, com);
+      if (navigator.share) { navigator.share({ title: "Accès à l'appli de tournée", text: m.texte }).catch(function () {}); return; }
+      b.dataset.l = "Envoyer l'accès"; copier(m.texte, b);   // ordinateur : message copié, à coller dans un mail ou un SMS
+    });
+    return b;
+  }
+  /* Tous les agents d'un coup : une page à imprimer (un QR par agent) et la liste des messages. */
+  function outilsAcces(box, agents, com) {
+    var actifs = agents.filter(function (a) { return !a.actif || a.actif === "oui"; });
+    if (!actifs.length) return;
+    var bar = document.createElement("div");
+    bar.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin-bottom:8px;border:1px solid var(--trait);border-radius:9px;background:#FAF8F3";
+    var t = document.createElement("span"); t.style.cssText = "flex:1;min-width:180px"; t.textContent = "Installer l'appli chez les " + actifs.length + " agents actifs : chacun reçoit un lien ou un QR qui contient déjà son code.";
+    var imp = document.createElement("button"); imp.type = "button"; imp.className = "second"; imp.textContent = "🖨 Imprimer les QR de tous";
+    imp.style.cssText = "padding:6px 12px;font-size:13px";
+    var tout = document.createElement("button"); tout.type = "button"; tout.className = "second"; tout.textContent = "Copier tous les messages";
+    tout.style.cssText = "padding:6px 12px;font-size:13px"; tout.dataset.l = tout.textContent;
+    tout.addEventListener("click", function () {
+      if (!siteCommune(com)) { alert("Adresse du site de la commune inconnue."); return; }
+      copier(actifs.map(function (a) { return "— " + (a.nom || a.code) + " —\n" + messageAcces(a, com).texte; }).join("\n\n\n"), tout);
+    });
+    imp.addEventListener("click", function () {
+      var site = siteCommune(com); if (!site) { alert("Adresse du site de la commune inconnue."); return; }
+      var c = (LISTE_COMMUNES || []).filter(function (x) { return x.commune === com; })[0], nomC = c ? (c.nom || c.commune) : com;
+      var w = window.open("", "_blank"); if (!w) { alert("Autorisez l'ouverture de fenêtre pour imprimer."); return; }
+      w.document.write("<!doctype html><meta charset=utf-8><title>Accès agents — " + nomC + "</title><p style='font:16px system-ui'>Préparation des QR…</p>");
+      (QR_MOD[site] || (QR_MOD[site] = import(site + "/qr.js"))).then(function (mod) {
+        var cartes = actifs.map(function (a) {
+          var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          mod.dessiner(svg, messageAcces(a, com).lien);
+          var e = function (v) { return String(v || "").replace(/[&<>"]/g, function (ch) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]; }); };
+          return "<div class=c><h2>" + e(a.nom || "Agent") + "</h2>" + svg.outerHTML + "<p class=k>Code : <b>" + e(a.code) + "</b></p>"
+            + "<ol><li>Scanner ce QR avec l'appareil photo du téléphone.</li><li>Ajouter l'appli à l'écran d'accueil.</li><li>Autoriser localisation et appareil photo.</li></ol>"
+            + "<p class=s>Accès personnel — à remettre en main propre.</p></div>";
+        }).join("");
+        w.document.open();
+        w.document.write("<!doctype html><html lang=fr><meta charset=utf-8><title>Accès agents — " + nomC + "</title><style>"
+          + "body{font:14px system-ui,sans-serif;color:#1A1F1C;margin:12mm}h1{font-size:18px;margin:0 0 8mm}.g{display:grid;grid-template-columns:1fr 1fr;gap:8mm}"
+          + ".c{border:1px dashed #999;border-radius:6px;padding:6mm;break-inside:avoid;text-align:center}.c h2{margin:0 0 3mm;font-size:17px}"
+          + ".c svg{width:46mm;height:46mm;display:block;margin:0 auto}.k{font:13px ui-monospace,monospace;margin:3mm 0}.c ol{text-align:left;margin:2mm 0 2mm 5mm;padding:0;font-size:12px}"
+          + ".s{font-size:11px;color:#666;margin:2mm 0 0}@media print{body{margin:8mm}button{display:none}}</style>"
+          + "<h1>Application de tournée — " + nomC + " · accès des agents</h1><button onclick='print()' style='margin-bottom:6mm;padding:8px 14px'>Imprimer</button><div class=g>" + cartes + "</div></html>");
+        w.document.close(); setTimeout(function () { try { w.print(); } catch (er) {} }, 600);
+      }).catch(function (er) { delete QR_MOD[site]; try { w.document.body.textContent = "QR indisponible (" + (er && er.message || "site injoignable") + "). Utilisez « Copier tous les messages »."; } catch (x) {} });
+    });
+    bar.appendChild(t); bar.appendChild(imp); bar.appendChild(tout); box.appendChild(bar);
+  }
   function boutonCopier(texte, libelle) {
     var b = document.createElement("button"); b.type = "button"; b.className = "second";
     b.textContent = b.dataset.l = libelle || "Copier";
@@ -1678,6 +1740,7 @@
     api("agents", { commune: com }).then(function (j) {
       box.innerHTML = "";
       if (!j.agents.length) { box.textContent = "Aucun agent pour l'instant."; return; }
+      outilsAcces(box, j.agents, com);
       j.agents.forEach(function (ag) {
         var inactif = ag.actif && ag.actif !== "oui";
         var bloc = document.createElement("div"); bloc.style.cssText = "padding:9px 0;border-bottom:1px solid var(--trait)";
@@ -1698,7 +1761,7 @@
             msg("msg-agents", "Code " + ag.code + " supprimé.", "ok"); listerAgents();
           }).catch(function (er) { msg("msg-agents", er.message, "ko"); x.disabled = false; });
         });
-        l.appendChild(t); l.appendChild(boutonCopier(ag.code)); l.appendChild(boutonQR(ag.code, ag.nom, com)); l.appendChild(m); l.appendChild(x);
+        l.appendChild(t); l.appendChild(boutonCopier(ag.code)); l.appendChild(boutonQR(ag.code, ag.nom, com)); if (!inactif) l.appendChild(boutonPartager(ag, com)); l.appendChild(m); l.appendChild(x);
         bloc.appendChild(l);
         /* Panneau de modification : nom, actif, nouveau code. */
         var ed = document.createElement("div");
@@ -2958,7 +3021,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=92" defer></script>
+<script src="gestion.js?v=93" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
