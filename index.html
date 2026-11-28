@@ -542,7 +542,7 @@
           var j = null;
           try { j = JSON.parse(t); } catch (e) {}
           if (!r.ok || !j) throw new Error(r.status >= 500 ? "Échec côté serveur : voir l'exécution dans n8n." : "Réponse inattendue du serveur (" + r.status + ").");
-          if (!j.ok) throw new Error(j.motif || "Refusé.");
+          if (!j.ok) throw new Error(String(j.motif || "Refusé.").replace(/\s*\[line \d+\]/gi, ""));
           return j;
         });
       });
@@ -858,6 +858,10 @@
     e.preventDefault();
     var params = {};
     Array.prototype.forEach.call($("champs").querySelectorAll("input"), function (i) { params[i.name] = i.value.trim(); });
+    var pfx = String(params["commune.prefixeCode"] || "").trim().toUpperCase();
+    if (!/^[A-Z]{4,5}$/.test(pfx)) { msg("msg-commune", "Préfixe : de 4 à 5 lettres majuscules sans accent (actuellement « " + (pfx || "vide") + " »).", "ko"); return; }
+    if (prefixesPris().indexOf(pfx) >= 0) { msg("msg-commune", "Préfixe : « " + pfx + " » est déjà pris par une autre commune, choisissez-en un autre.", "ko"); return; }
+    params["commune.prefixeCode"] = pfx;
     var bouton = $("creer"); bouton.disabled = true;
     $("resultat-commune").innerHTML = "";
     msg("msg-commune", "Création en cours (dossiers, classeur, dépôt GitHub)… comptez une minute.");
@@ -1024,20 +1028,31 @@
     return Promise.all([maire, annuaire]).then(function (l) { return l[0].concat(l[1]); });
   }
   /* En cas d’erreur (création, brouillon, modification), on amène l’administrateur sur le champ en cause. */
-  var CHAMP_ERREUR = [[/Nom de commune/i, "commune.nom"], [/Préfixe/i, "commune.prefixeCode"], [/sous-domaine|adresses[.]application/i, "adresses.application"], [/e-mail pour les alertes/i, "#alertes"], [/^Logo/i, "commune.logoDrive"]];
+  var CHAMP_ERREUR = [[/Nom de commune/i, "commune.nom"], [/Préfixe|lettres majuscules/i, "commune.prefixeCode"], [/sous-domaine|adresses[.]application/i, "adresses.application"], [/e-mail pour les alertes/i, "#alertes"], [/^Logo/i, "commune.logoDrive"]];
   function allerAuChamp(idMsg, texte) {
     var zone = $(idMsg) && $(idMsg).closest(".carte"); if (!zone) return;
     var t = String(texte || ""), cible = null, champs = zone.querySelectorAll("input[name], textarea[name], select[name]");
     Array.prototype.some.call(champs, function (i) { if (i.name && i.name.indexOf(".") > 0 && t.indexOf(i.name) >= 0) { cible = i; return true; } });
     if (!cible) CHAMP_ERREUR.some(function (r) { if (r[0].test(t)) { cible = r[1].charAt(0) === "#" ? $(r[1].slice(1)) : zone.querySelector('[name="' + r[1] + '"]'); return !!cible; } return false; });
     if (!cible && /remplir|manquant|obligatoire|indiquez/i.test(t)) Array.prototype.some.call(champs, function (i) { if (i.required && !i.value.trim() && i.offsetParent) { cible = i; return true; } });
-    if (!cible || !cible.offsetParent) return;
+    if (!cible) return;
+    for (var d = cible.closest("details"); d; d = d.parentNode && d.parentNode.closest ? d.parentNode.closest("details") : null) d.open = true;
+    if (!cible.offsetParent) return;
     cible.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(function () { try { cible.focus({ preventScroll: true }); } catch (e) {} }, 400);
     cible.classList.add("champ-erreur"); setTimeout(function () { cible.classList.remove("champ-erreur"); }, 5000);
   }
   var msgSimple = msg;
-  msg = function (id, texte, genre) { msgSimple(id, texte, genre); if (genre === "ko") allerAuChamp(id, texte); };
+  var LIB_CHAMP = { "commune.prefixeCode": "Préfixe des codes des points (panneau « Identité de la commune »)", "commune.nom": "Nom de la commune", "adresses.application": "Adresse de l'application (panneau « Adresses publiques »)", "commune.logoDrive": "Logo" };
+  msg = function (id, texte, genre) {
+    if (genre === "ko") {
+      texte = String(texte || "").replace(/\s*\[line \d+\]/gi, "");
+      /* Erreur sur un champ : on dit lequel, en clair, au lieu du message technique seul. */
+      var r = CHAMP_ERREUR.filter(function (x) { return x[0].test(texte); })[0];
+      if (r && LIB_CHAMP[r[1]] && texte.indexOf(LIB_CHAMP[r[1]]) < 0) texte = LIB_CHAMP[r[1]] + " — " + texte.replace(/^Préfixe\s*:\s*/i, "") + (r[1] === "commune.prefixeCode" ? " Exemple : LYON, VALE." : "");
+    }
+    msgSimple(id, texte, genre); if (genre === "ko") allerAuChamp(id, texte);
+  };
   /* Onglet Créer : dès qu'une commune est choisie dans la liste, on enchaîne tout seul
      1) la recherche des infos de la mairie (maire, téléphone, e-mail, site),
      2) l'enregistrement du brouillon, qui intègre les points OpenStreetMap si la case est cochée.
@@ -1092,6 +1107,8 @@
     function poser(c) {
       var set = function (k, v) { var e = champ(k); if (e && v) { e.value = v; e.dispatchEvent(new Event("input", { bubbles: true })); } };
       set("commune.nom", c.nom); set("commune.departement", c.codeDepartement); set("commune.codeInsee", c.code);
+      var pr = champ("commune.prefixeCode");
+      if (pr && pf === "p-" && !/^[A-Z]{4,5}$/.test(String(pr.value || "").trim())) pr.value = prefixeAuto(c.nom);
       var cps = c.codesPostaux || []; set("commune.codePostal", cps[0]);
       res.textContent = "✓ " + c.nom + " (" + c.codeDepartement + ") — INSEE " + c.code + (cps.length ? " — code postal " + cps[0] + (cps.length > 1 ? " (autres : " + cps.slice(1).join(", ") + ")" : "") : "") + "." + (BROUILLON_ID ? " Pensez à enregistrer le brouillon." : "");
       if (champ("commune.maire") || champ("commune.telephone")) {
@@ -2847,7 +2864,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=87" defer></script>
+<script src="gestion.js?v=88" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
