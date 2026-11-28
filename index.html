@@ -1557,12 +1557,18 @@
         bv.addEventListener("click", function () {
           if (!confirm("Mettre en service les " + nAv + " points à vérifier sans les visiter ?\n\nIls entrent dans la tournée à la position de la carte, avec les conteneurs annoncés. Les points inexistants se retirent ensuite un par un (« Retirer »).")) return;
           bv.disabled = true; bv.textContent = "Validation en cours…";
+          progres(jg.id, 3, "Mise en service de " + nAv + " points (jusqu'à une minute)", 90);
           api("supprimer-point", { commune: com, code: "*", mode: "valider-tous" }).then(function (r) {
-            relister();
-            msg(mid, r.lignes + " point(s) mis en service. L'appli de collecte les reçoit au prochain passage de n8n (15 minutes au plus).", "ok");
-          }).catch(function (er) { msg(mid, er.message, "ko"); bv.disabled = false; bv.textContent = "Tout valider sans visite"; });
+            progresFin(jg.id, true, r.lignes + " points mis en service — 100 %");
+            setTimeout(function () {
+              relister();
+              msg(mid, r.lignes + " point(s) mis en service. L'appli de collecte les reçoit au prochain passage de n8n (15 minutes au plus).", "ok");
+            }, 1500);
+          }).catch(function (er) { progresFin(jg.id, false, "Interrompu"); msg(mid, er.message, "ko"); bv.disabled = false; bv.textContent = "Tout valider sans visite"; });
         });
-        bar.appendChild(bt0); bar.appendChild(bv); box.appendChild(bar);
+        var jg = document.createElement("div"); jg.id = "jauge-vt-" + (ext ? "e" : "p"); jg.className = "prog"; jg.hidden = true; jg.style.flexBasis = "100%";
+        jg.innerHTML = '<div class="jg-t"></div><div class="jg-b"><div class="jg-r"></div></div>';
+        bar.appendChild(bt0); bar.appendChild(bv); bar.appendChild(jg); box.appendChild(bar);
       }
       j.points.forEach(function (pt) {
         var l = document.createElement("div");
@@ -2921,7 +2927,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=90" defer></script>
+<script src="gestion.js?v=91" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
