@@ -1546,6 +1546,24 @@
     api("points", { commune: com }).then(function (j) {
       box.innerHTML = ""; POINTS_COMMUNE = j.points;
       if (!j.points.length) { box.textContent = "Aucun point pour l'instant."; return; }
+      /* Grandes villes : mise en service de tous les points « à vérifier » d'un coup, sans visite. */
+      var nAv = j.points.filter(function (p) { return p.actif === "a_verifier"; }).length;
+      if (nAv > 1) {
+        var bar = document.createElement("div");
+        bar.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin-bottom:8px;border:1px solid var(--trait);border-radius:9px;background:#FAF8F3";
+        var bt0 = document.createElement("span"); bt0.style.cssText = "flex:1;min-width:160px"; bt0.textContent = nAv + " points à vérifier sur le terrain.";
+        var bv = document.createElement("button"); bv.type = "button"; bv.className = "second"; bv.textContent = "Tout valider sans visite";
+        bv.style.cssText = "padding:6px 12px;font-size:13px";
+        bv.addEventListener("click", function () {
+          if (!confirm("Mettre en service les " + nAv + " points à vérifier sans les visiter ?\n\nIls entrent dans la tournée à la position de la carte, avec les conteneurs annoncés. Les points inexistants se retirent ensuite un par un (« Retirer »).")) return;
+          bv.disabled = true; bv.textContent = "Validation en cours…";
+          api("supprimer-point", { commune: com, code: "*", mode: "valider-tous" }).then(function (r) {
+            relister();
+            msg(mid, r.lignes + " point(s) mis en service. L'appli de collecte les reçoit au prochain passage de n8n (15 minutes au plus).", "ok");
+          }).catch(function (er) { msg(mid, er.message, "ko"); bv.disabled = false; bv.textContent = "Tout valider sans visite"; });
+        });
+        bar.appendChild(bt0); bar.appendChild(bv); box.appendChild(bar);
+      }
       j.points.forEach(function (pt) {
         var l = document.createElement("div");
         l.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--trait)";
@@ -2903,7 +2921,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=89" defer></script>
+<script src="gestion.js?v=90" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
