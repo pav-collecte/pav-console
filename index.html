@@ -598,6 +598,7 @@
       dessinerCorbeille();
     }
     LISTE_COMMUNES = liste;
+    if (BROUILLONS && BROUILLONS.length && $("liste-brouillons")) dessinerBrouillons();
     var dernier = "";
     try { dernier = localStorage.getItem("pav-console-commune") || ""; } catch (e) {}
     Array.prototype.forEach.call(document.querySelectorAll(".choix-commune"), function (sel) {
@@ -983,6 +984,18 @@
       var s = document.createElement("span");
       s.textContent = (d.points || []).length + " point(s), " + (d.agents || []).length + " agent(s)" + (b.maj ? " — modifié le " + new Date(b.maj).toLocaleString("fr-FR") : "");
       t.appendChild(n); t.appendChild(s); l.appendChild(t);
+      var cree = (LISTE_COMMUNES || []).filter(function (x) { return idCommune(x.nom || x.commune) === idCommune(b.nom) || x.commune === idCommune(b.nom); })[0];
+      if (cree) {
+        var ti = document.createElement("button"); ti.type = "button"; ti.className = "principal"; ti.textContent = "Reprendre l'import dans " + (cree.nom || cree.commune);
+        ti.style.cssText = "padding:6px 10px;font-size:13px;width:auto;margin:0";
+        ti.addEventListener("click", function () {
+          ti.disabled = true; $("resultat-commune").innerHTML = "";
+          $("jauge-creer").scrollIntoView({ behavior: "smooth", block: "center" });
+          progres("jauge-creer", 48, "Reprise de l'import du brouillon", 50);
+          finaliserBrouillon(b, cree, $("resultat-commune"));
+        });
+        l.appendChild(ti);
+      }
       [["Reprendre", function () { reprendreBrouillon(b); }], ["Points", function () { afficherPoints("brouillon:" + b.id); }],
        ["Agents", function () { afficherAgents("brouillon:" + b.id); }], ["Supprimer", function () { supprimerBrouillon(b); }]].forEach(function (x) {
         var bt = document.createElement("button"); bt.type = "button"; bt.className = "second"; bt.textContent = x[0];
@@ -1215,10 +1228,33 @@
   }
   function finaliserBrouillon(br, c, r) {
     var d = br.donnees || {}, pts = d.points || [], ags = d.agents || [], lignes = [], p = Promise.resolve();
+    /* Le serveur accepte 300 points par appel : envoi par paquets. Les points déjà présents dans la commune
+       (import précédent interrompu) sont sautés, on peut donc relancer sans créer de doublons. */
+    var PAQUET = 250, codes = [], fin = ags.length ? 80 : 97;
     if (pts.length) p = p.then(function () {
       msg("msg-commune", "Commune créée. Import des " + pts.length + " point(s) du brouillon…");
-      progres("jauge-creer", 52, "Création des " + pts.length + " point(s) de collecte (peut prendre une à deux minutes)", ags.length ? 80 : 95);
-      return api("points-importer", { commune: c.commune, points: pts }).then(function (j) { lignes.push(j.codes.length + " point(s) créé(s) « à vérifier » : " + j.codes.join(", ")); });
+      progres("jauge-creer", 50, "Vérification des points déjà créés", 52);
+      return api("points", { commune: c.commune }).catch(function () { return { points: [] }; }).then(function (j) {
+        var deja = (j.points || []).map(function (e) { return { lat: Number(e.lat), lon: Number(e.lon) }; });
+        var reste = pts.filter(function (x) { return !deja.some(function (e) { return distM(e, x) < 15; }); });
+        var sautes = pts.length - reste.length, q = Promise.resolve();
+        if (sautes) lignes.push(sautes + " point(s) déjà présents dans la commune : non recréés.");
+        var nb = Math.ceil(reste.length / PAQUET);
+        for (var k = 0; k < nb; k++) (function (k) {
+          q = q.then(function () {
+            var lot = reste.slice(k * PAQUET, (k + 1) * PAQUET), a = 52 + (fin - 52) * k / nb, b = 52 + (fin - 52) * (k + 1) / nb;
+            progres("jauge-creer", a, "Création des points de collecte : " + Math.min((k + 1) * PAQUET, reste.length) + " / " + reste.length + " (paquet " + (k + 1) + " sur " + nb + ")", b);
+            msg("msg-commune", "Commune créée. Import des points : paquet " + (k + 1) + " sur " + nb + "…");
+            return api("points-importer", { commune: c.commune, points: lot }).then(function (j) { codes = codes.concat(j.codes || []); });
+          });
+        })(k);
+        return q.then(function () {
+          if (codes.length) lignes.push(codes.length + " point(s) créé(s) « à vérifier » : " + (codes.length > 12 ? codes.slice(0, 3).join(", ") + " … " + codes.slice(-3).join(", ") : codes.join(", ")));
+        }, function (er) {
+          if (codes.length) lignes.push(codes.length + " point(s) déjà créés avant l'arrêt (ils ne seront pas recréés à la reprise).");
+          throw er;
+        });
+      });
     });
     ags.forEach(function (nom, i) {
       p = p.then(function () {
@@ -1234,7 +1270,10 @@
       msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon.", "ok");
     }).catch(function (er) {
       progresFin("jauge-creer", false, "Import du brouillon interrompu");
-      msg("msg-commune", "Commune créée, mais l'import du brouillon s'est arrêté : " + er.message + ". Le brouillon est conservé ; terminez depuis les onglets Points et Agents.", "ko");
+      msg("msg-commune", "Commune créée, mais l'import du brouillon s'est arrêté : " + er.message + ". Le brouillon est conservé : cliquez « Reprendre l'import » ci-dessous (ou dans Brouillons en cours) ; les points déjà créés ne seront pas recréés.", "ko");
+      var rep = document.createElement("button"); rep.type = "button"; rep.className = "principal"; rep.textContent = "Reprendre l'import dans " + (c.nom || c.commune);
+      rep.addEventListener("click", function () { rep.remove(); finaliserBrouillon(br, c, r); });
+      r.insertBefore(rep, r.firstChild);
     }).then(function () {
       if (!lignes.length) return;
       var pre = document.createElement("div"); pre.className = "petit"; pre.style.cssText = "white-space:pre-line;font-family:ui-monospace,Menlo,monospace;margin-top:8px";
@@ -2864,7 +2903,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=88" defer></script>
+<script src="gestion.js?v=89" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
