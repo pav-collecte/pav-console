@@ -876,7 +876,7 @@
       if (!alSaisi && alertes) $("alertes").value = alertes;
       return api("creer", { params: params, alertes: alertes, logo: LOGO, provisoire: !!($("provisoire") && $("provisoire").checked) });
     }).then(function (j) {
-      if (brC) progres("jauge-creer", 48, "Commune créée — préparation de l'import du brouillon", 52); else progresFin("jauge-creer", true, "Commune créée — 100 %");
+      progres("jauge-creer", 48, brC ? "Commune créée — préparation de l'import du brouillon" : "Commune créée — publication à suivre", 52);
       msg("msg-commune", "Commune « " + j.nom + " » créée (préfixe " + j.prefixe + ")." + (alSaisi ? "" : " Alertes envoyées à " + $("alertes").value + " (pas d'adresse des services techniques)."), "ok");
       var r = $("resultat-commune"); r.innerHTML = "";
       var liens = document.createElement("div"); liens.className = "liens";
@@ -906,6 +906,7 @@
           r.appendChild(pc);
         }).catch(function (er) { var pc = document.createElement("p"); pc.className = "petit"; pc.textContent = "Fiche client non créée : " + er.message + " (à faire dans l'onglet Clients)."; r.appendChild(pc); });
         if (br) return finaliserBrouillon(br, c, r);
+        publierMaintenant(c.commune, "jauge-creer", 50).catch(function () {});
         if (!osm) return;
         var p3 = document.createElement("p"); p3.className = "petit"; p3.textContent = "Recherche des points OpenStreetMap lancée dans l'onglet Points : cochez ceux à créer.";
         r.appendChild(p3);
@@ -1226,6 +1227,18 @@
       msg("msg-commune", "Brouillon « " + b.nom + " » enregistré, mais la recherche OpenStreetMap a échoué (" + er.message + "). Relancez-la depuis l'onglet Points.", "ko");
     });
   }
+  /* Publication immédiate (configuration, logo, points, météo) sur le site de la commune, sans attendre
+     le passage de n8n toutes les 15 minutes. Jauge optionnelle (id d'un .prog). */
+  function publierMaintenant(com, idJauge, debut) {
+    if (idJauge) progres(idJauge, debut || 5, "Publication sur l'appli de la commune (environ une minute)", 95);
+    return api("publier", { commune: com }).then(function (j) {
+      if (idJauge) progresFin(idJauge, true, "Publié sur l'appli — 100 % (en ligne d'ici une à deux minutes)");
+      return j;
+    }, function (er) {
+      if (idJauge) progresFin(idJauge, false, "Publication différée : n8n la fera à son prochain passage (15 minutes au plus)");
+      throw er;
+    });
+  }
   function finaliserBrouillon(br, c, r) {
     var d = br.donnees || {}, pts = d.points || [], ags = d.agents || [], lignes = [], p = Promise.resolve();
     /* Le serveur accepte 300 points par appel : envoi par paquets. Les points déjà présents dans la commune
@@ -1266,8 +1279,12 @@
     return p.then(function () { return api("brouillon-supprimer", { id: br.id }); }).then(function () {
       BROUILLONS = BROUILLONS.filter(function (x) { return x.id !== br.id; }); BROUILLON_ID = "";
       majBrouillonActif(); dessinerBrouillons(); remplirCommunes(LISTE_COMMUNES);
-      progresFin("jauge-creer", true, "Commune, points et agents créés — 100 %");
-      msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon.", "ok");
+      msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon. Publication sur l'appli…", "ok");
+      return publierMaintenant(c.commune, "jauge-creer", 85).then(function () {
+        msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon, et publiée : l'appli de collecte s'ouvre d'ici une à deux minutes.", "ok");
+      }, function () {
+        msg("msg-commune", "Commune « " + (c.nom || c.commune) + " » créée avec tout son brouillon. L'appli sera prête au prochain passage de n8n (15 minutes au plus).", "ok");
+      });
     }).catch(function (er) {
       progresFin("jauge-creer", false, "Import du brouillon interrompu");
       msg("msg-commune", "Commune créée, mais l'import du brouillon s'est arrêté : " + er.message + ". Le brouillon est conservé : cliquez « Reprendre l'import » ci-dessous (ou dans Brouillons en cours) ; les points déjà créés ne seront pas recréés.", "ko");
@@ -1546,6 +1563,17 @@
     api("points", { commune: com }).then(function (j) {
       box.innerHTML = ""; POINTS_COMMUNE = j.points;
       if (!j.points.length) { box.textContent = "Aucun point pour l'instant."; return; }
+      /* Publier tout de suite sur l'appli (sinon : passage de n8n toutes les 15 minutes). */
+      var pubL = document.createElement("div"); pubL.style.cssText = "margin-bottom:8px";
+      var pubB = document.createElement("button"); pubB.type = "button"; pubB.className = "second"; pubB.textContent = "Publier maintenant sur l'appli";
+      pubB.style.cssText = "padding:6px 12px;font-size:13px";
+      var pubJ = document.createElement("div"); pubJ.id = "jauge-pub-" + (ext ? "e" : "p"); pubJ.className = "prog"; pubJ.hidden = true;
+      pubJ.innerHTML = '<div class="jg-t"></div><div class="jg-b"><div class="jg-r"></div></div>';
+      pubB.addEventListener("click", function () {
+        pubB.disabled = true;
+        publierMaintenant(com, pubJ.id).catch(function (er) { msg(mid, er.message, "ko"); }).then(function () { pubB.disabled = false; });
+      });
+      pubL.appendChild(pubB); pubL.appendChild(pubJ); box.appendChild(pubL);
       /* Grandes villes : mise en service de tous les points « à vérifier » d'un coup, sans visite. */
       var nAv = j.points.filter(function (p) { return p.actif === "a_verifier"; }).length;
       if (nAv > 1) {
@@ -1559,11 +1587,14 @@
           bv.disabled = true; bv.textContent = "Validation en cours…";
           progres(jg.id, 3, "Mise en service de " + nAv + " points (jusqu'à une minute)", 90);
           api("supprimer-point", { commune: com, code: "*", mode: "valider-tous" }).then(function (r) {
-            progresFin(jg.id, true, r.lignes + " points mis en service — 100 %");
-            setTimeout(function () {
-              relister();
-              msg(mid, r.lignes + " point(s) mis en service. L'appli de collecte les reçoit au prochain passage de n8n (15 minutes au plus).", "ok");
-            }, 1500);
+            progres(jg.id, 50, r.lignes + " points mis en service — publication sur l'appli", 95);
+            publierMaintenant(com).then(function () {
+              progresFin(jg.id, true, r.lignes + " points mis en service et publiés — 100 %");
+              setTimeout(function () { relister(); msg(mid, r.lignes + " point(s) mis en service et publiés : l'appli de collecte les a d'ici une à deux minutes.", "ok"); }, 1500);
+            }, function () {
+              progresFin(jg.id, true, r.lignes + " points mis en service — 100 %");
+              setTimeout(function () { relister(); msg(mid, r.lignes + " point(s) mis en service. L'appli de collecte les reçoit au prochain passage de n8n (15 minutes au plus).", "ok"); }, 1500);
+            });
           }).catch(function (er) { progresFin(jg.id, false, "Interrompu"); msg(mid, er.message, "ko"); bv.disabled = false; bv.textContent = "Tout valider sans visite"; });
         });
         var jg = document.createElement("div"); jg.id = "jauge-vt-" + (ext ? "e" : "p"); jg.className = "prog"; jg.hidden = true; jg.style.flexBasis = "100%";
@@ -2927,7 +2958,7 @@ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==
   new MutationObserver(function(ms){ ms.forEach(function(x){ x.addedNodes.forEach(function(n){ if (n.nodeType === 1) scan(n); }); }); })
     .observe(document.body, { childList: true, subtree: true });
 })();</script>
-<script src="gestion.js?v=91" defer></script>
+<script src="gestion.js?v=92" defer></script>
 <script>
 /* Icônes PAV sur les onglets et en tête de chaque page de la console : les
    mêmes dessins que dans l'appli de tournée (agents, point de collecte…). */
